@@ -38,7 +38,7 @@ public class CorpusStatistics {
 
 			// import Twitter and Google news collection
 
-			String twiDir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Topics/Twitter";
+			String twiDir = "../data/EMNLP2012/Topics/Twitter";
 			TweetsUserIterator tUserIter = new TweetsUserIterator(twiDir,
 					String.valueOf(topic));
 

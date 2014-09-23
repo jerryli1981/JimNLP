@@ -13,7 +13,7 @@ public class GenerateModelSummary {
 
 	public static void main(String[] args) throws IOException {
 		
-         String dir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Golden_Standard";
+         String dir = "../data/EMNLP2012/Golden_Standard";
          ArrayList<File> fs = FileOperation.travelFileList(new File(dir));
          for(File f : fs){
         	String fn = f.getName();

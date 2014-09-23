@@ -59,7 +59,7 @@ public class OurMethod_AAAI {
 				// import Twitter and Google news collection
 				ArrayList<InstanceList> colls = new ArrayList<InstanceList>();
 
-				String twiDir = "/home/peng/Develop/Workspace/NLP/data/CIKM2012/Topics/Twitter";
+				String twiDir = "../data/CIKM2012/Topics/Twitter";
 				TweetsUserIterator tUserIter = new TweetsUserIterator(twiDir,
 						String.valueOf(topic));
 
@@ -78,7 +78,7 @@ public class OurMethod_AAAI {
 				TweetCorpus ntc = new TweetCorpus(tc, pipeLine);
 				colls.add(ntc);
 
-				String GoogleNewsDir = "/home/peng/Develop/Workspace/NLP/data/CIKM2012/Topics/Google";
+				String GoogleNewsDir = "../data/CIKM2012/Topics/Google";
 
 				OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
 						GoogleNewsDir + "/" + String.valueOf(topic));

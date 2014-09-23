@@ -521,7 +521,7 @@ public class simulateGoldStandard {
 
 	public void outputSummary(String topic, int iterTime) {
 
-		String outputDir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Output/summary";
+		String outputDir = "../data/EMNLP2012/Output/summary";
 
 		PrintWriter out = FileOperation.getPrintWriter(new File(outputDir),
 				String.valueOf(topic + "." + iterTime));

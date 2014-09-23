@@ -82,7 +82,7 @@ public class TestTopicAlignment {
 
 		LDAModel model = new LDAModel(numTopics, alpha, beta, numIters);
 		
-		String outputDir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012/";
+		String outputDir = "../data/EMNLP2012/";
 		String outputName = "newsTopicsGoogle";
 		model.readModel(outputDir, outputName);
 		

@@ -19,7 +19,7 @@ public class SentenceDetector extends Pipe{
 		SentenceModel model;
 
 		try {
-			modelIn = new FileInputStream("models/OpenNLP/en-sent.bin");
+			modelIn = new FileInputStream("../models/OpenNLP/en-sent.bin");
 			model = new SentenceModel(modelIn);
 			sd = new SentenceDetectorME(model);
 		} catch (FileNotFoundException e) {

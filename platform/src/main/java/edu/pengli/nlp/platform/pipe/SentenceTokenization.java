@@ -20,7 +20,7 @@ public class SentenceTokenization extends Pipe {
 		TokenizerModel model;
 
 		try {
-			modelIn = new FileInputStream("models/OpenNLP/en-token.bin");
+			modelIn = new FileInputStream("../models/OpenNLP/en-token.bin");
 			model = new TokenizerModel(modelIn);
 			tokenizer = new TokenizerME(model);
 		} catch (FileNotFoundException e) {

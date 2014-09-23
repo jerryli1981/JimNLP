@@ -298,7 +298,7 @@ public class HillClimbing {
 	
 	public void outputSummary(String topic, String iter) {
 
-		String outputDir = "/home/peng/Develop/Workspace/NLP/data/CIKM2012/Output/summary";
+		String outputDir = "../data/CIKM2012/Output/summary";
 
 		PrintWriter out_t = FileOperation.getPrintWriter(new File(outputDir),
 				String.valueOf(topic+"."+iter+".T"));

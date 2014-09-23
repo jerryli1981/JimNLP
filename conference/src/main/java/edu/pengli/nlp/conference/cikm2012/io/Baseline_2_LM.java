@@ -63,7 +63,7 @@ public class Baseline_2_LM {
 				// import Twitter and Google news collection
 				ArrayList<InstanceList> colls = new ArrayList<InstanceList>();
 
-				String twiDir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Topics/Twitter";
+				String twiDir = "../data/EMNLP2012/Topics/Twitter";
 				TweetsUserIterator tUserIter = new TweetsUserIterator(twiDir,
 						String.valueOf(topic));
 
@@ -82,7 +82,7 @@ public class Baseline_2_LM {
 				TweetCorpus ntc = new TweetCorpus(tc, pipeLine);
 				colls.add(ntc);
 
-				String GoogleNewsDir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Topics/Google";
+				String GoogleNewsDir = "../data/EMNLP2012/Topics/Google";
 
 				OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
 						GoogleNewsDir + "/" + String.valueOf(topic));
@@ -125,7 +125,7 @@ public class Baseline_2_LM {
 			recall += (Double) map.get("R");
 			precision += (Double) map.get("P");
 			fmeasure += (Double) map.get("F");
-			String outputDir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Output/summary";
+			String outputDir = "../data/EMNLP2012/Output/summary";
 			if (maxR <= (Double) map.get("R")) {
 				maxR = (Double) map.get("R");
 				for (int t = 0; t < topics.length; t++) {

@@ -12,7 +12,7 @@ public class ParserHTML {
 	public static void main(String[] args) {
 		String topic = "Dick Clark die";
 		File parentDir = new File(
-				"/home/peng/Develop/Workspace/NLP/data/EMNLP2012/HTML");
+				"../data/EMNLP2012/HTML");
 		String fileName = topic+".html";
 		String content = FileOperation.readContentFromFile(parentDir, fileName);
 		
@@ -25,7 +25,7 @@ public class ParserHTML {
 		
 		PrintWriter out = FileOperation
 				.getPrintWriter(
-						new File("/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Topics/Twitter"),
+						new File("../data/EMNLP2012/Topics/Twitter"),
 						topic+".extractfromhtml");
 		
 		int i=0;

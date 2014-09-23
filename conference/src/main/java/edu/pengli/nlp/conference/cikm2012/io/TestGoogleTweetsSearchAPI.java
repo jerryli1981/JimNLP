@@ -36,7 +36,7 @@ public class TestGoogleTweetsSearchAPI {
 				(topic);
 		PrintWriter out = FileOperation
 				.getPrintWriter(
-						new File("/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Topics/Twitter"),
+						new File("../data/EMNLP2012/Topics/Twitter"),
 						topic+".gapi");
 		list.setCx(cx);
 		list.setKey(apiKey);

@@ -31,7 +31,7 @@ public class TestRunLDAOnNewsCorpus {
 		// one instance per file
 		int topIdx = 1;
 		OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
-				"/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Topics/Google/"
+				"../data/EMNLP2012/Topics/Google/"
 						+ String.valueOf(topIdx));
 		instances.addThruPipe(fIter);
 
@@ -49,7 +49,7 @@ public class TestRunLDAOnNewsCorpus {
 		int topK = 10; // for each topic output top K words
 		model.outputModel(topK);
 
-		String outputDir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012/";
+		String outputDir = "../data/EMNLP2012/";
 		String outputName = "newsTopicsGoogle";
 		model.writeModel(outputDir, outputName);
 

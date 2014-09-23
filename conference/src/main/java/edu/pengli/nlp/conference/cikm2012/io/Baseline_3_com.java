@@ -56,7 +56,7 @@ public class Baseline_3_com {
 				// import Twitter and Google news collection
 				ArrayList<InstanceList> colls = new ArrayList<InstanceList>();
 
-				String twiDir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Topics/Twitter";
+				String twiDir = "../data/EMNLP2012/Topics/Twitter";
 				TweetsUserIterator tUserIter = new TweetsUserIterator(twiDir,
 						String.valueOf(topic));
 
@@ -75,7 +75,7 @@ public class Baseline_3_com {
 				TweetCorpus ntc = new TweetCorpus(tc, pipeLine);
 				colls.add(ntc);
 
-				String GoogleNewsDir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Topics/Google";
+				String GoogleNewsDir = "../data/EMNLP2012/Topics/Google";
 
 				OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
 						GoogleNewsDir + "/" + String.valueOf(topic));

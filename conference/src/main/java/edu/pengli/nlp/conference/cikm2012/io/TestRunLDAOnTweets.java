@@ -26,7 +26,7 @@ public class TestRunLDAOnTweets {
 		String topic  = "Marie_Colvin";
 		
 
-		String twiDir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Topics/Twitter";
+		String twiDir = "../data/EMNLP2012/Topics/Twitter";
 		TweetsUserIterator tUserIter = new TweetsUserIterator(twiDir,
 				String.valueOf(topic));
 		
@@ -59,13 +59,13 @@ public class TestRunLDAOnTweets {
 		model.predict_labels(ntc);
 
 		PrintWriter out = FileOperation.getPrintWriter(new File(
-				"/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Output"),
+				"../data/EMNLP2012/Output"),
 				topic);
 		model.output_labels(out, ntc);
 		
 		model.output_model();
 		
-		String outputDir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012/";
+		String outputDir = "../data/EMNLP2012/";
 		String outputName = "newsTopicsTwitter";
 		model.writeModel(outputDir, outputName);
 

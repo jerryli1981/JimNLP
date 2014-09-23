@@ -19,7 +19,7 @@ public class TokenSequenceRemoveStopwords extends Pipe{
 		stopWordsDict = new TreeSet<String>();
 		BufferedReader reader = null;
 		try {
-			reader = new BufferedReader(new FileReader("models/stop_words.dat"));
+			reader = new BufferedReader(new FileReader("../models/stop_words.dat"));
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

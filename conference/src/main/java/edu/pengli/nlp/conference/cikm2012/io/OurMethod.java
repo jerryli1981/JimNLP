@@ -54,7 +54,7 @@ public class OurMethod {
 				// import Twitter and Google news collection
 				ArrayList<InstanceList> colls = new ArrayList<InstanceList>();
 
-				String twiDir = "/home/peng/Develop/Workspace/NLP/data/CIKM2012/Topics/Twitter/cleaned";
+				String twiDir = "../data/CIKM2012/Topics/Twitter/cleaned";
 				TweetsUserIterator tUserIter = new TweetsUserIterator(twiDir,
 						String.valueOf(topic+".clean"));
 
@@ -73,7 +73,7 @@ public class OurMethod {
 				TweetCorpus ntc = new TweetCorpus(tc, pipeLine);
 				colls.add(ntc);
 
-				String GoogleNewsDir = "/home/peng/Develop/Workspace/NLP/data/CIKM2012/Topics/Google";
+				String GoogleNewsDir = "../data/CIKM2012/Topics/Google";
 
 				OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
 						GoogleNewsDir + "/" + String.valueOf(topic));
@@ -116,7 +116,7 @@ public class OurMethod {
 
 			HashMap map = RougeEvaluationWrapper.run(iter, "T");
 			recall += (Double) map.get("R");
-			String outputDir = "/home/peng/Develop/Workspace/NLP/data/CIKM2012/Output/summary";
+			String outputDir = "../data/CIKM2012/Output/summary";
 			if (maxR <= (Double) map.get("R")) {
 				maxR = (Double) map.get("R");
 				for (int t = 0; t < topics.length; t++) {

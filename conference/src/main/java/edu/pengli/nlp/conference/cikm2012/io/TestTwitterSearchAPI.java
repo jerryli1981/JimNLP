@@ -27,7 +27,7 @@ public class TestTwitterSearchAPI {
 //		query.setSinceId(170957701206114305L); //170957701206114305 (02-18)
 		PrintWriter out = FileOperation
 				.getPrintWriter(
-						new File("/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Topics/Twitter"),
+						new File("../data/EMNLP2012/Topics/Twitter"),
 						topic+".tapi");
 		int counts = 0;
 		try {

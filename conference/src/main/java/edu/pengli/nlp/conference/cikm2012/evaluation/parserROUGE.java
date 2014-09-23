@@ -11,7 +11,7 @@ import edu.pengli.nlp.platform.util.FileOperation;
 public class parserROUGE {
 
 	public static void main(String[] args) throws IOException {
-		String dir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012";
+		String dir = "../data/EMNLP2012";
 		BufferedReader in = FileOperation.getBufferedReader(new File(dir),
 				//"output.baseline0.n");
 		      //"output.baseline1.n");

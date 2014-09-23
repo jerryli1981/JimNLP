@@ -64,7 +64,7 @@ public class GenerateTestDocuments {
 	public static void main(String[] args) throws Exception {
 		// read topic list
 		File dataDir = new File(
-				"/home/peng/Develop/Workspace/NLP/data/EMNLP2012");
+				"../data/EMNLP2012");
 		String topicFileName = "topics.MB1-50.txt";
 		String content = FileOperation.readContentFromFile(dataDir,
 				topicFileName);
@@ -109,13 +109,13 @@ public class GenerateTestDocuments {
 		}
 
 		File indexLocation = new File(
-				"/home/peng/Develop/Workspace/NLP/data/EMNLP2012/INDEX");
+				"../data/EMNLP2012/INDEX");
 
 		for (Topic t : topicList) {
 			int id = Integer.parseInt(t.getID().replace("Number: MB0", ""));
 			System.out.println(id); 
 			File f = new File(
-					"/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Topics/Twitter");
+					"../data/EMNLP2012/Topics/Twitter");
 			PrintWriter out = FileOperation.getPrintWriter(f,
 					String.valueOf(id));
 			ArrayList<String> relTsIds = topIdxRelevantTweetsIdMap.get(id);

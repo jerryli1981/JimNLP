@@ -224,7 +224,7 @@ public class LexRanking {
 	
 	public void outputSummary(String topic, String iter) {
 
-		String outputDir = "/home/peng/Develop/Workspace/NLP/data/CIKM2012/Output/summary";
+		String outputDir = "../data/CIKM2012/Output/summary";
 
 		PrintWriter out = FileOperation.getPrintWriter(new File(outputDir),
 				String.valueOf(topic+"."+iter));

@@ -11,7 +11,7 @@ public class GenerateTestDocumentsFromGoogleNews {
 	
 	public static void main(String[] args) throws Exception{
 		String topicID = "5";
-		File parentDir = new File("/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Topics/Google News/"+topicID);
+		File parentDir = new File("../data/EMNLP2012/Topics/Google News/"+topicID);
 		String url = "http://articles.latimes.com/2011/jan/25/world/la-fg-mexico-clinton-20110125";
 		String content = htmlCrawler.fetchHTML(url);
 		PrintWriter out = FileOperation.getPrintWriter(parentDir, "latimes");

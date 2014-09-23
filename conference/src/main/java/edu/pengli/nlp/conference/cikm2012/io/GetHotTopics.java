@@ -39,7 +39,7 @@ public class GetHotTopics {
 
 		Customsearch cs = new Customsearch(httpTransport, jsonFactory, httpRequestInitializer);
 		
-		String dir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012";
+		String dir = "../data/EMNLP2012";
 		String fileName = "wikinews.list";
 		BufferedReader in = FileOperation.getBufferedReader(new File(dir), fileName);
 		String input = null;
@@ -69,7 +69,7 @@ public class GetHotTopics {
 
 		PrintWriter out = FileOperation
 				.getPrintWriter(
-						new File("/home/peng/Develop/Workspace/NLP/data/EMNLP2012/"), "rankedList");
+						new File("../data/EMNLP2012/"), "rankedList");
 		
 		LinkedHashMap ranked = RankMap.sortHashMapByValues(map, false);
 		Iterator iter = ranked.keySet().iterator();

@@ -30,10 +30,10 @@ public class kappaStatistic {
 		for (int i = 0; i < labels.length; i++) {
 			BufferedReader LP = new BufferedReader(
 					new FileReader(
-							"/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Output/summary/LabeledByMe"));
+							"../data/EMNLP2012/Output/summary/LabeledByMe"));
 			BufferedReader JJ = new BufferedReader(
 					new FileReader(
-							"/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Output/summary/LabeledByGao"));
+							"../data/EMNLP2012/Output/summary/LabeledByGao"));
 			String slp = null;
 			String sjj = null;
 			String label = labels[i];

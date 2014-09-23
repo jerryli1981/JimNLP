@@ -23,7 +23,7 @@ public class PreProcessingTweets {
 		for (int t = 0; t < topics.length; t++) {
 			String topic = topics[t];
 
-			String twiDir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Topics/Twitter";
+			String twiDir = "../data/EMNLP2012/Topics/Twitter";
 			TweetsUserIterator tUserIter = new TweetsUserIterator(twiDir,
 					String.valueOf(topic));
 

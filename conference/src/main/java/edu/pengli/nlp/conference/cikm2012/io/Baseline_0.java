@@ -50,7 +50,7 @@ public class Baseline_0 {
 				int summaryLength_t = lengthLimit_t[i];
 				// import Twitter and Google news collection
 
-				String twiDir = "/home/peng/Develop/Workspace/NLP/data/CIKM2012/Topics/Twitter";
+				String twiDir = "../data/CIKM2012/Topics/Twitter";
 				TweetsUserIterator tUserIter = new TweetsUserIterator(twiDir,
 						String.valueOf(topic));
 
@@ -74,7 +74,7 @@ public class Baseline_0 {
 				
 				
 
-				String GoogleNewsDir = "/home/peng/Develop/Workspace/NLP/data/CIKM2012/Topics/Google";
+				String GoogleNewsDir = "../data/CIKM2012/Topics/Google";
 
 				OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
 						GoogleNewsDir + "/" + String.valueOf(topic));

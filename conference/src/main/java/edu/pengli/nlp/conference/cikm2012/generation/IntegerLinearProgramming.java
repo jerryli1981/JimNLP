@@ -284,7 +284,7 @@ public class IntegerLinearProgramming {
 	}
 
 	public void outputSummary_N(String topic, int iterTime) {
-		String outputDir = "/home/peng/Develop/Workspace/NLP/data/CIKM2012/Output/summary";
+		String outputDir = "../data/CIKM2012/Output/summary";
 
 		PrintWriter out_n = FileOperation.getPrintWriter(new File(outputDir),
 				String.valueOf(topic + "." + iterTime + ".N"));
@@ -310,7 +310,7 @@ public class IntegerLinearProgramming {
 	}
 	
 	public void outputSummary_T(String topic, int iterTime) {
-		String outputDir = "/home/peng/Develop/Workspace/NLP/data/CIKM2012/Output/summary";
+		String outputDir = "../data/CIKM2012/Output/summary";
 
 		PrintWriter out_t = FileOperation.getPrintWriter(new File(outputDir),
 				String.valueOf(topic + "." + iterTime + ".T"));
@@ -349,7 +349,7 @@ public class IntegerLinearProgramming {
 			}
 		}
 
-		String outputDir = "/home/peng/Develop/Workspace/NLP/data/CIKM2012/Output/summary";
+		String outputDir = "../data/CIKM2012/Output/summary";
 
 		PrintWriter out = FileOperation.getPrintWriter(new File(outputDir),
 				String.valueOf(topic + "." + iterTime));

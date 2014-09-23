@@ -10,7 +10,7 @@ public class ComputeManualEvaluationScore {
 
 
 	public static void main(String[] args) throws IOException {
-		String path = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Output/summary";
+		String path = "../data/EMNLP2012/Output/summary";
 		String methodName = "Ours";
 		File dir = new File(path+"/"+methodName);
 		File[] fs = dir.listFiles();

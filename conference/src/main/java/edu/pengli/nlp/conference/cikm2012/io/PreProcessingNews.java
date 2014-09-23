@@ -47,7 +47,7 @@ public class PreProcessingNews {
 			String topic = topics[t];
 			System.out.println(topic);
 
-			String GoogleNewsDir = "/home/peng/Develop/Workspace/NLP/data/EMNLP2012/Topics/Google";
+			String GoogleNewsDir = "../data/EMNLP2012/Topics/Google";
 
 			OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
 					GoogleNewsDir + "/" + String.valueOf(topic));
@@ -72,9 +72,9 @@ public class PreProcessingNews {
 
 				String[] cmd = {
 						"/usr/bin/python",
-						"/home/peng/Develop/Workspace/NLP/models/splitta/sbd.py",
+						"../models/splitta/sbd.py",
 						"-m",
-						"/home/peng/Develop/Workspace/NLP/models/splitta/model_nb",
+						"..P/models/splitta/model_nb",
 						"-t", input, "-o", output };
 
 				Process p = Runtime.getRuntime().exec(cmd);

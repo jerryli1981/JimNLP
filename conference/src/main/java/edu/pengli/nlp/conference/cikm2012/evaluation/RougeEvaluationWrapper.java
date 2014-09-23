@@ -19,16 +19,16 @@ public class RougeEvaluationWrapper {
 				"Russian_presidential_election", "features_of_ipad3", "Syrian_uprising",
 				"Dick_Clark", "Mexican_Drug_War", "Obama_same_sex_marriage_donation",
 				"Russian_jet_crash", "Yulia_Tymoshenko_hunger_strike"};
-		String parentDir = "/home/peng/Develop/Workspace/NLP/data/CIKM2012/";
+		String parentDir = "../data/CIKM2012/";
 		PrintWriter out = FileOperation.getPrintWriter(new File(parentDir), "setting_local.xml");
 		out.println("<ROUGE_EVAL version=\"1.5.5\">");
 		for(String topic : topics){
 			out.println("<EVAL ID=\""+topic+"\">");
 			out.println("<PEER-ROOT>");
-			out.println("/home/peng/Develop/Workspace/NLP/data/CIKM2012/Output/summary");
+			out.println("../data/CIKM2012/Output/summary");
 			out.println("</PEER-ROOT>");
 			out.println("<MODEL-ROOT>");
-			out.println("/home/peng/Develop/Workspace/NLP/data/CIKM2012/Golden_Standard");
+			out.println("../data/CIKM2012/Golden_Standard");
 			out.println("</MODEL-ROOT>");
 			out.println("<INPUT-FORMAT TYPE=\"SPL\">");
 			out.println("</INPUT-FORMAT>");
@@ -44,10 +44,10 @@ public class RougeEvaluationWrapper {
 		out.close();
 		
 		String[] cmd = { "/usr/bin/perl",
-				"./models/ROUGE/ROUGE-1.5.5.pl", "-e",
-				"./models/ROUGE/data", "-n", "4", "-w", "1.2", "-m",
+				"../models/ROUGE/ROUGE-1.5.5.pl", "-e",
+				"../models/ROUGE/data", "-n", "4", "-w", "1.2", "-m",
 				"-2", "4", "-u", "-c", "95", "-r", "1000", "-f", "A", "-p",
-				"0.5", "-t", "0", "-a", "-d", "./data/CIKM2012/setting_local.xml"};
+				"0.5", "-t", "0", "-a", "-d", "../data/CIKM2012/setting_local.xml"};
 		HashMap<String, Double> map  = new HashMap<String, Double>();
 
 		try {
