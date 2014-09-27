@@ -9,11 +9,9 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Set;
 
-import edu.pengli.nlp.conference.cikm2012.evaluation.RougeEvaluationWrapper;
 import edu.pengli.nlp.conference.cikm2012.generation.BipartiteGraphRandomWalk;
 import edu.pengli.nlp.conference.cikm2012.pipe.CharSequenceCleanNews;
 import edu.pengli.nlp.conference.cikm2012.pipe.CharSequenceCleanTweets;
-import edu.pengli.nlp.conference.cikm2012.pipe.CharSequenceExtractParagraph;
 import edu.pengli.nlp.conference.cikm2012.pipe.iterator.TweetsUserIterator;
 import edu.pengli.nlp.conference.cikm2012.types.GoogleNewsCorpus;
 import edu.pengli.nlp.conference.cikm2012.types.TweetCorpus;

@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 
-import edu.pengli.nlp.conference.cikm2012.types.Summary;
 import edu.pengli.nlp.platform.algorithms.ranking.LexRank;
 import edu.pengli.nlp.platform.pipe.CharSequence2TokenSequence;
 import edu.pengli.nlp.platform.pipe.FeatureIDFPipe;
@@ -16,6 +15,7 @@ import edu.pengli.nlp.platform.pipe.TokenSequenceRemoveStopwords;
 import edu.pengli.nlp.platform.types.FeatureVector;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.types.InstanceList;
+import edu.pengli.nlp.platform.types.Summary;
 import edu.pengli.nlp.platform.util.FileOperation;
 
 public class LexRanking {

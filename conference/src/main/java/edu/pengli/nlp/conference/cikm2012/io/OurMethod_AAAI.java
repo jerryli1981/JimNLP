@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import lpsolve.LpSolveException;
-import edu.pengli.nlp.conference.cikm2012.evaluation.RougeEvaluationWrapper;
 import edu.pengli.nlp.conference.cikm2012.generation.IntegerLinearProgramming;
 import edu.pengli.nlp.conference.cikm2012.pipe.CharSequenceCleanNews;
 import edu.pengli.nlp.conference.cikm2012.pipe.CharSequenceCleanTweets;
@@ -24,6 +23,7 @@ import edu.pengli.nlp.platform.pipe.TokenSequenceRemoveStopwords;
 import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerFileIterator;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.types.InstanceList;
+import edu.pengli.nlp.platform.util.RougeEvaluationWrapper;
 
 
 public class OurMethod_AAAI {
@@ -39,12 +39,24 @@ public class OurMethod_AAAI {
 				"Syrian_uprising", "Dick_Clark", "Mexican_Drug_War",
 				"Obama_same_sex_marriage_donation", "Russian_jet_crash",
 				"Yulia_Tymoshenko_hunger_strike" };
+		
+		ArrayList<String> corpusNameList = new ArrayList<String>();
+		for(String s : topics){
+			corpusNameList.add(s);
+		}
+		
 		int[] lengthLimit_n = { 198, 192, 151, 207, 161, 180, 178, 231, 201, 249 };
 		int[] lengthLimit_t = { 206, 185, 214, 194, 196, 94, 104, 94, 136, 92 };
 
 		double recall_T = 0.0;
 		double recall_N = 0.0;
 		int runTime = 5;
+		
+
+		String twiDir = "../data/CIKM2012/testData/Twitter";
+		String GoogleNewsDir = "../data/CIKM2012/testData/Google";
+		
+		String outputSummaryDir = "../data/CIKM2012/Output";
 		
 		for (int iter = 0; iter < runTime; iter++) {
 			System.out.println(iter);
@@ -59,7 +71,7 @@ public class OurMethod_AAAI {
 				// import Twitter and Google news collection
 				ArrayList<InstanceList> colls = new ArrayList<InstanceList>();
 
-				String twiDir = "../data/CIKM2012/Topics/Twitter";
+				
 				TweetsUserIterator tUserIter = new TweetsUserIterator(twiDir,
 						String.valueOf(topic));
 
@@ -78,8 +90,7 @@ public class OurMethod_AAAI {
 				TweetCorpus ntc = new TweetCorpus(tc, pipeLine);
 				colls.add(ntc);
 
-				String GoogleNewsDir = "../data/CIKM2012/Topics/Google";
-
+			
 				OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
 						GoogleNewsDir + "/" + String.valueOf(topic));
 
@@ -115,19 +126,31 @@ public class OurMethod_AAAI {
 				
 				IntegerLinearProgramming ilp = new IntegerLinearProgramming(ccta);
 				ilp.runNews(summaryLength_n, numTopics*numAspect);
-				ilp.outputSummary_N(topic, iter);
+				ilp.outputSummary_N(outputSummaryDir, topic, iter);
 				
 				ilp.runTwitters(summaryLength_t, numTopics*numAspect);
-				ilp.outputSummary_T(topic, iter);
+				ilp.outputSummary_T(outputSummaryDir, topic, iter);
 				
 			}
+			
+			String modelSummaryDir = "../data/CIKM2012/ROUGE/models";
+			String confFilePath = "../data/CIKM2012/ROUGE/conf.xml";
+			
+			
+			
+/*			RougeEvaluationWrapper.setConfigurationFile(corpusNameList, outputSummaryDir,
+					modelSummaryDir, modelSummariesMap, confFilePath);
+			String metric = "ROUGE-SU4";
+			
+			HashMap map = RougeEvaluationWrapper.runRough(confFilePath, metric);
+		
 			HashMap map_T = RougeEvaluationWrapper.run(iter, "T");
 			System.out.println("Twitter Recall is "+(Double) map_T.get("R"));
 			recall_T += (Double) map_T.get("R");
 			
 			HashMap map_N = RougeEvaluationWrapper.run(iter, "N");
 			System.out.println("News Recall is "+(Double) map_N.get("R"));
-			recall_N += (Double) map_N.get("R");
+			recall_N += (Double) map_N.get("R");*/
 
 		}
 		

@@ -8,11 +8,11 @@ import java.util.Iterator;
 import java.util.Random;
 import java.util.Set;
 
-import edu.pengli.nlp.conference.cikm2012.types.Summary;
 import edu.pengli.nlp.platform.algorithms.lda.CCTAModel;
 import edu.pengli.nlp.platform.types.Alphabet;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.types.InstanceList;
+import edu.pengli.nlp.platform.types.Summary;
 import edu.pengli.nlp.platform.util.FileOperation;
 
 public class HillClimbing {

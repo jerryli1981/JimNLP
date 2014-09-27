@@ -11,8 +11,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Set;
 
-import edu.pengli.nlp.conference.cikm2012.evaluation.RougeEvaluationWrapper;
-import edu.pengli.nlp.conference.cikm2012.evaluation.RougeEvaluationWrapper2;
 import edu.pengli.nlp.conference.cikm2012.generation.BipartiteGraphRandomWalk;
 import edu.pengli.nlp.conference.cikm2012.generation.simulateGoldStandard;
 import edu.pengli.nlp.conference.cikm2012.pipe.CharSequenceCleanNews;

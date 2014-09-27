@@ -5,7 +5,6 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import edu.pengli.nlp.conference.cikm2012.evaluation.RougeEvaluationWrapper;
 import edu.pengli.nlp.conference.cikm2012.generation.HillClimbing;
 import edu.pengli.nlp.conference.cikm2012.pipe.CharSequenceCleanNews;
 import edu.pengli.nlp.conference.cikm2012.pipe.CharSequenceCleanTweets;
@@ -122,13 +121,13 @@ public class Baseline_1 {
 				summarygenerator.outputSummary(topic, String.valueOf(iter));
 			}
 			
-			HashMap map_T = RougeEvaluationWrapper.run(iter, "T");
+/*			HashMap map_T = RougeEvaluationWrapper.run(iter, "T");
 			System.out.println("Twitter Recall is "+(Double) map_T.get("R"));
 			recall_T += (Double) map_T.get("R");
 			
 			HashMap map_N = RougeEvaluationWrapper.run(iter, "N");
 			System.out.println("News Recall is "+(Double) map_N.get("R"));
-			recall_N += (Double) map_N.get("R");
+			recall_N += (Double) map_N.get("R");*/
 			
 		}
 		

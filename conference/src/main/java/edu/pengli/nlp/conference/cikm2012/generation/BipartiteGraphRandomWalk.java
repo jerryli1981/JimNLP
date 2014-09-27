@@ -9,7 +9,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Set;
 
-import edu.pengli.nlp.conference.cikm2012.types.Summary;
 import edu.pengli.nlp.platform.algorithms.lda.CCTAModel;
 import edu.pengli.nlp.platform.algorithms.ranking.LexRank;
 import edu.pengli.nlp.platform.pipe.CharSequence2TokenSequence;
@@ -22,6 +21,7 @@ import edu.pengli.nlp.platform.pipe.TokenSequenceRemoveStopwords;
 import edu.pengli.nlp.platform.types.FeatureVector;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.types.InstanceList;
+import edu.pengli.nlp.platform.types.Summary;
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.Maths;
 import edu.pengli.nlp.platform.util.RankMap;

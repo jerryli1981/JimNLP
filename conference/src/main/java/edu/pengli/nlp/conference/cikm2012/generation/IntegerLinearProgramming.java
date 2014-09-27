@@ -9,7 +9,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Set;
 
-import edu.pengli.nlp.conference.cikm2012.types.Summary;
 import edu.pengli.nlp.platform.algorithms.classify.Clustering;
 import edu.pengli.nlp.platform.algorithms.lda.CCTAModel;
 import edu.pengli.nlp.platform.algorithms.ranking.LexRank;
@@ -22,6 +21,7 @@ import edu.pengli.nlp.platform.pipe.TokenSequenceLowercase;
 import edu.pengli.nlp.platform.pipe.TokenSequenceRemoveStopwords;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.types.InstanceList;
+import edu.pengli.nlp.platform.types.Summary;
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.Maths;
 import edu.pengli.nlp.platform.util.RankMap;
@@ -283,9 +283,8 @@ public class IntegerLinearProgramming {
 		return sb.toString().trim();
 	}
 
-	public void outputSummary_N(String topic, int iterTime) {
-		String outputDir = "../data/CIKM2012/Output/summary";
-
+	public void outputSummary_N(String outputDir, String topic, int iterTime) {
+	
 		PrintWriter out_n = FileOperation.getPrintWriter(new File(outputDir),
 				String.valueOf(topic + "." + iterTime + ".N"));
 
@@ -309,8 +308,7 @@ public class IntegerLinearProgramming {
 		out_n.close();
 	}
 	
-	public void outputSummary_T(String topic, int iterTime) {
-		String outputDir = "../data/CIKM2012/Output/summary";
+	public void outputSummary_T(String outputDir, String topic, int iterTime) {
 
 		PrintWriter out_t = FileOperation.getPrintWriter(new File(outputDir),
 				String.valueOf(topic + "." + iterTime + ".T"));
