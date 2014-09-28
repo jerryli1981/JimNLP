@@ -19,6 +19,7 @@ public class CharSequenceExtractContent extends CharSequenceRemoveHTML {
         	content = m.group();
         	content = content.replaceAll("</s>PARA", "</s>");
         	content = content.replaceAll("<.*?>", "");
+        	content = content.replaceAll("\"", "");
         }
 		carrier.setData((CharSequence) content.trim());
 		return carrier;

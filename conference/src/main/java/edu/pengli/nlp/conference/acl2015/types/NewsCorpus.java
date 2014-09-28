@@ -30,7 +30,7 @@ public class NewsCorpus extends InstanceList implements Serializable {
 					String tok = toks[j];
 					if(tok.matches("[a-zA-Z_0-9-]+")) length++;
 				}
-				if(length <= 5) continue;
+				if(length <= 10) continue;
 				Instance inst = new Instance(sent, null, i + "_"
 						+ doc.getName(), sent);
 				ii.add(inst);

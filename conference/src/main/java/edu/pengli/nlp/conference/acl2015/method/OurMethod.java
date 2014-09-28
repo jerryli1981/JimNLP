@@ -11,7 +11,7 @@ import org.jdom2.Element;
 import org.jdom2.JDOMException;
 import org.jdom2.input.SAXBuilder;
 
-import edu.pengli.nlp.conference.acl2015.generation.LexRankGeneration;
+import edu.pengli.nlp.conference.acl2015.generation.AbstractiveGeneration;
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.RougeEvaluationWrapper;
 
@@ -32,7 +32,8 @@ public class OurMethod {
 		Element docSetA = docSets.get(1);
 		String corpusName = docSetA.getAttributeValue("id");
 		corpusNameList.add(corpusName);
-		LexRankGeneration.run(inputCorpusDir+"/"+topic.getAttributeValue("id"), 
+		AbstractiveGeneration ag = new AbstractiveGeneration();
+		ag.run(inputCorpusDir+"/"+topic.getAttributeValue("id"), 
 				outputSummaryDir, corpusName);
 	}
 	
