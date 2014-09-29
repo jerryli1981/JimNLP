@@ -1,14 +1,17 @@
 package edu.pengli.nlp.conference.acl2015.types;
 
+import java.util.ArrayList;
+
 import edu.stanford.nlp.trees.TreeGraphNode;
 
 public class InformationItem {
 	
 	private TreeGraphNode subject;
 	private TreeGraphNode predicate;
-	private TreeGraphNode object;
+	private ArrayList<TreeGraphNode> object;
 	
-	public InformationItem(TreeGraphNode subject, TreeGraphNode predicate, TreeGraphNode object){
+	public InformationItem(TreeGraphNode subject, TreeGraphNode predicate, 
+			ArrayList<TreeGraphNode> object){
 		this.subject = subject;
 		this.predicate = predicate;
 		this.object = object;
@@ -20,15 +23,23 @@ public class InformationItem {
 	public TreeGraphNode getPredicate(){
 		return predicate;
 	}
-	public TreeGraphNode getObject(){
+	public ArrayList<TreeGraphNode> getObject(){
 		return object;
 	}
 	
 	public String toString(){
 		if(object != null)
-		return subject.toString()+":"+predicate.toString()+":"+object.toString();
-		else
-			return subject.toString()+":"+predicate.toString();
+		{
+			StringBuffer objectMention = new StringBuffer();;
+			for(TreeGraphNode n : object){
+				objectMention.append(n.nodeString()+" ");
+			}
+	
+			return subject.nodeString()+"<----->"+predicate.nodeString()+"<----->"+objectMention.toString().trim();
+		}else{
+			return subject.nodeString()+"<----->"+predicate.nodeString();
+		}
+			
 		
 	}
 
