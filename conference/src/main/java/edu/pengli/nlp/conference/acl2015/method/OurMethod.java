@@ -26,14 +26,10 @@ public class OurMethod {
 		
 		lp = LexicalizedParser
 				.loadModel("../models/Stanford/lexparser/englishPCFG.ser.gz", options);
-		
-
 	};
 
 	public static void main(String[] args) throws JDOMException, IOException {
 
-
-		
 		SAXBuilder builder = new SAXBuilder();
 		String inputCorpusDir = "../data/ACL2015/testData";
 		Document doc = builder.build(inputCorpusDir + "/"
@@ -43,6 +39,7 @@ public class OurMethod {
 		ArrayList<String> corpusNameList = new ArrayList<String>();
 		String outputSummaryDir = "../data/ACL2015/Output";
 		for (int i = 0; i < corpusList.size(); i++) {
+			System.out.println("******************************CORPUS ID IS " + i);
 			Element topic = corpusList.get(i);
 			List<Element> docSets = topic.getChildren();
 			Element docSetA = docSets.get(1);
@@ -51,6 +48,7 @@ public class OurMethod {
 			AbstractiveGeneration ag = new AbstractiveGeneration(lp);
 			ag.run(inputCorpusDir + "/" + topic.getAttributeValue("id"),
 					outputSummaryDir, corpusName);
+
 		}
 
 		// Rouge Evaluation

@@ -35,9 +35,10 @@ public class InformationItem {
 				objectMention.append(n.nodeString()+" ");
 			}
 	
-			return subject.nodeString()+"<----->"+predicate.nodeString()+"<----->"+objectMention.toString().trim();
+			return "S:"+subject.nodeString()+"<----->"+"P:"+predicate.nodeString()+"<----->"+"O:"+objectMention.toString().trim();
 		}else{
-			return subject.nodeString()+"<----->"+predicate.nodeString();
+			
+			return "S:"+subject.nodeString()+"<----->"+"P:"+predicate.nodeString();
 		}
 			
 		

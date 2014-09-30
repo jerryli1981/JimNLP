@@ -5,9 +5,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.Stack;
-import java.util.TreeMap;
 
 import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
 import edu.pengli.nlp.conference.acl2015.types.InformationItem;
@@ -19,15 +17,9 @@ import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerFileIterator;
 import edu.pengli.nlp.platform.types.DependencyGraph;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.types.InstanceList;
-import edu.stanford.nlp.ling.CoreLabel;
-import edu.stanford.nlp.ling.Sentence;
+import edu.stanford.nlp.ling.HasWord;
 import edu.stanford.nlp.parser.lexparser.LexicalizedParser;
-import edu.stanford.nlp.process.CoreLabelTokenFactory;
-import edu.stanford.nlp.process.PTBTokenizer;
 import edu.stanford.nlp.process.Tokenizer;
-import edu.stanford.nlp.process.TokenizerFactory;
-import edu.stanford.nlp.trees.Dependency;
-import edu.stanford.nlp.trees.EnglishGrammaticalStructure;
 import edu.stanford.nlp.trees.GrammaticalRelation;
 import edu.stanford.nlp.trees.GrammaticalStructure;
 import edu.stanford.nlp.trees.GrammaticalStructureFactory;
@@ -49,64 +41,83 @@ public class AbstractiveGeneration {
 	NLGFactory nlgFactory;
 	Realiser realiser;
 	LexicalizedParser lp;
+	TreebankLanguagePack tlp;
+	GrammaticalStructureFactory gsf;
 
 	public AbstractiveGeneration(LexicalizedParser lp) {
 		Lexicon lexicon = Lexicon.getDefaultLexicon();
 		nlgFactory = new NLGFactory(lexicon);
 		realiser = new Realiser(lexicon);
 		this.lp = lp;
-
+		tlp = new PennTreebankLanguagePack();
+		gsf = tlp.grammaticalStructureFactory();
 	}
 
 	private Tree parseSentence(Instance sent) {
 
-		TokenizerFactory<CoreLabel> tokenizerFactory = PTBTokenizer.factory(
-				new CoreLabelTokenFactory(), "");
-		Tokenizer<CoreLabel> tok = tokenizerFactory
-				.getTokenizer(new StringReader((String) sent.getSource()));
-		List<CoreLabel> rawWords2 = tok.tokenize();
+		// the first way
+		/*
+		 * TokenizerFactory<CoreLabel> tokenizerFactory = PTBTokenizer.factory(
+		 * new CoreLabelTokenFactory(), ""); Tokenizer<CoreLabel> tok =
+		 * tokenizerFactory .getTokenizer(new StringReader((String)
+		 * sent.getSource())); List<CoreLabel> rawWords2 = tok.tokenize();
+		 * 
+		 * return lp.apply(rawWords2);
+		 */
 
-		return lp.apply(rawWords2);
+		// //////////////////
+
+		// the second way is better than first way in performance
+		Tokenizer<? extends HasWord> toke = tlp.getTokenizerFactory()
+				.getTokenizer(new StringReader((String) sent.getSource()));
+		List<? extends HasWord> sentence = toke.tokenize();
+		return lp.parse(sentence);
 
 	}
 
-	private ArrayList<InformationItem> extractInformationItems(Tree parseTree, GrammaticalStructure gs) {
-		Collection<TypedDependency> tds = gs.typedDependencies();
-		DependencyGraph graph = new DependencyGraph(tds.size()*2);
+	/*
+	 * current implementation just cove direct object and prep object, subject
+	 * and predicate are necessary. object could be empty.
+	 */
+	private ArrayList<InformationItem> extractInformationItems(Tree parseTree,
+			Collection<TypedDependency> tds) {
 
+		DependencyGraph graph = new DependencyGraph(parseTree.size());
 		for (TypedDependency td : tds) {
 			graph.addEdge(td);
 		}
-		
+
 		HashSet<TreeGraphNode> predicates = new HashSet<TreeGraphNode>();
 		TreeGraphNode subjectIncase = null;
 		for (TypedDependency td : tds) {
 			TreeGraphNode gov = td.gov();
 			GrammaticalRelation gr = td.reln();
-			if (gr.toString().equals("nsubj") || gr.toString().equals("dobj") 
-					|| (gr.toString().equals("prep") && gov.parent().nodeString().startsWith("VB"))) {
+			if (gr.toString().equals("nsubj")
+					|| gr.toString().equals("dobj")
+					|| (gr.toString().equals("prep") && gov.parent()
+							.nodeString().startsWith("VB"))) {
 				predicates.add(gov);
 			}
-			
-			if (gr.toString().equals("nsubj")){
+
+			if (gr.toString().equals("nsubj")) {
 				Iterable<TypedDependency> iter = graph.adj(td.gov().index());
-				for(TypedDependency child : iter){
-					GrammaticalRelation dgr = child.reln(); 
-					if(dgr.toString().equals("dobj") || 
-							(dgr.toString().equals("prep") && 
-									child.gov().parent().nodeString().startsWith("VB"))){
+				for (TypedDependency child : iter) {
+					GrammaticalRelation dgr = child.reln();
+					if (dgr.toString().equals("dobj")
+							|| (dgr.toString().equals("prep") && child.gov()
+									.parent().nodeString().startsWith("VB"))) {
 						subjectIncase = td.dep();
 					}
-					
+
 				}
-				
+
 			}
 		}
 
 		ArrayList<InformationItem> possibleItems = new ArrayList<InformationItem>();
 
 		for (TreeGraphNode p : predicates) {
-			
+
 			boolean subjectExist = false;
 			boolean directObjectExist = false;
 			boolean prepObjectExist = false;
@@ -114,10 +125,11 @@ public class AbstractiveGeneration {
 			TreeGraphNode directObject = null;
 			TreeGraphNode prep = null;
 			TreeGraphNode prepObject = null;
-			
+
 			for (TypedDependency td : tds) {
 				TreeGraphNode gov = td.gov();
-				if(!gov.equals(p)) continue;
+				if (!gov.equals(p))
+					continue;
 				TreeGraphNode dep = td.dep();
 				GrammaticalRelation gr = td.reln();
 				if (gr.toString().equals("nsubj")) {
@@ -128,48 +140,65 @@ public class AbstractiveGeneration {
 					directObjectExist = true;
 					directObject = dep;
 				}
-				if(gr.toString().equals("prep") && gov.parent().nodeString().startsWith("VB")){
-					
+				if (gr.toString().equals("prep")
+						&& gov.parent().nodeString().startsWith("VB")) {
+
 					for (TypedDependency pair : tds) {
 						TreeGraphNode g = pair.gov();
-						if(dep.equals(g) && pair.reln().toString().equals("pobj")){
+						if (dep.equals(g)
+								&& pair.reln().toString().equals("pobj")) {
 							prepObjectExist = true;
 							prep = g;
 							prepObject = pair.dep();
 						}
-						
+
 					}
 				}
 			}
-			
-			if(subjectExist == false && directObjectExist ==true && prepObjectExist == false){
+
+			if (subjectIncase == null)
+				continue;
+
+			if (subjectExist == false && directObjectExist == true
+					&& prepObjectExist == false) {
 				ArrayList<TreeGraphNode> obj = new ArrayList<TreeGraphNode>();
-                obj.add(directObject);
-				possibleItems.add(new InformationItem(subjectIncase, p, obj));	
-				
-			}else if(subjectExist == false && directObjectExist ==false && prepObjectExist == true){
-				
-				ArrayList<TreeGraphNode> obj = new ArrayList<TreeGraphNode>();
-                obj.add(prep);
-                obj.add(prepObject);
+				obj.add(directObject);
 				possibleItems.add(new InformationItem(subjectIncase, p, obj));
-				
-			}else if(subjectExist == true && directObjectExist ==false && prepObjectExist == false){
+
+			} else if (subjectExist == false && directObjectExist == false
+					&& prepObjectExist == true) {
+
+				ArrayList<TreeGraphNode> obj = new ArrayList<TreeGraphNode>();
+				obj.add(prep);
+				obj.add(prepObject);
+				possibleItems.add(new InformationItem(subjectIncase, p, obj));
+
+			} else if (subjectExist == true && directObjectExist == false
+					&& prepObjectExist == false) {
 
 				possibleItems.add(new InformationItem(subject, p, null));
-				
-			}else if(subjectExist == true && directObjectExist == true && prepObjectExist == false){
-				ArrayList<TreeGraphNode> obj = new ArrayList<TreeGraphNode>();
-                obj.add(directObject);
-				possibleItems.add(new InformationItem(subject, p, obj));	
-			}else if(subjectExist == true && directObjectExist == false && prepObjectExist == true){
-				
-				ArrayList<TreeGraphNode> obj = new ArrayList<TreeGraphNode>();
-                obj.add(prep);
-                obj.add(prepObject);
-				possibleItems.add(new InformationItem(subject, p, obj));		
-			}
 
+			} else if (subjectExist == true && directObjectExist == true
+					&& prepObjectExist == false) {
+				ArrayList<TreeGraphNode> obj = new ArrayList<TreeGraphNode>();
+				obj.add(directObject);
+				possibleItems.add(new InformationItem(subject, p, obj));
+			} else if (subjectExist == true && directObjectExist == false
+					&& prepObjectExist == true) {
+
+				ArrayList<TreeGraphNode> obj = new ArrayList<TreeGraphNode>();
+				obj.add(prep);
+				obj.add(prepObject);
+				possibleItems.add(new InformationItem(subject, p, obj));
+			} else if (subjectExist == true && directObjectExist == true
+					&& prepObjectExist == true) {
+				// One Amish man craned his head out a buggy window
+				ArrayList<TreeGraphNode> obj = new ArrayList<TreeGraphNode>();
+				obj.add(directObject);
+				obj.add(prep);
+				obj.add(prepObject);
+				possibleItems.add(new InformationItem(subject, p, obj));
+			}
 		}
 
 		return possibleItems;
@@ -177,33 +206,35 @@ public class AbstractiveGeneration {
 	}
 
 	private ArrayList<String> generate(Instance sent) {
-		
-		TreebankLanguagePack tlp = new PennTreebankLanguagePack();
-		GrammaticalStructureFactory gsf = tlp.grammaticalStructureFactory();
-		
+
+//		sent.setSource("The suspect apparently called his wife from a cell phone shortly before the shooting began, saying he was acting out in revenge for something that happened 20 years ago, Miller said.");
 		Tree parsedTree = parseSentence(sent);
 		GrammaticalStructure gs = gsf.newGrammaticalStructure(parsedTree);
 		Collection<TypedDependency> tds = gs.typedDependencies();
 
-		
+		DependencyGraph dg = new DependencyGraph(parsedTree.size());
+
+		for (TypedDependency td : tds) {
+			dg.addEdge(td);
+		}
+
 		SPhraseSpec newSent = nlgFactory.createClause();
 		ArrayList<String> comSents = new ArrayList<String>();
-		ArrayList<InformationItem> items = extractInformationItems(parsedTree, gs);
-
 		System.out.println("Original Sent is: " + sent.getSource());
+		ArrayList<InformationItem> items = extractInformationItems(parsedTree,
+				tds);
+
 		if (items.size() != 0)
 			for (InformationItem item : items) {
 
 				System.out.println("Information Item is: " + item.toString());
 
-				NPPhraseSpec subjectNp = generateNP(tds, item.getSubject());
-
-				// System.out.println(lt.getRealiser().realiseSentence(subjectNp));
+				NPPhraseSpec subjectNp = generateNP(tds, item.getSubject(), dg);
 
 				newSent.setSubject(subjectNp);
 
 				VPPhraseSpec vp = generateVP(tds, item.getPredicate(),
-						item.getObject());
+						item.getObject(), dg);
 
 				newSent.setVerbPhrase(vp);
 
@@ -216,20 +247,44 @@ public class AbstractiveGeneration {
 		return comSents;
 	}
 
-	private NPPhraseSpec generateNP(Collection<TypedDependency> tds, TreeGraphNode head) {
-		
-		HashSet<TreeGraphNode> set = new HashSet<TreeGraphNode>();
-		for (TypedDependency td : tds) {
-			set.add(td.dep());
-			set.add(td.gov());
+	// search the tree recursively
+	private TreeGraphNode searchObjforPrep(DependencyGraph graph,
+			TreeGraphNode prepNode) {
+
+		TreeGraphNode obj = null;
+		Stack<Integer> stack = new Stack<Integer>();
+		boolean[] marked = new boolean[graph.V()];
+		int headIdx = prepNode.index();
+		marked[headIdx] = true;
+		stack.add(headIdx);
+		boolean stop =false;
+		while (!stack.isEmpty()) {
+			int s = stack.pop();
+			Iterable<TypedDependency> iter = graph.adj(s);
+			
+			for (TypedDependency td : iter) {
+				GrammaticalRelation dgr = td.reln();
+				if (dgr.toString().endsWith("obj") || dgr.toString().endsWith("pcomp")) {
+					obj = td.dep();
+					stop = true;
+				}
+				int depIdx = td.dep().index();
+				if (!marked[depIdx]) {
+					marked[depIdx] = true;
+					stack.add(depIdx);
+				}
+			}
+			if(stop == true)
+				break;
+			
 		}
 
-		DependencyGraph graph = new DependencyGraph(set.size() * 2);
+		return obj;
+	}
 
-		for (TypedDependency td : tds) {
-			graph.addEdge(td);
-		}
-		
+	private NPPhraseSpec generateNP(Collection<TypedDependency> tds,
+			TreeGraphNode head, DependencyGraph graph) {
+
 		NPPhraseSpec np = nlgFactory.createNounPhrase();
 		np.setHead(head.headWordNode().value());
 		Stack<Integer> stack = new Stack<Integer>();
@@ -243,50 +298,90 @@ public class AbstractiveGeneration {
 			for (TypedDependency td : iter) {
 				if (td.gov().index() == td.dep().index())
 					continue; // prevent infitive recusion
+
 				int depIdx = td.dep().index();
+
 				if (td.reln().toString().equals("prep")) {
 					String prep = td.dep().nodeString();
-					Iterable<TypedDependency> children = graph.adj(td.dep().index());
-					TreeGraphNode obj = null;
-					for(TypedDependency child : children){
-						GrammaticalRelation dgr = child.reln(); 
-						if(dgr.toString().equals("pobj")){
-							obj = child.dep();
+					TreeGraphNode obj = searchObjforPrep(graph, td.dep());
+					if (obj != null) {
+						PPPhraseSpec ppp = generatePrepP(tds, prep, obj, graph);
+						if (np.getPostModifiers().size() != 0) {
+							np.addPostModifier(ppp);
+						} else
+							np.setPostModifier(ppp);
+					}
+
+					continue; // do not deep travel any more
+
+				} else if (td.reln().toString().equals("nn")) {
+					NPPhraseSpec nounModifier = generateNP(tds, td.dep(), graph);
+					if (td.dep().index() < head.index()) {
+						if (np.getPreModifiers().size() != 0) {
+							np.addPreModifier(nounModifier);
+						} else
+							np.setPreModifier(nounModifier);
+					} else {
+						if (np.getPostModifiers().size() != 0) {
+							np.addPostModifier(nounModifier);
+						} else
+							np.setPostModifier(nounModifier);
+					}
+
+					continue;
+
+				} else if (td.reln().toString().equals("conj")) {
+
+					Iterable<TypedDependency> children = graph.adj(td.gov()
+							.index());
+					TreeGraphNode cc = null;
+					for (TypedDependency child : children) {
+						GrammaticalRelation dgr = child.reln();
+						if (dgr.toString().equals("cc")) {
+							cc = child.dep();
 						}
 					}
-					PPPhraseSpec ppp = generatePrepP(tds, prep, obj);
-					if (np.getPostModifiers().size() != 0) {
-						np.addPostModifier(ppp);
-					} else
-						np.setPostModifier(ppp);
-					continue; // do not deep travel any more
-				} else if (td.reln().toString().equals("nn")) {
-					NPPhraseSpec tmp = generateNP(tds, td.dep());
-					if (td.dep().index() < head.index())
-						np.setPreModifier(tmp);
-					else
-						np.setPostModifier(tmp);
-					continue;
-				} else if (td.reln().toString().startsWith("conj")) {
-					NPPhraseSpec tmp = generateNP(tds, td.dep());
-					String conj = td.reln().toString().replace("conj_", "");
-					np.addPostModifier(conj + " ");
-					np.addPostModifier(tmp);
-					continue;
-				} else if (td.reln().toString().equals("det")) {
-					TreeGraphNode det = td.dep();
+					NPPhraseSpec nounModifier = generateNP(tds, td.dep(), graph);
+					if(cc != null){
+						if (np.getPostModifiers().size() != 0) {
+							np.addPostModifier(cc.nodeString());
+							np.addPostModifier(nounModifier);
+						} else{
+							np.setPostModifier(cc.nodeString());
+							np.addPostModifier(nounModifier);
+						}	
+					}else{
+						if (np.getPostModifiers().size() != 0) {
+							np.addPostModifier(nounModifier);
+						} else{
+							np.addPostModifier(nounModifier);
+						}	
+					}
 
+					continue;
+				} else if (td.reln().toString().equals("det") || td.reln().toString().equals("poss")) {
+					TreeGraphNode det = td.dep();
 					np.setSpecifier(det.value());
 				} else if (td.reln().toString().equals("num")) {
-					TreeGraphNode numMod = td.dep();
-					np.addPreModifier(numMod.value());
+
+					TreeGraphNode numModifier = td.dep();
+					np.setSpecifier(numModifier.value());
 
 				} else if (td.reln().toString().equals("amod")) {
 					TreeGraphNode adjMod = td.dep();
-					if (adjMod.index() < head.index())
-						np.addPreModifier(adjMod.value());
-					else
-						np.addPostModifier(adjMod.value());
+					if (adjMod.index() < head.index()) {
+						if (np.getPreModifiers().size() != 0) {
+							np.addPreModifier(adjMod.nodeString());
+						} else
+							np.setPreModifier(adjMod.nodeString());
+
+					} else {
+						if (np.getPostModifiers().size() != 0) {
+							np.addPostModifier(adjMod.nodeString());
+						} else
+							np.setPostModifier(adjMod.nodeString());
+					}
+
 				} else
 					continue; // this is ignore all the other children
 
@@ -294,160 +389,80 @@ public class AbstractiveGeneration {
 					marked[depIdx] = true;
 					stack.add(depIdx);
 				}
-			}
+			}// end of typed Dependency
 		}
 
 		return np;
 	}
 
-	// follow the order to set vp
 	private VPPhraseSpec generateVP(Collection<TypedDependency> tds,
-			TreeGraphNode headVp, ArrayList<TreeGraphNode> object) {
-		
-		DependencyGraph graph = new DependencyGraph(tds.size()*2);
-
-		for (TypedDependency td : tds) {
-			graph.addEdge(td);
-		}
+			TreeGraphNode headVp, ArrayList<TreeGraphNode> object,
+			DependencyGraph graph) {
 
 		VPPhraseSpec vp = nlgFactory.createVerbPhrase();
 		vp.setHead(headVp.nodeString());
+		// set aux of the headVerb
+		Iterable<TypedDependency> children = graph.adj(headVp.index());
+		for (TypedDependency td : children) {
+			if (td.reln().toString().equals("aux")) {
+				vp.setPreModifier(td.dep().nodeString());
+				break;
+			}
+		}
 
-
+		// set object
 		if (object != null) {
-			
-			if(object.size() == 1){
-				
+
+			if (object.size() == 1) {
 				// set direct object
-				NPPhraseSpec dirObjNp = generateNP(tds, object.get(0));
+				NPPhraseSpec dirObjNp = generateNP(tds, object.get(0), graph);
+				vp.setObject(dirObjNp);
+			}
+
+			if (object.size() == 2) {
+				// set prep object from direct children
+				String prep = object.get(0).nodeString();
+				TreeGraphNode obj = searchObjforPrep(graph, object.get(0));
+				if (obj == null) {
+					System.out
+							.println("Prep Obj is NULL in generate VP. Program is stopped");
+					System.exit(0);
+				}
+				PPPhraseSpec ppp = generatePrepP(tds, prep, obj, graph);
+				vp.setObject(ppp);
+
+			}
+
+			if (object.size() == 3) {
+
+				// set direct and prep object
+				NPPhraseSpec dirObjNp = generateNP(tds, object.get(0), graph);
 				vp.setObject(dirObjNp);
 
-				// set indirect object from direct children
-				Iterable<TypedDependency> iter = graph.adj(headVp.index());
-				for (TypedDependency td : iter) {
-					if (td.reln().toString().startsWith("iobj")) {
-						NPPhraseSpec indirObjNp = generateNP(tds, td.dep());
-						vp.setIndirectObject(indirObjNp);
-						break;
-					}
+				String prep = object.get(1).nodeString();
+				TreeGraphNode obj = searchObjforPrep(graph, object.get(1));
+				if (obj == null) {
+					System.out
+							.println("Prep Obj is NULL in generate VP when obj size is 3. Program is stopped");
+					System.exit(0);
 				}
-				
-			}
-			
-			if((object.size() == 2)){
-				// set prep object from direct children
-				Iterable<TypedDependency> iter = graph.adj(object.get(0).index());
-				for (TypedDependency td : iter) {
-					if (td.reln().toString().startsWith("pobj")) {
-						PPPhraseSpec ppp = generatePrepP(tds, td.gov().nodeString(),td.dep());
-						vp.setPostModifier(ppp);
-						break;
-					}
-				}
-			}
 
-		} else {
-			// set verb complement
-			Iterable<TypedDependency> iter = graph.adj(headVp.index());
-			for (TypedDependency td : iter) {
-				if (td.reln().toString().startsWith("ccomp")
-						&& (td.dep().index() > headVp.index())) {
-					String comp = generateClauseComplement(graph, td.dep());
-					if (vp.getPostModifiers().size() != 0) {
-						vp.addPostModifier(comp);
-					} else
-						vp.setPostModifier(comp);
-				}
+				PPPhraseSpec ppp = generatePrepP(tds, prep, obj, graph);
+				vp.setPostModifier(ppp);
+
 			}
 
 		}
-
-/*		// set prep and open clause complement if it has
-		Stack<Integer> stack = new Stack<Integer>();
-		boolean[] marked = new boolean[graph.V()];
-		int headIdx = headVp.index();
-		marked[headIdx] = true;
-		stack.add(headIdx);
-		while (!stack.isEmpty()) {
-			int s = stack.pop();
-			Iterable<TypedDependency> iter = graph.adj(s);
-			for (TypedDependency td : iter) {
-				int depIdx = td.dep().index();
-				if (td.reln().toString().startsWith("prep")) {
-					String prep = null;
-					if (td.reln().toString().equals("prep")) {
-						continue;
-					}
-					prep = td.reln().toString().replaceAll("prepc?_", ""); // dependency
-																			// has
-																			// prepc
-					prep = prep.replaceAll("_", " "); // prep_out_of
-					TreeGraphNode obj = td.dep();
-					PPPhraseSpec ppp = generatePrepP(tds, prep, obj);
-					if (ppp == null)
-						continue;
-					if (vp.getPostModifiers().size() != 0) {
-						vp.addPostModifier(ppp);
-					} else
-						vp.setPostModifier(ppp);
-				} else if (td.reln().toString().startsWith("xcomp")) {
-					String comp = generateClauseComplement(graph, td.dep());
-					if (vp.getPostModifiers().size() != 0) {
-						vp.addPostModifier(comp);
-					} else
-						vp.setPostModifier(comp);
-
-				} else
-					continue;// this is ignore all the other children
-
-				if (!marked[depIdx]) {
-					marked[depIdx] = true;
-					stack.add(depIdx);
-				}
-			}
-
-		}*/
 		return vp;
 	}
 
-	private PPPhraseSpec generatePrepP(Collection<TypedDependency> tds, String prep,
-			TreeGraphNode np) {
+	private PPPhraseSpec generatePrepP(Collection<TypedDependency> tds,
+			String prep, TreeGraphNode np, DependencyGraph graph) {
 		PPPhraseSpec ppp = nlgFactory.createPrepositionPhrase();
 		ppp.setPreposition(prep);
-		NPPhraseSpec npp = generateNP(tds, np);
+		NPPhraseSpec npp = generateNP(tds, np, graph);
 		ppp.setObject(npp);
 		return ppp;
-	}
-
-	private String generateClauseComplement(DependencyGraph graph,
-			TreeGraphNode predicate) {
-
-		Stack<Integer> stack = new Stack<Integer>();
-		boolean[] marked = new boolean[graph.V()];
-		int headIdx = predicate.index();
-		marked[headIdx] = true;
-		stack.add(headIdx);
-		TreeMap<Integer, TreeGraphNode> map = new TreeMap<Integer, TreeGraphNode>();
-		map.put(predicate.index(), predicate);
-		while (!stack.isEmpty()) {
-			int s = stack.pop();
-			Iterable<TypedDependency> iter = graph.adj(s);
-			for (TypedDependency td : iter) {
-				int depIdx = td.dep().index();
-				if (!marked[depIdx]) {
-					map.put(depIdx, td.dep());
-					marked[depIdx] = true;
-					stack.add(depIdx);
-				}
-			}
-		}
-		StringBuilder sb = new StringBuilder();
-		Set<Integer> keys = map.keySet();
-		for (Integer i : keys) {
-			sb.append(map.get(i).value() + " ");
-		}
-
-		return sb.toString().trim();
 	}
 
 	public void run(String inputCorpusDir, String outputSummaryDir,
