@@ -7,7 +7,7 @@ import edu.pengli.nlp.conference.cikm2012.pipe.CharSequenceCleanTweets;
 import edu.pengli.nlp.conference.cikm2012.pipe.iterator.TweetsUserIterator;
 import edu.pengli.nlp.conference.cikm2012.types.TweetCorpus;
 import edu.pengli.nlp.platform.pipe.PipeLine;
-import edu.pengli.nlp.platform.pipe.SentenceTokenization;
+import edu.pengli.nlp.platform.pipe.CharSequenceTokenizationAndSentencesplit;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.util.FileOperation;
 
@@ -30,7 +30,7 @@ public class PreProcessingTweets {
 			// one tweet as one sentence, so do not need sentence detection.
 			PipeLine pipeLine = new PipeLine();
 			pipeLine.addPipe(new CharSequenceCleanTweets());
-			pipeLine.addPipe(new SentenceTokenization());
+			pipeLine.addPipe(new CharSequenceTokenizationAndSentencesplit());
 			TweetCorpus tc = new TweetCorpus(tUserIter, pipeLine);
 			
 			PrintWriter out = FileOperation.getPrintWriter(new File(twiDir+"/cleaned"), topic+".clean");

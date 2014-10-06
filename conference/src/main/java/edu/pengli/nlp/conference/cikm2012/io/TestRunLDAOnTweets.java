@@ -11,7 +11,7 @@ import edu.pengli.nlp.platform.algorithms.lda.TwitterLDAModel;
 import edu.pengli.nlp.platform.pipe.CharSequence2TokenSequence;
 import edu.pengli.nlp.platform.pipe.Noop;
 import edu.pengli.nlp.platform.pipe.PipeLine;
-import edu.pengli.nlp.platform.pipe.SentenceTokenization;
+import edu.pengli.nlp.platform.pipe.CharSequenceTokenizationAndSentencesplit;
 import edu.pengli.nlp.platform.pipe.TokenSequence2FeatureSequence;
 import edu.pengli.nlp.platform.pipe.TokenSequenceLowercase;
 import edu.pengli.nlp.platform.pipe.TokenSequenceRemoveStopwords;
@@ -33,7 +33,7 @@ public class TestRunLDAOnTweets {
 		//one tweet as one sentence, so do not need sentence detection.
 		PipeLine pipeLine = new PipeLine();
 		pipeLine.addPipe(new CharSequenceCleanTweets());
-		pipeLine.addPipe(new SentenceTokenization());
+		pipeLine.addPipe(new CharSequenceTokenizationAndSentencesplit());
 		TweetCorpus tc = new TweetCorpus(tUserIter, pipeLine);
 		
 		pipeLine = new PipeLine();

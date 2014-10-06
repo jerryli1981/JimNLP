@@ -13,7 +13,6 @@ import edu.pengli.nlp.conference.cikm2012.types.TweetCorpus;
 import edu.pengli.nlp.platform.algorithms.lda.CCTAModel;
 import edu.pengli.nlp.platform.algorithms.ranking.LexRank;
 import edu.pengli.nlp.platform.pipe.CharSequence2TokenSequence;
-import edu.pengli.nlp.platform.pipe.FeatureIDFPipe;
 import edu.pengli.nlp.platform.pipe.FeatureSequence2FeatureVector;
 import edu.pengli.nlp.platform.pipe.PipeLine;
 import edu.pengli.nlp.platform.pipe.TokenSequence2FeatureSequence;
@@ -75,7 +74,7 @@ public class simulateGoldStandard {
 		tf_fvs.addThruPipe(sentenceList.iterator());
 
 		pipeLine = new PipeLine();
-		pipeLine.addPipe(new FeatureIDFPipe(tf_fvs));
+//		pipeLine.addPipe(new FeatureVectorTFIDFWeight(tf_fvs));
 		InstanceList tf_idf_fvs = new InstanceList(pipeLine);
 		tf_idf_fvs.addThruPipe(tf_fvs.iterator());
 
@@ -135,7 +134,7 @@ public class simulateGoldStandard {
 
 		tf_fvs.addThruPipe(sentenceList.iterator());
 		pipeLine = new PipeLine();
-		pipeLine.addPipe(new FeatureIDFPipe(tf_fvs));
+//		pipeLine.addPipe(new FeatureVectorTFIDFWeight(tf_fvs));
 		InstanceList tf_idf_fvs = new InstanceList(pipeLine);
 		tf_idf_fvs.addThruPipe(tf_fvs.iterator());
 
@@ -498,7 +497,7 @@ public class simulateGoldStandard {
 		tf_fvs.addThruPipe(sentenceList.iterator());
 
 		pipeLine = new PipeLine();
-		pipeLine.addPipe(new FeatureIDFPipe(tf_fvs));
+//		pipeLine.addPipe(new FeatureVectorTFIDFWeight(tf_fvs));
 		InstanceList tf_idf_fvs = new InstanceList(pipeLine);
 		tf_idf_fvs.addThruPipe(tf_fvs.iterator());
 

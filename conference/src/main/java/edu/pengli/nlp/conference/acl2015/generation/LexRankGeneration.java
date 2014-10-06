@@ -5,10 +5,9 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 
 import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
-import edu.pengli.nlp.conference.acl2015.types.NewsCorpus;
 import edu.pengli.nlp.platform.algorithms.ranking.LexRank;
 import edu.pengli.nlp.platform.pipe.CharSequence2TokenSequence;
-import edu.pengli.nlp.platform.pipe.FeatureIDFPipe;
+import edu.pengli.nlp.platform.pipe.CharSequenceTokenizationAndSentencesplit;
 import edu.pengli.nlp.platform.pipe.FeatureSequence2FeatureVector;
 import edu.pengli.nlp.platform.pipe.Input2CharSequence;
 import edu.pengli.nlp.platform.pipe.Noop;
@@ -118,11 +117,18 @@ public class LexRankGeneration {
 		pipeLine.addPipe(new Input2CharSequence("UTF-8"));
 		pipeLine.addPipe(new CharSequenceExtractContent(
 				"<TEXT>[\\p{Graph}\\p{Space}]*</TEXT>"));
-		NewsCorpus corpus = new NewsCorpus(fIter, pipeLine);
+		pipeLine.addPipe(new CharSequenceTokenizationAndSentencesplit());
+		pipeLine.addPipe(new CharSequence2TokenSequence());
+		pipeLine.addPipe(new TokenSequenceLowercase());
+		pipeLine.addPipe(new TokenSequenceRemoveStopwords());
+		pipeLine.addPipe(new TokenSequence2FeatureSequence());
+		pipeLine.addPipe(new FeatureSequence2FeatureVector());
+//		NewsCorpus corpus = new NewsCorpus(fIter, pipeLine, null);
 
 		pipeLine = new PipeLine();
 		pipeLine.addPipe(new Noop());
-		NewsCorpus docs = new NewsCorpus(corpus, pipeLine);
+//		NewsCorpus docs = new NewsCorpus(corpus.iterator(), null, null);
+		InstanceList docs = null;
 
 		InstanceList totalSentenceList = new InstanceList(null);
 		for (Instance doc : docs) {
@@ -144,7 +150,7 @@ public class LexRankGeneration {
 		tf_fvs.addThruPipe(totalSentenceList.iterator());
 
 		pipeLine = new PipeLine();
-		pipeLine.addPipe(new FeatureIDFPipe(tf_fvs));
+//		pipeLine.addPipe(new FeatureVectorTFIDFWeight(tf_fvs));
 		InstanceList tf_idf_fvs = new InstanceList(pipeLine);
 		tf_idf_fvs.addThruPipe(tf_fvs.iterator());
 

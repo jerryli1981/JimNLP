@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
@@ -14,19 +13,9 @@ import org.jdom2.input.SAXBuilder;
 import edu.pengli.nlp.conference.acl2015.generation.AbstractiveGeneration;
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.RougeEvaluationWrapper;
-import edu.stanford.nlp.parser.lexparser.LexicalizedParser;
+
 
 public class OurMethod {
-
-	private static LexicalizedParser lp;
-	
-	static {
-		
-		String[] options = { "-maxLength", "200", "-retainTmpSubcategories" };
-		
-		lp = LexicalizedParser
-				.loadModel("../models/Stanford/lexparser/englishPCFG.ser.gz", options);
-	};
 
 	public static void main(String[] args) throws JDOMException, IOException {
 
@@ -39,13 +28,12 @@ public class OurMethod {
 		ArrayList<String> corpusNameList = new ArrayList<String>();
 		String outputSummaryDir = "../data/ACL2015/Output";
 		for (int i = 0; i < corpusList.size(); i++) {
-			System.out.println("******************************CORPUS ID IS " + i);
 			Element topic = corpusList.get(i);
 			List<Element> docSets = topic.getChildren();
 			Element docSetA = docSets.get(1);
 			String corpusName = docSetA.getAttributeValue("id");
 			corpusNameList.add(corpusName);
-			AbstractiveGeneration ag = new AbstractiveGeneration(lp);
+			AbstractiveGeneration ag = new AbstractiveGeneration();
 			ag.run(inputCorpusDir + "/" + topic.getAttributeValue("id"),
 					outputSummaryDir, corpusName);
 

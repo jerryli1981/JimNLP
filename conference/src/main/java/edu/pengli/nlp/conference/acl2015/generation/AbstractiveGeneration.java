@@ -1,33 +1,31 @@
 package edu.pengli.nlp.conference.acl2015.generation;
 
-import java.io.StringReader;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Stack;
 
 import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
 import edu.pengli.nlp.conference.acl2015.types.InformationItem;
-import edu.pengli.nlp.conference.acl2015.types.NewsCorpus;
+import edu.pengli.nlp.platform.pipe.CharSequenceTokenizationAndSentencesplit;
 import edu.pengli.nlp.platform.pipe.Input2CharSequence;
-import edu.pengli.nlp.platform.pipe.Noop;
 import edu.pengli.nlp.platform.pipe.PipeLine;
+import edu.pengli.nlp.platform.pipe.SentenceParsing;
 import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerFileIterator;
+import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerLineIterator;
 import edu.pengli.nlp.platform.types.DependencyGraph;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.types.InstanceList;
-import edu.stanford.nlp.ling.HasWord;
-import edu.stanford.nlp.parser.lexparser.LexicalizedParser;
-import edu.stanford.nlp.process.Tokenizer;
+import edu.stanford.nlp.ling.IndexedWord;
+
+import edu.stanford.nlp.pipeline.Annotation;
+import edu.stanford.nlp.semgraph.SemanticGraph;
+import edu.stanford.nlp.semgraph.SemanticGraphEdge;
 import edu.stanford.nlp.trees.GrammaticalRelation;
-import edu.stanford.nlp.trees.GrammaticalStructure;
-import edu.stanford.nlp.trees.GrammaticalStructureFactory;
-import edu.stanford.nlp.trees.PennTreebankLanguagePack;
-import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.trees.TreeGraphNode;
-import edu.stanford.nlp.trees.TreebankLanguagePack;
 import edu.stanford.nlp.trees.TypedDependency;
+
 import simplenlg.framework.NLGFactory;
 import simplenlg.lexicon.Lexicon;
 import simplenlg.phrasespec.NPPhraseSpec;
@@ -40,53 +38,22 @@ public class AbstractiveGeneration {
 
 	NLGFactory nlgFactory;
 	Realiser realiser;
-	LexicalizedParser lp;
-	TreebankLanguagePack tlp;
-	GrammaticalStructureFactory gsf;
 
-	public AbstractiveGeneration(LexicalizedParser lp) {
+
+	public AbstractiveGeneration() {
 		Lexicon lexicon = Lexicon.getDefaultLexicon();
 		nlgFactory = new NLGFactory(lexicon);
 		realiser = new Realiser(lexicon);
-		this.lp = lp;
-		tlp = new PennTreebankLanguagePack();
-		gsf = tlp.grammaticalStructureFactory();
 	}
 
-	private Tree parseSentence(Instance sent) {
-
-		// the first way
-		/*
-		 * TokenizerFactory<CoreLabel> tokenizerFactory = PTBTokenizer.factory(
-		 * new CoreLabelTokenFactory(), ""); Tokenizer<CoreLabel> tok =
-		 * tokenizerFactory .getTokenizer(new StringReader((String)
-		 * sent.getSource())); List<CoreLabel> rawWords2 = tok.tokenize();
-		 * 
-		 * return lp.apply(rawWords2);
-		 */
-
-		// //////////////////
-
-		// the second way is better than first way in performance
-		Tokenizer<? extends HasWord> toke = tlp.getTokenizerFactory()
-				.getTokenizer(new StringReader((String) sent.getSource()));
-		List<? extends HasWord> sentence = toke.tokenize();
-		return lp.parse(sentence);
-
-	}
 
 	/*
 	 * current implementation just cove direct object and prep object, subject
 	 * and predicate are necessary. object could be empty.
 	 */
-	private ArrayList<InformationItem> extractInformationItems(Tree parseTree,
-			Collection<TypedDependency> tds) {
-
-		DependencyGraph graph = new DependencyGraph(parseTree.size());
-		for (TypedDependency td : tds) {
-			graph.addEdge(td);
-		}
-
+	private ArrayList<InformationItem> extractInformationItems(SemanticGraph graph) {
+		
+		Collection<TypedDependency> tds = graph.typedDependencies();
 		HashSet<TreeGraphNode> predicates = new HashSet<TreeGraphNode>();
 		TreeGraphNode subjectIncase = null;
 		for (TypedDependency td : tds) {
@@ -99,16 +66,16 @@ public class AbstractiveGeneration {
 				predicates.add(gov);
 			}
 
-			if (gr.toString().equals("nsubj")) {
-				Iterable<TypedDependency> iter = graph.adj(td.gov().index());
-				for (TypedDependency child : iter) {
-					GrammaticalRelation dgr = child.reln();
+			if (gr.toString().equals("nsubj")) {			
+				IndexedWord word = new IndexedWord(td.gov().label());
+				Iterable<SemanticGraphEdge> children = graph.outgoingEdgeIterable(word);
+				for(SemanticGraphEdge sge : children){
+					GrammaticalRelation dgr = sge.getRelation();
 					if (dgr.toString().equals("dobj")
-							|| (dgr.toString().equals("prep") && child.gov()
+							|| (dgr.toString().equals("prep") && gov
 									.parent().nodeString().startsWith("VB"))) {
 						subjectIncase = td.dep();
 					}
-
 				}
 
 			}
@@ -205,38 +172,25 @@ public class AbstractiveGeneration {
 
 	}
 
-	private ArrayList<String> generate(Instance sent) {
-
-//		sent.setSource("The suspect apparently called his wife from a cell phone shortly before the shooting began, saying he was acting out in revenge for something that happened 20 years ago, Miller said.");
-		Tree parsedTree = parseSentence(sent);
-		GrammaticalStructure gs = gsf.newGrammaticalStructure(parsedTree);
-		Collection<TypedDependency> tds = gs.typedDependencies();
-
-		DependencyGraph dg = new DependencyGraph(parsedTree.size());
-
-		for (TypedDependency td : tds) {
-			dg.addEdge(td);
-		}
+	private ArrayList<String> generate(SemanticGraph graph) {
 
 		SPhraseSpec newSent = nlgFactory.createClause();
 		ArrayList<String> comSents = new ArrayList<String>();
-		System.out.println("Original Sent is: " + sent.getSource());
-		ArrayList<InformationItem> items = extractInformationItems(parsedTree,
-				tds);
+
+		ArrayList<InformationItem> items = extractInformationItems(graph);
 
 		if (items.size() != 0)
 			for (InformationItem item : items) {
 
 				System.out.println("Information Item is: " + item.toString());
 
-				NPPhraseSpec subjectNp = generateNP(tds, item.getSubject(), dg);
+//				NPPhraseSpec subjectNp = generateNP(tds, item.getSubject(), dg);
 
-				newSent.setSubject(subjectNp);
+//				newSent.setSubject(subjectNp);
 
-				VPPhraseSpec vp = generateVP(tds, item.getPredicate(),
-						item.getObject(), dg);
+//				VPPhraseSpec vp = generateVP(tds, item.getPredicate(),item.getObject(), dg);
 
-				newSent.setVerbPhrase(vp);
+//				newSent.setVerbPhrase(vp);
 
 				String output = realiser.realiseSentence(newSent);
 
@@ -423,11 +377,6 @@ public class AbstractiveGeneration {
 				// set prep object from direct children
 				String prep = object.get(0).nodeString();
 				TreeGraphNode obj = searchObjforPrep(graph, object.get(0));
-				if (obj == null) {
-					System.out
-							.println("Prep Obj is NULL in generate VP. Program is stopped");
-					System.exit(0);
-				}
 				PPPhraseSpec ppp = generatePrepP(tds, prep, obj, graph);
 				vp.setObject(ppp);
 
@@ -441,12 +390,6 @@ public class AbstractiveGeneration {
 
 				String prep = object.get(1).nodeString();
 				TreeGraphNode obj = searchObjforPrep(graph, object.get(1));
-				if (obj == null) {
-					System.out
-							.println("Prep Obj is NULL in generate VP when obj size is 3. Program is stopped");
-					System.exit(0);
-				}
-
 				PPPhraseSpec ppp = generatePrepP(tds, prep, obj, graph);
 				vp.setPostModifier(ppp);
 
@@ -475,25 +418,23 @@ public class AbstractiveGeneration {
 		pipeLine.addPipe(new Input2CharSequence("UTF-8"));
 		pipeLine.addPipe(new CharSequenceExtractContent(
 				"<TEXT>[\\p{Graph}\\p{Space}]*</TEXT>"));
-		NewsCorpus corpus = new NewsCorpus(fIter, pipeLine);
-
+		pipeLine.addPipe(new CharSequenceTokenizationAndSentencesplit());
+		InstanceList docs = new InstanceList(pipeLine);
+		docs.addThruPipe(fIter);
+		
 		pipeLine = new PipeLine();
-		pipeLine.addPipe(new Noop());
-		NewsCorpus docs = new NewsCorpus(corpus, pipeLine);
-
-		InstanceList totalSentenceList = new InstanceList(null);
-		for (Instance doc : docs) {
-			InstanceList sentsList = (InstanceList) doc.getSource();
-			for (Instance inst : sentsList) {
-				Instance sent = new Instance(inst.getSource(), null,
-						inst.getName(), inst.getSource());
-				totalSentenceList.add(sent);
-			}
-		}
-
-		for (Instance sent : totalSentenceList) {
-			ArrayList<String> candidateSents = generate(sent);
-
+		pipeLine.addPipe(new SentenceParsing());
+		
+		for(Instance doc : docs){
+			Annotation text = (Annotation)doc.getData();
+			OneInstancePerLineIterator lineIter = 
+					new OneInstancePerLineIterator((CharSequence)text.toString());
+			InstanceList sentList = new InstanceList(pipeLine);
+		    sentList.addThruPipe(lineIter);
+		    for(Instance sent : sentList){
+		    	SemanticGraph graph = (SemanticGraph)sent.getData();
+		    	ArrayList<String> candidateSents = generate(graph);
+		    }
 		}
 
 	}
