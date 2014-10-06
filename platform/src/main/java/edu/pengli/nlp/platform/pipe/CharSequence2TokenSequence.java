@@ -26,6 +26,7 @@ public class CharSequence2TokenSequence extends Pipe {
 			ts.add(tok);
 		}
 		carrier.setData(ts);
+		carrier.setSource(string);
 
 		return carrier;
 

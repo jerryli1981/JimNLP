@@ -7,6 +7,7 @@ import edu.pengli.nlp.platform.types.FeatureSequence;
 import edu.pengli.nlp.platform.types.Instance;
 import gnu.trove.map.hash.TIntIntHashMap;
 
+//this is count how many docs contains features
 public class FeatureDocFreqPipe extends Pipe {
 	
 	FeatureCounter counter;

@@ -5,6 +5,8 @@ import edu.pengli.nlp.platform.types.FeatureCounter;
 import edu.pengli.nlp.platform.types.FeatureSequence;
 import edu.pengli.nlp.platform.types.Instance;
 
+
+// count feature frequence in the collection
 public class FeatureCountPipe extends Pipe {
 
 

@@ -3,7 +3,7 @@ package edu.pengli.nlp.platform.types;
 import java.util.LinkedList;
 
 import edu.stanford.nlp.trees.TypedDependency;
-
+//need to remove
 public class DependencyGraph {
 
 	private int V; // number of vertices
