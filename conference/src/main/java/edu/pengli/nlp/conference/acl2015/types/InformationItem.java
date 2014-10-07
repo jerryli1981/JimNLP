@@ -2,28 +2,30 @@ package edu.pengli.nlp.conference.acl2015.types;
 
 import java.util.ArrayList;
 
+import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.trees.TreeGraphNode;
 
+//this is pattern
 public class InformationItem {
 	
-	private TreeGraphNode subject;
-	private TreeGraphNode predicate;
-	private ArrayList<TreeGraphNode> object;
+	private IndexedWord subject;
+	private IndexedWord predicate;
+	private ArrayList<IndexedWord> object;
 	
-	public InformationItem(TreeGraphNode subject, TreeGraphNode predicate, 
-			ArrayList<TreeGraphNode> object){
+	public InformationItem(IndexedWord subject, IndexedWord predicate, 
+			ArrayList<IndexedWord> object){
 		this.subject = subject;
 		this.predicate = predicate;
 		this.object = object;
 	}
 	
-	public TreeGraphNode getSubject(){
+	public IndexedWord getSubject(){
 		return subject;
 	}
-	public TreeGraphNode getPredicate(){
+	public IndexedWord getPredicate(){
 		return predicate;
 	}
-	public ArrayList<TreeGraphNode> getObject(){
+	public ArrayList<IndexedWord> getObject(){
 		return object;
 	}
 	
@@ -31,14 +33,14 @@ public class InformationItem {
 		if(object != null)
 		{
 			StringBuffer objectMention = new StringBuffer();;
-			for(TreeGraphNode n : object){
-				objectMention.append(n.nodeString()+" ");
+			for(IndexedWord n : object){
+				objectMention.append(n.originalText()+" ");
 			}
 	
-			return "S:"+subject.nodeString()+"<----->"+"P:"+predicate.nodeString()+"<----->"+"O:"+objectMention.toString().trim();
+			return "S:"+subject.originalText()+"<----->"+"P:"+predicate.originalText()+"<----->"+"O:"+objectMention.toString().trim();
 		}else{
 			
-			return "S:"+subject.nodeString()+"<----->"+"P:"+predicate.nodeString();
+			return "S:"+subject.originalText()+"<----->"+"P:"+predicate.originalText();
 		}
 			
 		

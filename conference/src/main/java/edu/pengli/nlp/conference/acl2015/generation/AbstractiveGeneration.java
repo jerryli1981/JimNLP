@@ -4,6 +4,7 @@ package edu.pengli.nlp.conference.acl2015.generation;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Stack;
 
 import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
@@ -14,18 +15,13 @@ import edu.pengli.nlp.platform.pipe.PipeLine;
 import edu.pengli.nlp.platform.pipe.SentenceParsing;
 import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerFileIterator;
 import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerLineIterator;
-import edu.pengli.nlp.platform.types.DependencyGraph;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.types.InstanceList;
 import edu.stanford.nlp.ling.IndexedWord;
-
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
 import edu.stanford.nlp.trees.GrammaticalRelation;
-import edu.stanford.nlp.trees.TreeGraphNode;
-import edu.stanford.nlp.trees.TypedDependency;
-
 import simplenlg.framework.NLGFactory;
 import simplenlg.lexicon.Lexicon;
 import simplenlg.phrasespec.NPPhraseSpec;
@@ -46,99 +42,132 @@ public class AbstractiveGeneration {
 		realiser = new Realiser(lexicon);
 	}
 
-
 	/*
 	 * current implementation just cove direct object and prep object, subject
 	 * and predicate are necessary. object could be empty.
 	 */
 	private ArrayList<InformationItem> extractInformationItems(SemanticGraph graph) {
 		
-		Collection<TypedDependency> tds = graph.typedDependencies();
-		HashSet<TreeGraphNode> predicates = new HashSet<TreeGraphNode>();
-		TreeGraphNode subjectIncase = null;
-		for (TypedDependency td : tds) {
-			TreeGraphNode gov = td.gov();
-			GrammaticalRelation gr = td.reln();
-			if (gr.toString().equals("nsubj")
-					|| gr.toString().equals("dobj")
-					|| (gr.toString().equals("prep") && gov.parent()
-							.nodeString().startsWith("VB"))) {
-				predicates.add(gov);
-			}
-
-			if (gr.toString().equals("nsubj")) {			
-				IndexedWord word = new IndexedWord(td.gov().label());
-				Iterable<SemanticGraphEdge> children = graph.outgoingEdgeIterable(word);
-				for(SemanticGraphEdge sge : children){
-					GrammaticalRelation dgr = sge.getRelation();
-					if (dgr.toString().equals("dobj")
-							|| (dgr.toString().equals("prep") && gov
-									.parent().nodeString().startsWith("VB"))) {
-						subjectIncase = td.dep();
+		HashSet<IndexedWord> predicates = new HashSet<IndexedWord>();
+		Stack<Integer> stack = new Stack<Integer>();
+		boolean[] marked = new boolean[graph.size()*2]; //index count from 1, also contains punc.
+		int rootIdx = graph.getFirstRoot().index();
+		marked[rootIdx] = true;
+		stack.add(rootIdx);
+		List<IndexedWord> sentenceSubjects = new ArrayList<IndexedWord>();
+		while (!stack.isEmpty()) {
+			int s = stack.pop();
+			Iterable<SemanticGraphEdge> iter = 
+					graph.outgoingEdgeIterable(graph.getNodeByIndex(s));
+			for (SemanticGraphEdge edge : iter) {
+				GrammaticalRelation gr = edge.getRelation();
+				IndexedWord gov = edge.getGovernor();
+				if (gr.toString().equals("nsubj")
+						|| gr.toString().equals("dobj")|| 
+						(gr.toString().equals("prep") && gov.tag().startsWith("VB"))) {
+					predicates.add(edge.getGovernor());
+				}
+				
+				//find sentence subject
+				if (gr.toString().equals("nsubj") && gov.tag().startsWith("VB")) {
+					Collection<IndexedWord> sibs = graph.getSiblings(edge.getDependent());
+					for(IndexedWord sib : sibs){
+						GrammaticalRelation dgr = graph.reln(gov, sib);
+						if (dgr.toString().equals("dobj")
+								|| (dgr.toString().equals("prep"))) {
+							
+							sentenceSubjects.add(edge.getDependent());
+						}
 					}
 				}
-
+				
+				int depIdx = edge.getDependent().index();
+				if (!marked[depIdx]) {
+					marked[depIdx] = true;
+					stack.add(depIdx);
+				}
 			}
 		}
-
+					
 		ArrayList<InformationItem> possibleItems = new ArrayList<InformationItem>();
+		
+		if (sentenceSubjects.size() == 0)
+			return possibleItems;
 
-		for (TreeGraphNode p : predicates) {
+		for (IndexedWord p : predicates) {
 
 			boolean subjectExist = false;
 			boolean directObjectExist = false;
 			boolean prepObjectExist = false;
-			TreeGraphNode subject = null;
-			TreeGraphNode directObject = null;
-			TreeGraphNode prep = null;
-			TreeGraphNode prepObject = null;
-
-			for (TypedDependency td : tds) {
-				TreeGraphNode gov = td.gov();
-				if (!gov.equals(p))
-					continue;
-				TreeGraphNode dep = td.dep();
-				GrammaticalRelation gr = td.reln();
-				if (gr.toString().equals("nsubj")) {
-					subjectExist = true;
-					subject = dep;
-				}
-				if (gr.getShortName().equals("dobj")) {
-					directObjectExist = true;
-					directObject = dep;
-				}
-				if (gr.toString().equals("prep")
-						&& gov.parent().nodeString().startsWith("VB")) {
-
-					for (TypedDependency pair : tds) {
-						TreeGraphNode g = pair.gov();
-						if (dep.equals(g)
-								&& pair.reln().toString().equals("pobj")) {
-							prepObjectExist = true;
-							prep = g;
-							prepObject = pair.dep();
+			IndexedWord subject = null;
+			IndexedWord directObject = null;
+			IndexedWord prep = null;
+			IndexedWord prepObject = null;
+			
+			// travel the graph
+			
+			stack = new Stack<Integer>();
+			marked = new boolean[graph.size()*2]; //index count from 1, also contains punc.
+			rootIdx = graph.getFirstRoot().index();
+			marked[rootIdx] = true;
+			stack.add(rootIdx);
+			while (!stack.isEmpty()) {
+				int s = stack.pop();
+				Iterable<SemanticGraphEdge> iter = 
+						graph.outgoingEdgeIterable(p);
+				for (SemanticGraphEdge edge : iter) {
+					GrammaticalRelation gr = edge.getRelation();
+					IndexedWord gov = edge.getGovernor();
+					if (gr.toString().equals("nsubj")){
+						subjectExist = true;
+						subject = edge.getDependent();
+					}
+					
+					if (gr.toString().equals("dobj")) {
+						directObjectExist = true;
+						directObject = edge.getDependent();
+					}
+					
+					if (gr.toString().equals("prep")
+							&& gov.tag().startsWith("VB")) {
+						
+						Iterable<SemanticGraphEdge> children = 
+								graph.outgoingEdgeIterable(edge.getDependent());
+						for(SemanticGraphEdge child : children){
+							GrammaticalRelation dgr = child.getRelation();
+							if (dgr.toString().equals("pobj")) {
+								prepObjectExist = true;
+								prep = edge.getDependent();
+								prepObject = child.getDependent();
+							}
 						}
-
+							
+					}
+					
+									
+					int depIdx = edge.getDependent().index();
+					if (!marked[depIdx]) {
+						marked[depIdx] = true;
+						stack.add(depIdx);
 					}
 				}
 			}
 
-			if (subjectIncase == null)
-				continue;
+
 
 			if (subjectExist == false && directObjectExist == true
 					&& prepObjectExist == false) {
-				ArrayList<TreeGraphNode> obj = new ArrayList<TreeGraphNode>();
+				ArrayList<IndexedWord> obj = new ArrayList<IndexedWord>();
 				obj.add(directObject);
-				possibleItems.add(new InformationItem(subjectIncase, p, obj));
+				possibleItems.add(new InformationItem(sentenceSubjects.get(0), p, obj));
 
 			} else if (subjectExist == false && directObjectExist == false
 					&& prepObjectExist == true) {
 
-				ArrayList<TreeGraphNode> obj = new ArrayList<TreeGraphNode>();
+				ArrayList<IndexedWord> obj = new ArrayList<IndexedWord>();
 				obj.add(prep);
 				obj.add(prepObject);
-				possibleItems.add(new InformationItem(subjectIncase, p, obj));
+				possibleItems.add(new InformationItem(sentenceSubjects.get(0), p, obj));
 
 			} else if (subjectExist == true && directObjectExist == false
 					&& prepObjectExist == false) {
@@ -147,20 +176,20 @@ public class AbstractiveGeneration {
 
 			} else if (subjectExist == true && directObjectExist == true
 					&& prepObjectExist == false) {
-				ArrayList<TreeGraphNode> obj = new ArrayList<TreeGraphNode>();
+				ArrayList<IndexedWord> obj = new ArrayList<IndexedWord>();
 				obj.add(directObject);
 				possibleItems.add(new InformationItem(subject, p, obj));
 			} else if (subjectExist == true && directObjectExist == false
 					&& prepObjectExist == true) {
 
-				ArrayList<TreeGraphNode> obj = new ArrayList<TreeGraphNode>();
+				ArrayList<IndexedWord> obj = new ArrayList<IndexedWord>();
 				obj.add(prep);
 				obj.add(prepObject);
 				possibleItems.add(new InformationItem(subject, p, obj));
 			} else if (subjectExist == true && directObjectExist == true
 					&& prepObjectExist == true) {
 				// One Amish man craned his head out a buggy window
-				ArrayList<TreeGraphNode> obj = new ArrayList<TreeGraphNode>();
+				ArrayList<IndexedWord> obj = new ArrayList<IndexedWord>();
 				obj.add(directObject);
 				obj.add(prep);
 				obj.add(prepObject);
@@ -184,13 +213,13 @@ public class AbstractiveGeneration {
 
 				System.out.println("Information Item is: " + item.toString());
 
-//				NPPhraseSpec subjectNp = generateNP(tds, item.getSubject(), dg);
+				NPPhraseSpec subjectNp = generateNP(graph, item.getSubject());
 
-//				newSent.setSubject(subjectNp);
+				newSent.setSubject(subjectNp);
 
-//				VPPhraseSpec vp = generateVP(tds, item.getPredicate(),item.getObject(), dg);
+				VPPhraseSpec vp = generateVP(graph, item.getPredicate(),item.getObject());
 
-//				newSent.setVerbPhrase(vp);
+				newSent.setVerbPhrase(vp);
 
 				String output = realiser.realiseSentence(newSent);
 
@@ -202,27 +231,26 @@ public class AbstractiveGeneration {
 	}
 
 	// search the tree recursively
-	private TreeGraphNode searchObjforPrep(DependencyGraph graph,
-			TreeGraphNode prepNode) {
+	private IndexedWord searchObjforPrep(SemanticGraph graph, IndexedWord prepNode) {
 
-		TreeGraphNode obj = null;
+		IndexedWord obj = null;
 		Stack<Integer> stack = new Stack<Integer>();
-		boolean[] marked = new boolean[graph.V()];
+		boolean[] marked = new boolean[graph.size()*2];
 		int headIdx = prepNode.index();
 		marked[headIdx] = true;
 		stack.add(headIdx);
 		boolean stop =false;
 		while (!stack.isEmpty()) {
 			int s = stack.pop();
-			Iterable<TypedDependency> iter = graph.adj(s);
+			Iterable<SemanticGraphEdge> iter = graph.outgoingEdgeIterable(prepNode);
 			
-			for (TypedDependency td : iter) {
-				GrammaticalRelation dgr = td.reln();
+			for (SemanticGraphEdge edge : iter) {
+				GrammaticalRelation dgr = edge.getRelation();
 				if (dgr.toString().endsWith("obj") || dgr.toString().endsWith("pcomp")) {
-					obj = td.dep();
+					obj = edge.getDependent();
 					stop = true;
 				}
-				int depIdx = td.dep().index();
+				int depIdx = edge.getDependent().index();
 				if (!marked[depIdx]) {
 					marked[depIdx] = true;
 					stack.add(depIdx);
@@ -230,36 +258,36 @@ public class AbstractiveGeneration {
 			}
 			if(stop == true)
 				break;
-			
 		}
 
 		return obj;
 	}
 
-	private NPPhraseSpec generateNP(Collection<TypedDependency> tds,
-			TreeGraphNode head, DependencyGraph graph) {
+	private NPPhraseSpec generateNP(SemanticGraph graph, IndexedWord head) {
 
 		NPPhraseSpec np = nlgFactory.createNounPhrase();
-		np.setHead(head.headWordNode().value());
+		np.setHead(head.originalText());
 		Stack<Integer> stack = new Stack<Integer>();
-		boolean[] marked = new boolean[graph.V()];
+		boolean[] marked = new boolean[graph.size()*2];
 		int headIdx = head.index();
 		marked[headIdx] = true;
 		stack.add(headIdx);
 		while (!stack.isEmpty()) {
 			int s = stack.pop();
-			Iterable<TypedDependency> iter = graph.adj(s);
-			for (TypedDependency td : iter) {
-				if (td.gov().index() == td.dep().index())
+			Iterable<SemanticGraphEdge> iter = graph.outgoingEdgeIterable(graph.getNodeByIndex(s));
+			for (SemanticGraphEdge edge : iter) {
+				if (edge.getGovernor().index() == edge.getDependent().index())
 					continue; // prevent infitive recusion
+				
+				GrammaticalRelation gr = edge.getRelation();
 
-				int depIdx = td.dep().index();
+				int depIdx = edge.getDependent().index();
 
-				if (td.reln().toString().equals("prep")) {
-					String prep = td.dep().nodeString();
-					TreeGraphNode obj = searchObjforPrep(graph, td.dep());
+				if (gr.toString().equals("prep")) {
+					String prep = edge.getDependent().originalText();
+					IndexedWord obj = searchObjforPrep(graph, edge.getDependent());
 					if (obj != null) {
-						PPPhraseSpec ppp = generatePrepP(tds, prep, obj, graph);
+						PPPhraseSpec ppp = generatePrepP(graph, prep, obj);
 						if (np.getPostModifiers().size() != 0) {
 							np.addPostModifier(ppp);
 						} else
@@ -268,9 +296,9 @@ public class AbstractiveGeneration {
 
 					continue; // do not deep travel any more
 
-				} else if (td.reln().toString().equals("nn")) {
-					NPPhraseSpec nounModifier = generateNP(tds, td.dep(), graph);
-					if (td.dep().index() < head.index()) {
+				} else if (gr.toString().equals("nn")) {
+					NPPhraseSpec nounModifier = generateNP(graph, edge.getDependent());
+					if (edge.getDependent().index() < head.index()) {
 						if (np.getPreModifiers().size() != 0) {
 							np.addPreModifier(nounModifier);
 						} else
@@ -284,24 +312,23 @@ public class AbstractiveGeneration {
 
 					continue;
 
-				} else if (td.reln().toString().equals("conj")) {
+				} else if (gr.toString().equals("conj")) {
 
-					Iterable<TypedDependency> children = graph.adj(td.gov()
-							.index());
-					TreeGraphNode cc = null;
-					for (TypedDependency child : children) {
-						GrammaticalRelation dgr = child.reln();
+					Iterable<SemanticGraphEdge> children = graph.outgoingEdgeIterable(edge.getGovernor());
+					IndexedWord cc = null;
+					for (SemanticGraphEdge child : children) {
+						GrammaticalRelation dgr = child.getRelation();
 						if (dgr.toString().equals("cc")) {
-							cc = child.dep();
+							cc = child.getDependent();
 						}
 					}
-					NPPhraseSpec nounModifier = generateNP(tds, td.dep(), graph);
+					NPPhraseSpec nounModifier = generateNP(graph, edge.getDependent());
 					if(cc != null){
 						if (np.getPostModifiers().size() != 0) {
-							np.addPostModifier(cc.nodeString());
+							np.addPostModifier(cc.originalText());
 							np.addPostModifier(nounModifier);
 						} else{
-							np.setPostModifier(cc.nodeString());
+							np.setPostModifier(cc.originalText());
 							np.addPostModifier(nounModifier);
 						}	
 					}else{
@@ -313,27 +340,27 @@ public class AbstractiveGeneration {
 					}
 
 					continue;
-				} else if (td.reln().toString().equals("det") || td.reln().toString().equals("poss")) {
-					TreeGraphNode det = td.dep();
+				} else if (gr.toString().equals("det") || gr.toString().equals("poss")) {
+					IndexedWord det = edge.getDependent();
 					np.setSpecifier(det.value());
-				} else if (td.reln().toString().equals("num")) {
+				} else if (gr.toString().equals("num")) {
 
-					TreeGraphNode numModifier = td.dep();
+					IndexedWord numModifier = edge.getDependent();
 					np.setSpecifier(numModifier.value());
 
-				} else if (td.reln().toString().equals("amod")) {
-					TreeGraphNode adjMod = td.dep();
+				} else if (gr.toString().equals("amod")) {
+					IndexedWord adjMod = edge.getDependent();
 					if (adjMod.index() < head.index()) {
 						if (np.getPreModifiers().size() != 0) {
-							np.addPreModifier(adjMod.nodeString());
+							np.addPreModifier(adjMod.originalText());
 						} else
-							np.setPreModifier(adjMod.nodeString());
+							np.setPreModifier(adjMod.originalText());
 
 					} else {
 						if (np.getPostModifiers().size() != 0) {
-							np.addPostModifier(adjMod.nodeString());
+							np.addPostModifier(adjMod.originalText());
 						} else
-							np.setPostModifier(adjMod.nodeString());
+							np.setPostModifier(adjMod.originalText());
 					}
 
 				} else
@@ -349,17 +376,17 @@ public class AbstractiveGeneration {
 		return np;
 	}
 
-	private VPPhraseSpec generateVP(Collection<TypedDependency> tds,
-			TreeGraphNode headVp, ArrayList<TreeGraphNode> object,
-			DependencyGraph graph) {
+	private VPPhraseSpec generateVP(SemanticGraph graph,
+			IndexedWord headVp, ArrayList<IndexedWord> object) {
 
 		VPPhraseSpec vp = nlgFactory.createVerbPhrase();
-		vp.setHead(headVp.nodeString());
+		vp.setHead(headVp.originalText());
 		// set aux of the headVerb
-		Iterable<TypedDependency> children = graph.adj(headVp.index());
-		for (TypedDependency td : children) {
-			if (td.reln().toString().equals("aux")) {
-				vp.setPreModifier(td.dep().nodeString());
+		Iterable<SemanticGraphEdge> children = graph.outgoingEdgeIterable(headVp);
+		for (SemanticGraphEdge edge : children) {
+			GrammaticalRelation gr = edge.getRelation();
+			if (gr.toString().equals("aux")) {
+				vp.setPreModifier(edge.getDependent().originalText());
 				break;
 			}
 		}
@@ -369,15 +396,15 @@ public class AbstractiveGeneration {
 
 			if (object.size() == 1) {
 				// set direct object
-				NPPhraseSpec dirObjNp = generateNP(tds, object.get(0), graph);
+				NPPhraseSpec dirObjNp = generateNP(graph, object.get(0));
 				vp.setObject(dirObjNp);
 			}
 
 			if (object.size() == 2) {
 				// set prep object from direct children
-				String prep = object.get(0).nodeString();
-				TreeGraphNode obj = searchObjforPrep(graph, object.get(0));
-				PPPhraseSpec ppp = generatePrepP(tds, prep, obj, graph);
+				String prep = object.get(0).originalText();
+				IndexedWord obj = searchObjforPrep(graph, object.get(0));
+				PPPhraseSpec ppp = generatePrepP(graph, prep, obj);
 				vp.setObject(ppp);
 
 			}
@@ -385,12 +412,12 @@ public class AbstractiveGeneration {
 			if (object.size() == 3) {
 
 				// set direct and prep object
-				NPPhraseSpec dirObjNp = generateNP(tds, object.get(0), graph);
+				NPPhraseSpec dirObjNp = generateNP(graph, object.get(0));
 				vp.setObject(dirObjNp);
 
-				String prep = object.get(1).nodeString();
-				TreeGraphNode obj = searchObjforPrep(graph, object.get(1));
-				PPPhraseSpec ppp = generatePrepP(tds, prep, obj, graph);
+				String prep = object.get(1).originalText();
+				IndexedWord obj = searchObjforPrep(graph, object.get(1));
+				PPPhraseSpec ppp = generatePrepP(graph, prep, obj);
 				vp.setPostModifier(ppp);
 
 			}
@@ -399,11 +426,10 @@ public class AbstractiveGeneration {
 		return vp;
 	}
 
-	private PPPhraseSpec generatePrepP(Collection<TypedDependency> tds,
-			String prep, TreeGraphNode np, DependencyGraph graph) {
+	private PPPhraseSpec generatePrepP(SemanticGraph graph, String prep, IndexedWord np) {
 		PPPhraseSpec ppp = nlgFactory.createPrepositionPhrase();
 		ppp.setPreposition(prep);
-		NPPhraseSpec npp = generateNP(tds, np, graph);
+		NPPhraseSpec npp = generateNP(graph, np);
 		ppp.setObject(npp);
 		return ppp;
 	}
@@ -432,8 +458,8 @@ public class AbstractiveGeneration {
 			InstanceList sentList = new InstanceList(pipeLine);
 		    sentList.addThruPipe(lineIter);
 		    for(Instance sent : sentList){
-		    	SemanticGraph graph = (SemanticGraph)sent.getData();
-		    	ArrayList<String> candidateSents = generate(graph);
+		    	System.out.println("Original Sent is: "+sent.getSource());
+		    	generate((SemanticGraph)sent.getData());
 		    }
 		}
 
