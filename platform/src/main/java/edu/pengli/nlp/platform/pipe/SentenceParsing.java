@@ -21,7 +21,7 @@ public class SentenceParsing extends Pipe{
 	public SentenceParsing() {
 
 		Properties props = new Properties();
-		props.put("annotators", "tokenize, ssplit, parse");
+		props.put("annotators", "tokenize, ssplit, pos, parse");
 		props.put("parse.model", "../models/Stanford/models/lexparser/englishPCFG.ser.gz");
 		props.put("parser.flags", "-retainTmpSubcategories");
 		props.put("pos.model", "../models/Stanford/models/pos-tagger/english-left3words/english-left3words-distsim.tagger");
@@ -30,6 +30,8 @@ public class SentenceParsing extends Pipe{
 
 	public Instance pipe(Instance inst) {
 		String text = (String) inst.getData();
+		inst.setSource(text);
+//		text = "GEORGETOWN, Pennsylvania 2006-10-05 16:53:53 UTC A procession of 34 buggies and carriages carried mourners to a hilltop cemetery Thursday as the Amish community buried the first of five girls killed by a gunman inside their tiny one-room schoolhouse.";
 		Annotation annotation = new Annotation(text);
 		parser.annotate(annotation);
 		List<CoreMap> sentences = annotation.get(SentencesAnnotation.class);
@@ -37,10 +39,10 @@ public class SentenceParsing extends Pipe{
 			System.out.println("Impossible of Sentence Parsing");
 			System.exit(0);
 		}
-		Tree tree = null;
+//		Tree tree = null;
 		SemanticGraph dependencies = null;
 		for(CoreMap sentence: sentences) {
-		   tree = sentence.get(TreeAnnotation.class);
+//		   tree = sentence.get(TreeAnnotation.class);
 		   dependencies = sentence.get(BasicDependenciesAnnotation.class);
 		}
 		inst.setData(dependencies);		
