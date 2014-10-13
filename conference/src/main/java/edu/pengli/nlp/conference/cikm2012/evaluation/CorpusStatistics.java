@@ -13,7 +13,7 @@ import edu.pengli.nlp.platform.algorithms.lda.CCTAModel;
 import edu.pengli.nlp.platform.pipe.CharSequence2TokenSequence;
 import edu.pengli.nlp.platform.pipe.Input2CharSequence;
 import edu.pengli.nlp.platform.pipe.PipeLine;
-import edu.pengli.nlp.platform.pipe.CharSequenceTokenizationAndSentencesplit;
+import edu.pengli.nlp.platform.pipe.CharSequenceCoreNLPAnnotation;
 import edu.pengli.nlp.platform.pipe.TokenSequence2FeatureSequence;
 import edu.pengli.nlp.platform.pipe.TokenSequenceLowercase;
 import edu.pengli.nlp.platform.pipe.TokenSequenceRemoveStopwords;
@@ -44,7 +44,7 @@ public class CorpusStatistics {
 			// one tweet as one sentence, so do not need sentence detection.
 			PipeLine pipeLine = new PipeLine();
 			pipeLine.addPipe(new CharSequenceCleanTweets());
-			pipeLine.addPipe(new CharSequenceTokenizationAndSentencesplit());
+			pipeLine.addPipe(new CharSequenceCoreNLPAnnotation());
 			TweetCorpus tc = new TweetCorpus(tUserIter, pipeLine);
 
 			pipeLine = new PipeLine();
@@ -71,7 +71,7 @@ public class CorpusStatistics {
 			pipeLine = new PipeLine();
 			pipeLine.addPipe(new Input2CharSequence("UTF-8"));
 			pipeLine.addPipe(new CharSequenceCleanNews());
-			pipeLine.addPipe(new CharSequenceTokenizationAndSentencesplit());
+			pipeLine.addPipe(new CharSequenceCoreNLPAnnotation());
 			GoogleNewsCorpus gc = new GoogleNewsCorpus(fIter, pipeLine);
 			pipeLine = new PipeLine();
 			pipeLine.addPipe(new CharSequence2TokenSequence());

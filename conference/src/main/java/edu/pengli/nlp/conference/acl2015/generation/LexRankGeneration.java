@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
 import edu.pengli.nlp.platform.algorithms.ranking.LexRank;
 import edu.pengli.nlp.platform.pipe.CharSequence2TokenSequence;
-import edu.pengli.nlp.platform.pipe.CharSequenceTokenizationAndSentencesplit;
+import edu.pengli.nlp.platform.pipe.CharSequenceCoreNLPAnnotation;
 import edu.pengli.nlp.platform.pipe.FeatureSequence2FeatureVector;
 import edu.pengli.nlp.platform.pipe.Input2CharSequence;
 import edu.pengli.nlp.platform.pipe.Noop;
@@ -117,7 +117,7 @@ public class LexRankGeneration {
 		pipeLine.addPipe(new Input2CharSequence("UTF-8"));
 		pipeLine.addPipe(new CharSequenceExtractContent(
 				"<TEXT>[\\p{Graph}\\p{Space}]*</TEXT>"));
-		pipeLine.addPipe(new CharSequenceTokenizationAndSentencesplit());
+		pipeLine.addPipe(new CharSequenceCoreNLPAnnotation());
 		pipeLine.addPipe(new CharSequence2TokenSequence());
 		pipeLine.addPipe(new TokenSequenceLowercase());
 		pipeLine.addPipe(new TokenSequenceRemoveStopwords());

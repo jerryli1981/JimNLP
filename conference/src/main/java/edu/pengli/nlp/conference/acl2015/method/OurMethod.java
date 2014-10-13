@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
@@ -17,7 +18,7 @@ import edu.pengli.nlp.platform.util.RougeEvaluationWrapper;
 
 public class OurMethod {
 
-	public static void main(String[] args) throws JDOMException, IOException {
+	public static void main(String[] args) throws JDOMException, IOException, ClassNotFoundException {
 
 		SAXBuilder builder = new SAXBuilder();
 		String inputCorpusDir = "../data/ACL2015/testData";
@@ -36,11 +37,10 @@ public class OurMethod {
 			AbstractiveGeneration ag = new AbstractiveGeneration();
 			ag.run(inputCorpusDir + "/" + topic.getAttributeValue("id"),
 					outputSummaryDir, corpusName);
-
 		}
 
 		// Rouge Evaluation
-		String modelSummaryDir = "../data/ACL2015/ROUGE/models";
+/*		String modelSummaryDir = "../data/ACL2015/ROUGE/models";
 		ArrayList<File> files = FileOperation.travelFileList(new File(
 				modelSummaryDir));
 		HashMap<String, ArrayList<String>> modelSummariesMap = new HashMap<String, ArrayList<String>>();
@@ -70,7 +70,7 @@ public class OurMethod {
 				confFilePath);
 		String metric = "ROUGE-SU4";
 		HashMap map = RougeEvaluationWrapper.runRough(confFilePath, metric);
-		System.out.println(metric + " is " + (Double) map.get(metric));
+		System.out.println(metric + " is " + (Double) map.get(metric));*/
 
 		System.out.println("Our method is done");
 

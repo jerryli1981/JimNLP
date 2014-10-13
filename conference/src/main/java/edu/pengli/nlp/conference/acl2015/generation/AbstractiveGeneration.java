@@ -1,27 +1,42 @@
 package edu.pengli.nlp.conference.acl2015.generation;
 
-
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Stack;
 
+import edu.knowitall.openie.Argument;
 import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
+import edu.pengli.nlp.conference.acl2015.pipe.RelationExtraction;
 import edu.pengli.nlp.conference.acl2015.types.InformationItem;
-import edu.pengli.nlp.platform.pipe.CharSequenceTokenizationAndSentencesplit;
+import edu.pengli.nlp.conference.acl2015.types.Pattern;
+import edu.pengli.nlp.platform.pipe.CharSequenceCoreNLPAnnotation;
 import edu.pengli.nlp.platform.pipe.Input2CharSequence;
 import edu.pengli.nlp.platform.pipe.PipeLine;
-import edu.pengli.nlp.platform.pipe.SentenceParsing;
 import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerFileIterator;
 import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerLineIterator;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.types.InstanceList;
+import edu.pengli.nlp.platform.util.FileOperation;
+import edu.stanford.nlp.ling.CoreAnnotations.NamedEntityTagAnnotation;
+import edu.stanford.nlp.ling.CoreAnnotations.PartOfSpeechAnnotation;
+import edu.stanford.nlp.ling.CoreAnnotations.TextAnnotation;
+import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
+import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
 import edu.stanford.nlp.trees.GrammaticalRelation;
+import edu.stanford.nlp.util.CoreMap;
+import scala.collection.Seq;
+import scala.collection.Iterator;
 import simplenlg.framework.NLGFactory;
 import simplenlg.lexicon.Lexicon;
 import simplenlg.phrasespec.NPPhraseSpec;
@@ -35,7 +50,6 @@ public class AbstractiveGeneration {
 	NLGFactory nlgFactory;
 	Realiser realiser;
 
-
 	public AbstractiveGeneration() {
 		Lexicon lexicon = Lexicon.getDefaultLexicon();
 		nlgFactory = new NLGFactory(lexicon);
@@ -46,41 +60,47 @@ public class AbstractiveGeneration {
 	 * current implementation just cove direct object and prep object, subject
 	 * and predicate are necessary. object could be empty.
 	 */
-	private ArrayList<InformationItem> extractInformationItems(SemanticGraph graph) {
-		
+
+	private ArrayList<InformationItem> extractInformationItems(
+			SemanticGraph graph) {
+
 		HashSet<IndexedWord> predicates = new HashSet<IndexedWord>();
 		Stack<Integer> stack = new Stack<Integer>();
-		boolean[] marked = new boolean[graph.size()*2]; //index count from 1, also contains punc.
+		boolean[] marked = new boolean[graph.size() * 2]; // index count from 1,
+															// also contains
+															// punc.
 		int rootIdx = graph.getFirstRoot().index();
 		marked[rootIdx] = true;
 		stack.add(rootIdx);
 		List<IndexedWord> sentenceSubjects = new ArrayList<IndexedWord>();
 		while (!stack.isEmpty()) {
 			int s = stack.pop();
-			Iterable<SemanticGraphEdge> iter = 
-					graph.outgoingEdgeIterable(graph.getNodeByIndex(s));
+			Iterable<SemanticGraphEdge> iter = graph.outgoingEdgeIterable(graph
+					.getNodeByIndex(s));
 			for (SemanticGraphEdge edge : iter) {
 				GrammaticalRelation gr = edge.getRelation();
 				IndexedWord gov = edge.getGovernor();
 				if (gr.toString().equals("nsubj")
-						|| gr.toString().equals("dobj")|| 
-						(gr.toString().equals("prep") && gov.tag().startsWith("VB"))) {
+						|| gr.toString().equals("dobj")
+						|| (gr.toString().equals("prep") && gov.tag()
+								.startsWith("VB"))) {
 					predicates.add(edge.getGovernor());
 				}
-				
-				//find sentence subject
+
+				// find sentence subject
 				if (gr.toString().equals("nsubj") && gov.tag().startsWith("VB")) {
-					Collection<IndexedWord> sibs = graph.getSiblings(edge.getDependent());
-					for(IndexedWord sib : sibs){
+					Collection<IndexedWord> sibs = graph.getSiblings(edge
+							.getDependent());
+					for (IndexedWord sib : sibs) {
 						GrammaticalRelation dgr = graph.reln(gov, sib);
 						if (dgr.toString().equals("dobj")
 								|| (dgr.toString().equals("prep"))) {
-							
+
 							sentenceSubjects.add(edge.getDependent());
 						}
 					}
 				}
-				
+
 				int depIdx = edge.getDependent().index();
 				if (!marked[depIdx]) {
 					marked[depIdx] = true;
@@ -88,9 +108,9 @@ public class AbstractiveGeneration {
 				}
 			}
 		}
-					
+
 		ArrayList<InformationItem> possibleItems = new ArrayList<InformationItem>();
-		
+
 		if (sentenceSubjects.size() == 0)
 			return possibleItems;
 
@@ -103,37 +123,38 @@ public class AbstractiveGeneration {
 			IndexedWord directObject = null;
 			IndexedWord prep = null;
 			IndexedWord prepObject = null;
-			
+
 			// travel the graph
-			
+
 			stack = new Stack<Integer>();
-			marked = new boolean[graph.size()*2]; //index count from 1, also contains punc.
+			marked = new boolean[graph.size() * 2]; // index count from 1, also
+													// contains punc.
 			rootIdx = graph.getFirstRoot().index();
 			marked[rootIdx] = true;
 			stack.add(rootIdx);
 			while (!stack.isEmpty()) {
 				int s = stack.pop();
-				Iterable<SemanticGraphEdge> iter = 
-						graph.outgoingEdgeIterable(p);
+				Iterable<SemanticGraphEdge> iter = graph
+						.outgoingEdgeIterable(p);
 				for (SemanticGraphEdge edge : iter) {
 					GrammaticalRelation gr = edge.getRelation();
 					IndexedWord gov = edge.getGovernor();
-					if (gr.toString().equals("nsubj")){
+					if (gr.toString().equals("nsubj")) {
 						subjectExist = true;
 						subject = edge.getDependent();
 					}
-					
+
 					if (gr.toString().equals("dobj")) {
 						directObjectExist = true;
 						directObject = edge.getDependent();
 					}
-					
+
 					if (gr.toString().equals("prep")
 							&& gov.tag().startsWith("VB")) {
-						
-						Iterable<SemanticGraphEdge> children = 
-								graph.outgoingEdgeIterable(edge.getDependent());
-						for(SemanticGraphEdge child : children){
+
+						Iterable<SemanticGraphEdge> children = graph
+								.outgoingEdgeIterable(edge.getDependent());
+						for (SemanticGraphEdge child : children) {
 							GrammaticalRelation dgr = child.getRelation();
 							if (dgr.toString().equals("pobj")) {
 								prepObjectExist = true;
@@ -141,10 +162,9 @@ public class AbstractiveGeneration {
 								prepObject = child.getDependent();
 							}
 						}
-							
+
 					}
-					
-									
+
 					int depIdx = edge.getDependent().index();
 					if (!marked[depIdx]) {
 						marked[depIdx] = true;
@@ -153,13 +173,12 @@ public class AbstractiveGeneration {
 				}
 			}
 
-
-
 			if (subjectExist == false && directObjectExist == true
 					&& prepObjectExist == false) {
 				ArrayList<IndexedWord> obj = new ArrayList<IndexedWord>();
 				obj.add(directObject);
-				possibleItems.add(new InformationItem(sentenceSubjects.get(0), p, obj));
+				possibleItems.add(new InformationItem(sentenceSubjects.get(0),
+						p, obj));
 
 			} else if (subjectExist == false && directObjectExist == false
 					&& prepObjectExist == true) {
@@ -167,7 +186,8 @@ public class AbstractiveGeneration {
 				ArrayList<IndexedWord> obj = new ArrayList<IndexedWord>();
 				obj.add(prep);
 				obj.add(prepObject);
-				possibleItems.add(new InformationItem(sentenceSubjects.get(0), p, obj));
+				possibleItems.add(new InformationItem(sentenceSubjects.get(0),
+						p, obj));
 
 			} else if (subjectExist == true && directObjectExist == false
 					&& prepObjectExist == false) {
@@ -217,7 +237,8 @@ public class AbstractiveGeneration {
 
 				newSent.setSubject(subjectNp);
 
-				VPPhraseSpec vp = generateVP(graph, item.getPredicate(),item.getObject());
+				VPPhraseSpec vp = generateVP(graph, item.getPredicate(),
+						item.getObject());
 
 				newSent.setVerbPhrase(vp);
 
@@ -231,22 +252,25 @@ public class AbstractiveGeneration {
 	}
 
 	// search the tree recursively
-	private IndexedWord searchObjforPrep(SemanticGraph graph, IndexedWord prepNode) {
+	private IndexedWord searchObjforPrep(SemanticGraph graph,
+			IndexedWord prepNode) {
 
 		IndexedWord obj = null;
 		Stack<Integer> stack = new Stack<Integer>();
-		boolean[] marked = new boolean[graph.size()*2];
+		boolean[] marked = new boolean[graph.size() * 2];
 		int headIdx = prepNode.index();
 		marked[headIdx] = true;
 		stack.add(headIdx);
-		boolean stop =false;
+		boolean stop = false;
 		while (!stack.isEmpty()) {
 			int s = stack.pop();
-			Iterable<SemanticGraphEdge> iter = graph.outgoingEdgeIterable(prepNode);
-			
+			Iterable<SemanticGraphEdge> iter = graph
+					.outgoingEdgeIterable(prepNode);
+
 			for (SemanticGraphEdge edge : iter) {
 				GrammaticalRelation dgr = edge.getRelation();
-				if (dgr.toString().endsWith("obj") || dgr.toString().endsWith("pcomp")) {
+				if (dgr.toString().endsWith("obj")
+						|| dgr.toString().endsWith("pcomp")) {
 					obj = edge.getDependent();
 					stop = true;
 				}
@@ -256,7 +280,7 @@ public class AbstractiveGeneration {
 					stack.add(depIdx);
 				}
 			}
-			if(stop == true)
+			if (stop == true)
 				break;
 		}
 
@@ -268,24 +292,26 @@ public class AbstractiveGeneration {
 		NPPhraseSpec np = nlgFactory.createNounPhrase();
 		np.setHead(head.originalText());
 		Stack<Integer> stack = new Stack<Integer>();
-		boolean[] marked = new boolean[graph.size()*2];
+		boolean[] marked = new boolean[graph.size() * 2];
 		int headIdx = head.index();
 		marked[headIdx] = true;
 		stack.add(headIdx);
 		while (!stack.isEmpty()) {
 			int s = stack.pop();
-			Iterable<SemanticGraphEdge> iter = graph.outgoingEdgeIterable(graph.getNodeByIndex(s));
+			Iterable<SemanticGraphEdge> iter = graph.outgoingEdgeIterable(graph
+					.getNodeByIndex(s));
 			for (SemanticGraphEdge edge : iter) {
 				if (edge.getGovernor().index() == edge.getDependent().index())
 					continue; // prevent infitive recusion
-				
+
 				GrammaticalRelation gr = edge.getRelation();
 
 				int depIdx = edge.getDependent().index();
 
 				if (gr.toString().equals("prep")) {
 					String prep = edge.getDependent().originalText();
-					IndexedWord obj = searchObjforPrep(graph, edge.getDependent());
+					IndexedWord obj = searchObjforPrep(graph,
+							edge.getDependent());
 					if (obj != null) {
 						PPPhraseSpec ppp = generatePrepP(graph, prep, obj);
 						if (np.getPostModifiers().size() != 0) {
@@ -297,7 +323,8 @@ public class AbstractiveGeneration {
 					continue; // do not deep travel any more
 
 				} else if (gr.toString().equals("nn")) {
-					NPPhraseSpec nounModifier = generateNP(graph, edge.getDependent());
+					NPPhraseSpec nounModifier = generateNP(graph,
+							edge.getDependent());
 					if (edge.getDependent().index() < head.index()) {
 						if (np.getPreModifiers().size() != 0) {
 							np.addPreModifier(nounModifier);
@@ -314,7 +341,8 @@ public class AbstractiveGeneration {
 
 				} else if (gr.toString().equals("conj")) {
 
-					Iterable<SemanticGraphEdge> children = graph.outgoingEdgeIterable(edge.getGovernor());
+					Iterable<SemanticGraphEdge> children = graph
+							.outgoingEdgeIterable(edge.getGovernor());
 					IndexedWord cc = null;
 					for (SemanticGraphEdge child : children) {
 						GrammaticalRelation dgr = child.getRelation();
@@ -322,25 +350,27 @@ public class AbstractiveGeneration {
 							cc = child.getDependent();
 						}
 					}
-					NPPhraseSpec nounModifier = generateNP(graph, edge.getDependent());
-					if(cc != null){
+					NPPhraseSpec nounModifier = generateNP(graph,
+							edge.getDependent());
+					if (cc != null) {
 						if (np.getPostModifiers().size() != 0) {
 							np.addPostModifier(cc.originalText());
 							np.addPostModifier(nounModifier);
-						} else{
+						} else {
 							np.setPostModifier(cc.originalText());
 							np.addPostModifier(nounModifier);
-						}	
-					}else{
+						}
+					} else {
 						if (np.getPostModifiers().size() != 0) {
 							np.addPostModifier(nounModifier);
-						} else{
+						} else {
 							np.addPostModifier(nounModifier);
-						}	
+						}
 					}
 
 					continue;
-				} else if (gr.toString().equals("det") || gr.toString().equals("poss")) {
+				} else if (gr.toString().equals("det")
+						|| gr.toString().equals("poss")) {
 					IndexedWord det = edge.getDependent();
 					np.setSpecifier(det.value());
 				} else if (gr.toString().equals("num")) {
@@ -376,13 +406,14 @@ public class AbstractiveGeneration {
 		return np;
 	}
 
-	private VPPhraseSpec generateVP(SemanticGraph graph,
-			IndexedWord headVp, ArrayList<IndexedWord> object) {
+	private VPPhraseSpec generateVP(SemanticGraph graph, IndexedWord headVp,
+			ArrayList<IndexedWord> object) {
 
 		VPPhraseSpec vp = nlgFactory.createVerbPhrase();
 		vp.setHead(headVp.originalText());
 		// set aux of the headVerb
-		Iterable<SemanticGraphEdge> children = graph.outgoingEdgeIterable(headVp);
+		Iterable<SemanticGraphEdge> children = graph
+				.outgoingEdgeIterable(headVp);
 		for (SemanticGraphEdge edge : children) {
 			GrammaticalRelation gr = edge.getRelation();
 			if (gr.toString().equals("aux")) {
@@ -426,7 +457,8 @@ public class AbstractiveGeneration {
 		return vp;
 	}
 
-	private PPPhraseSpec generatePrepP(SemanticGraph graph, String prep, IndexedWord np) {
+	private PPPhraseSpec generatePrepP(SemanticGraph graph, String prep,
+			IndexedWord np) {
 		PPPhraseSpec ppp = nlgFactory.createPrepositionPhrase();
 		ppp.setPreposition(prep);
 		NPPhraseSpec npp = generateNP(graph, np);
@@ -434,8 +466,61 @@ public class AbstractiveGeneration {
 		return ppp;
 	}
 
+	private ArrayList<Pattern> generateEventSchema(InstanceList corpus) {
+
+		for (Instance doc : corpus) {
+
+			HashMap<CoreMap, Seq<edu.knowitall.openie.Instance>> map = (HashMap<CoreMap, Seq<edu.knowitall.openie.Instance>>) doc
+					.getData();
+
+			Set<CoreMap> sentences = map.keySet();
+			for (CoreMap sent : sentences) {
+				System.out.println(sent.toString());
+
+				for (CoreLabel token : sent.get(TokensAnnotation.class)) {
+					String word = token.get(TextAnnotation.class);
+					String pos = token.get(PartOfSpeechAnnotation.class);
+					String ne = token.get(NamedEntityTagAnnotation.class);
+				}
+				Seq<edu.knowitall.openie.Instance> extractions = map.get(sent);
+			}
+
+			InstanceList sents = (InstanceList) doc.getData();
+			for (Instance sent : sents) {
+				Seq<edu.knowitall.openie.Instance> extractions = (Seq<edu.knowitall.openie.Instance>) sent
+						.getData();
+				Iterator<edu.knowitall.openie.Instance> iterator = extractions
+						.iterator();
+				while (iterator.hasNext()) {
+					edu.knowitall.openie.Instance inst = iterator.next();
+					StringBuilder sb = new StringBuilder();
+					sb.append(inst.confidence()).append('\t')
+							.append(inst.extr().arg1().text()).append('\t')
+							.append(inst.extr().rel().text()).append('\t');
+
+					Iterator<Argument> argIter = inst.extr().arg2s().iterator();
+					while (argIter.hasNext()) {
+						Argument arg = argIter.next();
+						sb.append(arg.text()).append("; ");
+					}
+
+					System.out.println(sb.toString());
+				}
+			}
+
+		}
+
+		return null;
+
+	}
+
+	private List<String> generateSummary(ArrayList<Pattern> schema) {
+
+		return null;
+	}
+
 	public void run(String inputCorpusDir, String outputSummaryDir,
-			String corpusName) {
+			String corpusName) throws IOException, ClassNotFoundException {
 
 		OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
 				inputCorpusDir + "/" + corpusName);
@@ -444,25 +529,22 @@ public class AbstractiveGeneration {
 		pipeLine.addPipe(new Input2CharSequence("UTF-8"));
 		pipeLine.addPipe(new CharSequenceExtractContent(
 				"<TEXT>[\\p{Graph}\\p{Space}]*</TEXT>"));
-		pipeLine.addPipe(new CharSequenceTokenizationAndSentencesplit());
+		pipeLine.addPipe(new CharSequenceCoreNLPAnnotation());
+		pipeLine.addPipe(new RelationExtraction());
 		InstanceList docs = new InstanceList(pipeLine);
 		docs.addThruPipe(fIter);
-		
-		pipeLine = new PipeLine();
-		pipeLine.addPipe(new SentenceParsing());
-		
-		for(Instance doc : docs){
-			Annotation text = (Annotation)doc.getData();
-			OneInstancePerLineIterator lineIter = 
-					new OneInstancePerLineIterator((CharSequence)text.toString());
-			InstanceList sentList = new InstanceList(pipeLine);
-		    sentList.addThruPipe(lineIter);
-		    for(Instance sent : sentList){
-		    	System.out.println("Original Sent is: "+sent.getSource());
-		    	generate((SemanticGraph)sent.getData());
-		    }
-		}
 
+		System.out.println("Begin generate envent schema");
+		ArrayList<Pattern> schema = generateEventSchema(docs);
+
+		System.out.println("Begin generate final summary");
+		List<String> summary = generateSummary(schema);
+		PrintWriter out = FileOperation.getPrintWriter(new File(
+				outputSummaryDir), corpusName);
+		for (String sentence : summary) {
+			out.println(sentence);
+		}
+		out.close();
 	}
 
 }
