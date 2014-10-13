@@ -14,19 +14,16 @@ public class InstanceList extends ArrayList<Instance> implements Serializable {
 	Pipe pipe;
 
 	Alphabet dataAlphabet;
-	
-	public InstanceList (Pipe pipe)
-	{
+
+	public InstanceList(Pipe pipe) {
 		this.pipe = pipe;
 	}
 
-	
-	public boolean add (Instance instance)
-	{
+	public boolean add(Instance instance) {
 		if (dataAlphabet == null)
 			dataAlphabet = instance.getDataAlphabet();
 
-		return super.add (instance);
+		return super.add(instance);
 	}
 
 	public void addThruPipe(Iterator<Instance> ii) {
@@ -36,30 +33,33 @@ public class InstanceList extends ArrayList<Instance> implements Serializable {
 			add(inst);
 		}
 	}
-	
+
 	public void setDataAlphabet(Alphabet dataAlphabet) {
 		this.dataAlphabet = dataAlphabet;
 	}
-	
 
 	public Alphabet getDataAlphabet() {
 		if (dataAlphabet == null && pipe != null) {
-			dataAlphabet = pipe.getDataAlphabet ();
+			dataAlphabet = pipe.getDataAlphabet();
 		}
 		return dataAlphabet;
 	}
-	
 
 	private void writeObject(ObjectOutputStream out) throws IOException {
-           out.writeObject(dataAlphabet);
-		
+		out.writeObject(dataAlphabet);
+		for (Instance inst : this) {
+			out.writeObject(inst);
+		}
+
 	}
 
 	private void readObject(ObjectInputStream in) throws IOException,
 			ClassNotFoundException {
 		dataAlphabet = (Alphabet) in.readObject();
+		for (Instance inst : this) {
+			inst = (Instance)in.readObject();
+		}
 	}
-
 
 	public Pipe getPipe() {
 		return pipe;

@@ -1,5 +1,8 @@
 package edu.pengli.nlp.platform.types;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
 public class Instance implements Serializable{
@@ -61,6 +64,27 @@ public class Instance implements Serializable{
 	
 	public void setSource(Object source){
 		this.source = source;
+	}
+	
+	// Serialization of Instance
+
+	private static final long serialVersionUID = 1;
+	private static final int CURRENT_SERIAL_VERSION = 0;
+	
+	private void writeObject (ObjectOutputStream out) throws IOException {
+		out.writeInt (CURRENT_SERIAL_VERSION);
+		out.writeObject(data);
+		out.writeObject(target);
+		out.writeObject(name);
+		out.writeObject(source);
+	}
+	
+	private void readObject (ObjectInputStream in) throws IOException, ClassNotFoundException {
+		int version = in.readInt ();
+		data = in.readObject();
+		target = in.readObject();
+		name = in.readObject();
+		source = in.readObject();
 	}
 
 }

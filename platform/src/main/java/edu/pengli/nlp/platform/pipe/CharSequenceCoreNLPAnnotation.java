@@ -7,14 +7,14 @@ import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.AnnotationPipeline;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 
-public class CharSequenceTokenizationAndSentencesplit extends Pipe {
+public class CharSequenceCoreNLPAnnotation extends Pipe {
 
-	AnnotationPipeline pipeline;
+	StanfordCoreNLP pipeline;
 
-	public CharSequenceTokenizationAndSentencesplit() {
+	public CharSequenceCoreNLPAnnotation() {
 
 		Properties props = new Properties();
-		props.put("annotators", "tokenize, ssplit");
+		props.put("annotators", "tokenize, ssplit, pos, lemma, ner");
 		pipeline = new StanfordCoreNLP(props);
 
 	}
