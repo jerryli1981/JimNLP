@@ -3,6 +3,8 @@ package edu.pengli.nlp.conference.acl2015.generation;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -10,6 +12,19 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.Stack;
+
+import org.apache.commons.httpclient.DefaultHttpMethodRetryHandler;
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.HttpMethod;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.params.HttpMethodParams;
+import org.apache.log4j.Logger;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import edu.knowitall.openie.Argument;
 import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
@@ -30,7 +45,6 @@ import edu.stanford.nlp.ling.CoreAnnotations.TextAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.IndexedWord;
-import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
 import edu.stanford.nlp.trees.GrammaticalRelation;
@@ -49,11 +63,19 @@ public class AbstractiveGeneration {
 
 	NLGFactory nlgFactory;
 	Realiser realiser;
+	
+	private final static String API_URL = "http://spotlight.dbpedia.org/";
+	private static final double CONFIDENCE = 0.0;
+	private static final int SUPPORT = 0;
+    private static HttpClient client;
+    private Logger LOG;
 
 	public AbstractiveGeneration() {
 		Lexicon lexicon = Lexicon.getDefaultLexicon();
 		nlgFactory = new NLGFactory(lexicon);
 		realiser = new Realiser(lexicon);
+	    LOG = Logger.getLogger(this.getClass());
+		client = new HttpClient();
 	}
 
 	/*
@@ -465,30 +487,112 @@ public class AbstractiveGeneration {
 		ppp.setObject(npp);
 		return ppp;
 	}
+	
+	
+    private String request(HttpMethod method){
+
+        String response = null;
+
+        // Provide custom retry handler is necessary
+        method.getParams().setParameter(HttpMethodParams.RETRY_HANDLER,
+                new DefaultHttpMethodRetryHandler(3, false));
+
+        try {
+            // Execute the method.
+            int statusCode = client.executeMethod(method);
+
+            if (statusCode != HttpStatus.SC_OK) {
+                LOG.error("Method failed: " + method.getStatusLine());
+            }
+
+            // Read the response body.
+            byte[] responseBody = method.getResponseBody(); //TODO Going to buffer response body of large or unknown size. Using getResponseBodyAsStream instead is recommended.
+
+            // Deal with the response.
+            // Use caution: ensure correct character encoding and is not binary data
+            response = new String(responseBody);
+
+        } catch (HttpException e) {
+            LOG.error("Fatal protocol violation: " + e.getMessage());
+            System.out.println("Fatal protocol violation");
+            System.exit(0);
+           
+        } catch (IOException e) {
+            LOG.error("Fatal transport error: " + e.getMessage());
+            LOG.error(method.getQueryString());
+            System.out.println("Fatal transport error");
+            System.exit(0);
+        } finally {
+            // Release the connection.
+            method.releaseConnection();
+        }
+        return response;
+
+    }
+	
+	public String ner(String sentMention){
+		String spotlightResponse = null;
+
+		GetMethod getMethod;
+		
+		try {
+			getMethod = new GetMethod(API_URL + "rest/annotate/?"
+					+ "confidence=" + CONFIDENCE + "&support=" + SUPPORT + "&text="
+					+ URLEncoder.encode(sentMention, "utf-8"));
+			
+			getMethod.addRequestHeader(new Header("Accept", "application/json"));
+
+			spotlightResponse = request(getMethod);
+			assert spotlightResponse != null;
+			
+		} catch (UnsupportedEncodingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+
+		JSONObject resultJSON = null;
+		JSONArray entities = null;
+
+		try {
+			resultJSON = new JSONObject(spotlightResponse);
+			entities = resultJSON.getJSONArray("Resources");
+
+			for (int i = 0; i < entities.length(); i++) {
+				JSONObject entity = entities.getJSONObject(i);
+				System.out.println(entity.getString("@surfaceForm"));
+				System.out.println(entity.getString("@types"));
+
+			}
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	
+			return null;
+
+	}
 
 	private ArrayList<Pattern> generateEventSchema(InstanceList corpus) {
 
 		for (Instance doc : corpus) {
 
-			HashMap<CoreMap, Seq<edu.knowitall.openie.Instance>> map = (HashMap<CoreMap, Seq<edu.knowitall.openie.Instance>>) doc
-					.getData();
+			HashMap<CoreMap, Seq<edu.knowitall.openie.Instance>> map = 
+					(HashMap<CoreMap, Seq<edu.knowitall.openie.Instance>>) doc.getData();
 
 			Set<CoreMap> sentences = map.keySet();
 			for (CoreMap sent : sentences) {
-				System.out.println(sent.toString());
-
+				
+				StringBuilder sentMention = new StringBuilder();
 				for (CoreLabel token : sent.get(TokensAnnotation.class)) {
 					String word = token.get(TextAnnotation.class);
 					String pos = token.get(PartOfSpeechAnnotation.class);
-					String ne = token.get(NamedEntityTagAnnotation.class);
+					sentMention.append(word+"/"+pos+" ");
 				}
-				Seq<edu.knowitall.openie.Instance> extractions = map.get(sent);
-			}
-
-			InstanceList sents = (InstanceList) doc.getData();
-			for (Instance sent : sents) {
-				Seq<edu.knowitall.openie.Instance> extractions = (Seq<edu.knowitall.openie.Instance>) sent
-						.getData();
+				System.out.println(sentMention);
+				String NER = ner(sent.toString());
+				
+				Seq<edu.knowitall.openie.Instance> extractions = map.get(sent);	
 				Iterator<edu.knowitall.openie.Instance> iterator = extractions
 						.iterator();
 				while (iterator.hasNext()) {
@@ -507,7 +611,6 @@ public class AbstractiveGeneration {
 					System.out.println(sb.toString());
 				}
 			}
-
 		}
 
 		return null;

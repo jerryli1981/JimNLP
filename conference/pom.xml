@@ -15,14 +15,27 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 
+	<repositories>
+		<repository>
+			<id>spotlight-releases-repository</id>
+			<url>https://github.com/dbpedia-spotlight/maven-repo/raw/master/releases</url>
+		</repository>
+
+		<repository>
+			<id>spotlight-snapshots-repository</id>
+			<url>https://github.com/dbpedia-spotlight/maven-repo/raw/master/snapshots</url>
+		</repository>
+
+	</repositories>
+
 	<dependencies>
-	
+
 		<dependency>
 			<groupId>org.jdom</groupId>
 			<artifactId>jdom2</artifactId>
 			<version>2.0.5</version>
 		</dependency>
-		
+
 		<dependency>
 			<groupId>simplenlg</groupId>
 			<artifactId>simplenlg</artifactId>
@@ -45,20 +58,20 @@
 			<artifactId>twitter4j-core</artifactId>
 			<version>4.0.2</version>
 		</dependency>
-		
+
 		<dependency>
 			<groupId>cc.twittertools</groupId>
 			<artifactId>twitter-tools-core</artifactId>
 			<version>1.4.2</version>
 		</dependency>
-		
+
 		<dependency>
 			<groupId>org.python</groupId>
 			<artifactId>jython</artifactId>
 			<version>2.7-b3</version>
 		</dependency>
-		
-			<dependency>
+
+		<dependency>
 			<groupId>lpsolver</groupId>
 			<artifactId>lpsolver</artifactId>
 			<version>5.5.0</version>
@@ -81,13 +94,29 @@
 			<artifactId>google-api-services-customsearch</artifactId>
 			<version>v1-rev43-1.19.0</version>
 		</dependency>
-		
+
 		<dependency>
 			<groupId>edu.washington.cs.knowitall.openie</groupId>
 			<artifactId>openie_2.10</artifactId>
 			<version>4.1.1</version>
 		</dependency>
-		
+
+		<dependency>
+			<groupId>org.dbpedia.extraction</groupId>
+			<artifactId>core</artifactId>
+			<version>3.8</version>
+		</dependency>
+		<dependency>
+			<groupId>edu.umd</groupId>
+			<artifactId>cloud9</artifactId>
+			<version>SNAPSHOT</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.semanticweb.yars</groupId>
+			<artifactId>nxparser</artifactId>
+			<version>1.1</version>
+		</dependency>
 
 		<!-- Project Dependency -->
 		<dependency>
@@ -97,5 +126,6 @@
 		</dependency>
 
 	</dependencies>
+
 
 </project>
