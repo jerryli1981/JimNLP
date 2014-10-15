@@ -54,6 +54,7 @@ import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.semgraph.SemanticGraph;
+import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.BasicDependenciesAnnotation;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
 import edu.stanford.nlp.trees.CollinsHeadFinder;
 import edu.stanford.nlp.trees.GrammaticalRelation;
@@ -652,37 +653,147 @@ public class AbstractiveGeneration {
 			// System.out.println(" Head string is ");
 			// System.out.println(node.headTerminal(headFinder, parent));
 			String head = node.headTerminal(headFinder, parent).toString();
-			map.put(np.toString().trim(), head);
+			String nounPhrase = np.toString().trim();
+			nounPhrase = nounPhrase.replaceAll("\\s,", ",");
+			nounPhrase = nounPhrase.replaceAll(" '", "'");
+			
+			map.put(nounPhrase, head);
 
 		}
 		for (Tree child : node.children()) {
 			dfs(child, node, headFinder, map);
 		}
 	}
+	
+	private ArrayList<String> filteredArgument(String argument, CoreMap sent){
+		
+		SPhraseSpec newSent = nlgFactory.createClause();
+		
+	    SemanticGraph graph = sent.get(BasicDependenciesAnnotation.class);
+	        
+	    String[] words = argument.split("\\s|,");
+	    ArrayList<String> npList = new ArrayList<String>();
+	    for(String s : words){
+	    	if(s.equals(""))
+	    		continue;
+	    	IndexedWord iw = graph.getNodeByWordPattern(s);
+	    	if(iw == null)
+	    		continue;
+	    	if(iw.tag().startsWith("NN")){ 		
+	    		NPPhraseSpec npSpec = generateNP(graph, iw);
+	    		newSent.setSubject(npSpec);   		
+	    		String np  = realiser.realiseSentence(newSent);
+	    		np = np.substring(0, np.length()-1);
+	    		np = np.replaceAll(",", " ");
+	    		np = np.replaceAll("\\s+", " ");
+	    		String head = npSpec.getHead().getRealisation();
+	    		npList.add(head);
+	    		npList.add(np);
+	    	}
+	    }	
+	    	    
+	    if(npList != null)
+	    	return npList;
+	    else{
+	    	npList.add(argument);
+	    	return npList;
+	    }
+	}
 
 	private ArrayList<Pattern> generatePatterns(CoreMap sent,
-			ArrayList<Tuple> tuples, String spotlightResponse)
+			ArrayList<Tuple> tuples, String spotlightResponse, PrintWriter out)
 			throws JSONException {
+		
+		//step 1: remove all tuples which relation contain said. 
+		
+		//how about relation extraction and headNp mutual reinforcement. 
+		//first we need to noun phrase merge. 
+		//noun phrase replacement by head noun only if noun phrase contains arguments.
 		
 		JSONObject resultJSON = null;
 		JSONArray entities = null;
 		resultJSON = new JSONObject(spotlightResponse);
-		System.out.println("ORGI: "+resultJSON.getString("@text"));
+		String originalSent = resultJSON.getString("@text");
+		out.println("ORGI: "+originalSent);
+		
+		//for bettern match, the argument should not contain prep, 
+		//and need extract head and np;
+		ArrayList<Tuple> filter_tuples = new ArrayList<Tuple>();
+		Set<String> argumentSet = new HashSet<String>();
+		for (Tuple t : tuples) {
+			if(!t.gerRel().equals("said")){
+				ArrayList<String> s1 = filteredArgument(t.getArg1(), sent);
+				for(String s : s1)
+					argumentSet.add(s);
+				
+				ArrayList<String> s2 = filteredArgument(t.getArg2(), sent);	
+				for(String s : s2)
+					argumentSet.add(s);
+	             
+				filter_tuples.add(t);
+			}
+		}
+		
+		for(Tuple t : filter_tuples){
+			out.println(t);
+		}
 
-		//transform tuple arguments to head noun
 		Tree tree = sent.get(TreeAnnotation.class);
 		HeadFinder headFinder = new CollinsHeadFinder();
 		HashMap<String, String> npheadMap = new HashMap<String, String>();
 		dfs(tree, tree, headFinder, npheadMap);
-		
-		for (Tuple t : tuples) {
-			System.out.println(t);
+
+        HashMap<String, Integer> npSizeMap = new HashMap<String, Integer>();
+        for(String np : npheadMap.keySet()){
+        	npSizeMap.put(np, np.split(" ").length);
+        }
+        
+        LinkedHashMap<String, Integer> rankedNpSizeMap = 
+        		RankMap.sortHashMapByValues(npSizeMap, false);
+        
+        ArrayList<String> npList = new ArrayList<String>();
+        for(String np : rankedNpSizeMap.keySet()){
+        	npList.add(np);
+        }
+        ArrayList<Integer> rmIdxList = new ArrayList<Integer>();
+        for(int i=0; i<npList.size()-1; i++){
+        	String np_i = npList.get(i);
+        	for(int j= i+1; j<npList.size(); j++){
+        		String np_j = npList.get(j);
+        		if(np_i.contains(np_j) && !rmIdxList.contains(j)){
+        			rmIdxList.add(j);
+        		}
+        	}
+        }  
+        ArrayList<String> mergedNpList = new ArrayList<String>();
+        for(int i=0; i<npList.size(); i++){
+        	if(!rmIdxList.contains(i))
+        		mergedNpList.add(npList.get(i));
+        }
+
+        
+		for(String np : mergedNpList){
+			out.println(np+"--->"+npheadMap.get(np)+"  ");
 		}
+        
+        String compressedSent = originalSent;
+        for(String np : mergedNpList){
+        	for(String arg : argumentSet){
+        		if(np.toLowerCase().contains(arg.toLowerCase()) || 
+        				arg.toLowerCase().contains(np.toLowerCase())){
+        			compressedSent = compressedSent.replace(np, npheadMap.get(np));
+        			break;
+        		}
+        	}	
+        }
+        
+        out.println("COMSENT: "+compressedSent);
+        	
+		out.println();
+		out.println();
+		out.println();
 		
-		for(String np : npheadMap.keySet()){
-			System.out.println(np+"--->"+npheadMap.get(np)+"  ");
-		}
-		System.out.println("_______________________________________________");
+
 		
 /*		StringBuilder sb = new StringBuilder();
 		HashMap<String, String> headStanfordNERmap = new HashMap<String, String>();
@@ -731,6 +842,8 @@ public class AbstractiveGeneration {
 				outputSummaryDir + "/" + corpusName + ".ser"));
 
 		corpus.readObject(in);
+		
+		PrintWriter out = FileOperation.getPrintWriter(new File(outputSummaryDir), corpusName+".ana");
 
 		ArrayList<Pattern> allPatterns = new ArrayList<Pattern>();
 		for (Instance doc : corpus) {
@@ -746,11 +859,12 @@ public class AbstractiveGeneration {
 				ArrayList<Tuple> tuples = map.get(sent);
 				String spotlightResponse = ner.get(sent);
 				ArrayList<Pattern> patterns = generatePatterns(sent, tuples,
-						spotlightResponse);
+						spotlightResponse, out);
 				// allPatterns.addAll(patterns);
 			}
 		}
 
+		out.close();
 		// pattern clustering
 		ArrayList<Pattern> ret = patternSelection(allPatterns);
 		return ret;
