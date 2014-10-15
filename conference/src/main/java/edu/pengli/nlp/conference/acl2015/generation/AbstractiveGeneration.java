@@ -1,7 +1,12 @@
 package edu.pengli.nlp.conference.acl2015.generation;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -9,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.Stack;
@@ -31,6 +37,7 @@ import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
 import edu.pengli.nlp.conference.acl2015.pipe.RelationExtraction;
 import edu.pengli.nlp.conference.acl2015.types.InformationItem;
 import edu.pengli.nlp.conference.acl2015.types.Pattern;
+import edu.pengli.nlp.conference.acl2015.types.Tuple;
 import edu.pengli.nlp.platform.pipe.CharSequenceCoreNLPAnnotation;
 import edu.pengli.nlp.platform.pipe.Input2CharSequence;
 import edu.pengli.nlp.platform.pipe.PipeLine;
@@ -39,6 +46,7 @@ import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerLineIterator;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.types.InstanceList;
 import edu.pengli.nlp.platform.util.FileOperation;
+import edu.pengli.nlp.platform.util.RankMap;
 import edu.stanford.nlp.ling.CoreAnnotations.NamedEntityTagAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.PartOfSpeechAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.TextAnnotation;
@@ -47,7 +55,11 @@ import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
+import edu.stanford.nlp.trees.CollinsHeadFinder;
 import edu.stanford.nlp.trees.GrammaticalRelation;
+import edu.stanford.nlp.trees.HeadFinder;
+import edu.stanford.nlp.trees.Tree;
+import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
 import edu.stanford.nlp.util.CoreMap;
 import scala.collection.Seq;
 import scala.collection.Iterator;
@@ -63,18 +75,18 @@ public class AbstractiveGeneration {
 
 	NLGFactory nlgFactory;
 	Realiser realiser;
-	
+
 	private final static String API_URL = "http://spotlight.dbpedia.org/";
 	private static final double CONFIDENCE = 0.0;
 	private static final int SUPPORT = 0;
-    private static HttpClient client;
-    private Logger LOG;
+	private static HttpClient client;
+	private Logger LOG;
 
 	public AbstractiveGeneration() {
 		Lexicon lexicon = Lexicon.getDefaultLexicon();
 		nlgFactory = new NLGFactory(lexicon);
 		realiser = new Realiser(lexicon);
-	    LOG = Logger.getLogger(this.getClass());
+		LOG = Logger.getLogger(this.getClass());
 		client = new HttpClient();
 	}
 
@@ -487,134 +499,261 @@ public class AbstractiveGeneration {
 		ppp.setObject(npp);
 		return ppp;
 	}
-	
-	
-    private String request(HttpMethod method){
 
-        String response = null;
+	private String request(HttpMethod method) {
 
-        // Provide custom retry handler is necessary
-        method.getParams().setParameter(HttpMethodParams.RETRY_HANDLER,
-                new DefaultHttpMethodRetryHandler(3, false));
+		String response = null;
 
-        try {
-            // Execute the method.
-            int statusCode = client.executeMethod(method);
+		// Provide custom retry handler is necessary
+		method.getParams().setParameter(HttpMethodParams.RETRY_HANDLER,
+				new DefaultHttpMethodRetryHandler(3, false));
 
-            if (statusCode != HttpStatus.SC_OK) {
-                LOG.error("Method failed: " + method.getStatusLine());
-            }
+		try {
+			// Execute the method.
+			int statusCode = client.executeMethod(method);
 
-            // Read the response body.
-            byte[] responseBody = method.getResponseBody(); //TODO Going to buffer response body of large or unknown size. Using getResponseBodyAsStream instead is recommended.
+			if (statusCode != HttpStatus.SC_OK) {
+				LOG.error("Method failed: " + method.getStatusLine());
+			}
 
-            // Deal with the response.
-            // Use caution: ensure correct character encoding and is not binary data
-            response = new String(responseBody);
+			// Read the response body.
+			byte[] responseBody = method.getResponseBody(); // TODO Going to
+															// buffer response
+															// body of large or
+															// unknown size.
+															// Using
+															// getResponseBodyAsStream
+															// instead is
+															// recommended.
 
-        } catch (HttpException e) {
-            LOG.error("Fatal protocol violation: " + e.getMessage());
-            System.out.println("Fatal protocol violation");
-            System.exit(0);
-           
-        } catch (IOException e) {
-            LOG.error("Fatal transport error: " + e.getMessage());
-            LOG.error(method.getQueryString());
-            System.out.println("Fatal transport error");
-            System.exit(0);
-        } finally {
-            // Release the connection.
-            method.releaseConnection();
-        }
-        return response;
+			// Deal with the response.
+			// Use caution: ensure correct character encoding and is not binary
+			// data
+			response = new String(responseBody);
 
-    }
-	
-	public String ner(String sentMention){
+		} catch (HttpException e) {
+			LOG.error("Fatal protocol violation: " + e.getMessage());
+			System.out.println("Fatal protocol violation");
+			System.exit(0);
+
+		} catch (IOException e) {
+			LOG.error("Fatal transport error: " + e.getMessage());
+			LOG.error(method.getQueryString());
+			System.out.println("Fatal transport error");
+			System.exit(0);
+		} finally {
+			// Release the connection.
+			method.releaseConnection();
+		}
+		return response;
+
+	}
+
+	private String NameEntityRecognition(String sentMention) {
 		String spotlightResponse = null;
 
 		GetMethod getMethod;
-		
+
 		try {
 			getMethod = new GetMethod(API_URL + "rest/annotate/?"
-					+ "confidence=" + CONFIDENCE + "&support=" + SUPPORT + "&text="
-					+ URLEncoder.encode(sentMention, "utf-8"));
-			
-			getMethod.addRequestHeader(new Header("Accept", "application/json"));
+					+ "confidence=" + CONFIDENCE + "&support=" + SUPPORT
+					+ "&text=" + URLEncoder.encode(sentMention, "utf-8"));
+
+			getMethod
+					.addRequestHeader(new Header("Accept", "application/json"));
 
 			spotlightResponse = request(getMethod);
 			assert spotlightResponse != null;
-			
+
 		} catch (UnsupportedEncodingException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
-
-		JSONObject resultJSON = null;
-		JSONArray entities = null;
-
-		try {
-			resultJSON = new JSONObject(spotlightResponse);
-			entities = resultJSON.getJSONArray("Resources");
-
-			for (int i = 0; i < entities.length(); i++) {
-				JSONObject entity = entities.getJSONObject(i);
-				System.out.println(entity.getString("@surfaceForm"));
-				System.out.println(entity.getString("@types"));
-
-			}
-		} catch (JSONException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	
-			return null;
+		return spotlightResponse;
 
 	}
 
-	private ArrayList<Pattern> generateEventSchema(InstanceList corpus) {
+	private void extractionSerialization(String outputSummaryDir,
+			String corpusName, InstanceList corpus)
+			throws FileNotFoundException, IOException, ClassNotFoundException {
 
 		for (Instance doc : corpus) {
+			HashMap<CoreMap, ArrayList<Tuple>> map = (HashMap<CoreMap, ArrayList<Tuple>>) doc
+					.getData();
 
-			HashMap<CoreMap, Seq<edu.knowitall.openie.Instance>> map = 
-					(HashMap<CoreMap, Seq<edu.knowitall.openie.Instance>>) doc.getData();
+			HashMap<CoreMap, String> ner = new HashMap<CoreMap, String>();
 
 			Set<CoreMap> sentences = map.keySet();
 			for (CoreMap sent : sentences) {
-				
-				StringBuilder sentMention = new StringBuilder();
-				for (CoreLabel token : sent.get(TokensAnnotation.class)) {
-					String word = token.get(TextAnnotation.class);
-					String pos = token.get(PartOfSpeechAnnotation.class);
-					sentMention.append(word+"/"+pos+" ");
+				String response = NameEntityRecognition(sent.toString());
+				ner.put(sent, response);
+			}
+			doc.setTarget(ner);
+		}
+
+		ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(
+				outputSummaryDir + "/" + corpusName + ".ser"));
+		corpus.writeObject(out);
+		out.close();
+	}
+
+	private String labelVoting(String mention) {
+
+		String[] toks = mention.split(",");
+		HashMap<String, Integer> counts = new HashMap<String, Integer>();
+		for (String s : toks) {
+			if (s.startsWith("DBpedia")) {
+				String label = s.replaceAll("DBpedia:", "");
+				label = label.toLowerCase();
+				if (!counts.containsKey(label)) {
+					counts.put(label, 1);
+				} else {
+					int c = counts.get(label);
+					counts.put(label, ++c);
 				}
-				System.out.println(sentMention);
-				String NER = ner(sent.toString());
-				
-				Seq<edu.knowitall.openie.Instance> extractions = map.get(sent);	
-				Iterator<edu.knowitall.openie.Instance> iterator = extractions
-						.iterator();
-				while (iterator.hasNext()) {
-					edu.knowitall.openie.Instance inst = iterator.next();
-					StringBuilder sb = new StringBuilder();
-					sb.append(inst.confidence()).append('\t')
-							.append(inst.extr().arg1().text()).append('\t')
-							.append(inst.extr().rel().text()).append('\t');
 
-					Iterator<Argument> argIter = inst.extr().arg2s().iterator();
-					while (argIter.hasNext()) {
-						Argument arg = argIter.next();
-						sb.append(arg.text()).append("; ");
+			} else if (s.startsWith("Freebase")) {
+				String tmp = s.replaceAll("Freebase:/", "");
+				String[] ls = tmp.split("/");
+				for (String label : ls) {
+					label = label.toLowerCase();
+					if (!counts.containsKey(label)) {
+						counts.put(label, 1);
+					} else {
+						int c = counts.get(label);
+						counts.put(label, ++c);
 					}
-
-					System.out.println(sb.toString());
 				}
 			}
 		}
+		LinkedHashMap map = RankMap.sortHashMapByValues(counts, false);
+		String ret = (String) map.keySet().iterator().next();
+		return ret;
+	}
+
+	public static void dfs(Tree node, Tree parent, HeadFinder headFinder,
+			HashMap<String, String> map) {
+		if (node == null || node.isLeaf()) {
+			return;
+		}
+		// if node is a NP - Get the terminal nodes to get the words in the NP
+		if (node.value().equals("NP")) {
+
+			// System.out.println(" Noun Phrase is ");
+			List<Tree> leaves = node.getLeaves();
+			StringBuilder np = new StringBuilder();
+			for (Tree leaf : leaves) {
+				// System.out.print(leaf.toString()+" ");
+				np.append(leaf.toString() + " ");
+			}
+
+			// System.out.println();
+			// System.out.println(" Head string is ");
+			// System.out.println(node.headTerminal(headFinder, parent));
+			String head = node.headTerminal(headFinder, parent).toString();
+			map.put(np.toString().trim(), head);
+
+		}
+		for (Tree child : node.children()) {
+			dfs(child, node, headFinder, map);
+		}
+	}
+
+	private ArrayList<Pattern> generatePatterns(CoreMap sent,
+			ArrayList<Tuple> tuples, String spotlightResponse)
+			throws JSONException {
+		
+		JSONObject resultJSON = null;
+		JSONArray entities = null;
+		resultJSON = new JSONObject(spotlightResponse);
+		System.out.println("ORGI: "+resultJSON.getString("@text"));
+
+		//transform tuple arguments to head noun
+		Tree tree = sent.get(TreeAnnotation.class);
+		HeadFinder headFinder = new CollinsHeadFinder();
+		HashMap<String, String> npheadMap = new HashMap<String, String>();
+		dfs(tree, tree, headFinder, npheadMap);
+		
+		for (Tuple t : tuples) {
+			System.out.println(t);
+		}
+		
+		for(String np : npheadMap.keySet()){
+			System.out.println(np+"--->"+npheadMap.get(np)+"  ");
+		}
+		System.out.println("_______________________________________________");
+		
+/*		StringBuilder sb = new StringBuilder();
+		HashMap<String, String> headStanfordNERmap = new HashMap<String, String>();
+		for (CoreLabel token : sent.get(TokensAnnotation.class)) {
+			String word = token.get(TextAnnotation.class);
+			String pos = token.get(PartOfSpeechAnnotation.class);
+			String ne = token.get(NamedEntityTagAnnotation.class);
+			sb.append(word + "/" + ne + " ");
+			headStanfordNERmap.put(word, ne);
+		}
+		System.out.println(sb.toString());
+		System.out.println("_______________________________________________");*/
+		
+/*		HashMap<String, String> headDBpediaNERmap = new HashMap<String, String>();
+
+		entities = resultJSON.getJSONArray("Resources");
+		for (int i = 0; i < entities.length(); i++) {
+			JSONObject entity = entities.getJSONObject(i);
+			String types = entity.getString("@types");
+			if (types.length() != 0) {
+				String tok = entity.getString("@surfaceForm");
+				System.out.print( tok + "-->");
+				String type = labelVoting(types);
+				System.out.print(type + "        " + types);
+				System.out.println();
+				headDBpediaNERmap.put(tok, type);
+			}
+		}
+		System.out.println("_______________________________________________");*/
+		
+
 
 		return null;
+	}
 
+	private ArrayList<Pattern> patternSelection(ArrayList<Pattern> patterns) {
+
+		return null;
+	}
+
+	private ArrayList<Pattern> generateEventSchema(String outputSummaryDir,
+			String corpusName, InstanceList corpus) throws IOException,
+			ClassNotFoundException, JSONException {
+
+		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + corpusName + ".ser"));
+
+		corpus.readObject(in);
+
+		ArrayList<Pattern> allPatterns = new ArrayList<Pattern>();
+		for (Instance doc : corpus) {
+
+			HashMap<CoreMap, ArrayList<Tuple>> map = (HashMap<CoreMap, ArrayList<Tuple>>) doc
+					.getData();
+
+			HashMap<CoreMap, String> ner = (HashMap<CoreMap, String>) doc
+					.getTarget();
+
+			for (CoreMap sent : map.keySet()) {
+
+				ArrayList<Tuple> tuples = map.get(sent);
+				String spotlightResponse = ner.get(sent);
+				ArrayList<Pattern> patterns = generatePatterns(sent, tuples,
+						spotlightResponse);
+				// allPatterns.addAll(patterns);
+			}
+		}
+
+		// pattern clustering
+		ArrayList<Pattern> ret = patternSelection(allPatterns);
+		return ret;
 	}
 
 	private List<String> generateSummary(ArrayList<Pattern> schema) {
@@ -623,31 +762,32 @@ public class AbstractiveGeneration {
 	}
 
 	public void run(String inputCorpusDir, String outputSummaryDir,
-			String corpusName) throws IOException, ClassNotFoundException {
+			String corpusName, PipeLine pipeLine) throws IOException,
+			ClassNotFoundException, JSONException {
 
 		OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
 				inputCorpusDir + "/" + corpusName);
 
-		PipeLine pipeLine = new PipeLine();
-		pipeLine.addPipe(new Input2CharSequence("UTF-8"));
-		pipeLine.addPipe(new CharSequenceExtractContent(
-				"<TEXT>[\\p{Graph}\\p{Space}]*</TEXT>"));
-		pipeLine.addPipe(new CharSequenceCoreNLPAnnotation());
-		pipeLine.addPipe(new RelationExtraction());
 		InstanceList docs = new InstanceList(pipeLine);
-		docs.addThruPipe(fIter);
+
+		
+/*		docs.addThruPipe(fIter);
+		  
+		System.out.println("Begin extraction serialization");
+		extractionSerialization(outputSummaryDir, corpusName, docs);*/
+		
 
 		System.out.println("Begin generate envent schema");
-		ArrayList<Pattern> schema = generateEventSchema(docs);
+		ArrayList<Pattern> schema = generateEventSchema(outputSummaryDir,
+				corpusName, docs);
 
-		System.out.println("Begin generate final summary");
-		List<String> summary = generateSummary(schema);
-		PrintWriter out = FileOperation.getPrintWriter(new File(
-				outputSummaryDir), corpusName);
-		for (String sentence : summary) {
-			out.println(sentence);
-		}
-		out.close();
+		/*
+		 * System.out.println("Begin generate final summary"); List<String>
+		 * summary = generateSummary(schema); PrintWriter out =
+		 * FileOperation.getPrintWriter(new File( outputSummaryDir),
+		 * corpusName); for (String sentence : summary) { out.println(sentence);
+		 * } out.close();
+		 */
 	}
 
 }

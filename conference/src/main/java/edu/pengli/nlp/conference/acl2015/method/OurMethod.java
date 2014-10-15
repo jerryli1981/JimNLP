@@ -10,15 +10,21 @@ import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
 import org.jdom2.input.SAXBuilder;
+import org.json.JSONException;
 
 import edu.pengli.nlp.conference.acl2015.generation.AbstractiveGeneration;
+import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
+import edu.pengli.nlp.conference.acl2015.pipe.RelationExtraction;
+import edu.pengli.nlp.platform.pipe.CharSequenceCoreNLPAnnotation;
+import edu.pengli.nlp.platform.pipe.Input2CharSequence;
+import edu.pengli.nlp.platform.pipe.PipeLine;
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.RougeEvaluationWrapper;
 
 
 public class OurMethod {
 
-	public static void main(String[] args) throws JDOMException, IOException, ClassNotFoundException {
+	public static void main(String[] args) throws JDOMException, IOException, ClassNotFoundException, JSONException {
 
 		SAXBuilder builder = new SAXBuilder();
 		String inputCorpusDir = "../data/ACL2015/testData";
@@ -28,7 +34,16 @@ public class OurMethod {
 		List<Element> corpusList = root.getChildren();
 		ArrayList<String> corpusNameList = new ArrayList<String>();
 		String outputSummaryDir = "../data/ACL2015/Output";
-		for (int i = 0; i < corpusList.size(); i++) {
+		
+		PipeLine pipeLine = new PipeLine();
+/*		pipeLine.addPipe(new Input2CharSequence("UTF-8"));
+		pipeLine.addPipe(new CharSequenceExtractContent(
+				"<TEXT>[\\p{Graph}\\p{Space}]*</TEXT>"));
+		pipeLine.addPipe(new CharSequenceCoreNLPAnnotation());
+		pipeLine.addPipe(new RelationExtraction());*/
+		
+		for (int i = 0; i < 1; i++) {
+			System.out.println("Corpus id is "+i);
 			Element topic = corpusList.get(i);
 			List<Element> docSets = topic.getChildren();
 			Element docSetA = docSets.get(1);
@@ -36,7 +51,7 @@ public class OurMethod {
 			corpusNameList.add(corpusName);
 			AbstractiveGeneration ag = new AbstractiveGeneration();
 			ag.run(inputCorpusDir + "/" + topic.getAttributeValue("id"),
-					outputSummaryDir, corpusName);
+					outputSummaryDir, corpusName, pipeLine);
 		}
 
 		// Rouge Evaluation
