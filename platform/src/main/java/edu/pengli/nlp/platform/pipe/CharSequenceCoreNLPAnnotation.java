@@ -14,7 +14,7 @@ public class CharSequenceCoreNLPAnnotation extends Pipe {
 	public CharSequenceCoreNLPAnnotation() {
 
 		Properties props = new Properties();
-		props.put("annotators", "tokenize, ssplit, pos, lemma, ner");
+		props.put("annotators", "tokenize, ssplit, pos, lemma, ner, parse");
 		pipeline = new StanfordCoreNLP(props);
 
 	}

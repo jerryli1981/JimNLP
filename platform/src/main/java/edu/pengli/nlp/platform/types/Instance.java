@@ -71,16 +71,14 @@ public class Instance implements Serializable{
 	private static final long serialVersionUID = 1;
 	private static final int CURRENT_SERIAL_VERSION = 0;
 	
-	private void writeObject (ObjectOutputStream out) throws IOException {
-		out.writeInt (CURRENT_SERIAL_VERSION);
+	public void writeObject (ObjectOutputStream out) throws IOException {
 		out.writeObject(data);
 		out.writeObject(target);
 		out.writeObject(name);
 		out.writeObject(source);
 	}
 	
-	private void readObject (ObjectInputStream in) throws IOException, ClassNotFoundException {
-		int version = in.readInt ();
+	public void readObject (ObjectInputStream in) throws IOException, ClassNotFoundException {
 		data = in.readObject();
 		target = in.readObject();
 		name = in.readObject();
