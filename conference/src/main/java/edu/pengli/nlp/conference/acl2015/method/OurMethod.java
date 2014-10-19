@@ -14,7 +14,7 @@ import org.json.JSONException;
 
 import edu.pengli.nlp.conference.acl2015.generation.AbstractiveGeneration;
 import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
-import edu.pengli.nlp.conference.acl2015.pipe.RelationExtraction;
+import edu.pengli.nlp.conference.acl2015.pipe.RelationExtractionbyOpenIE;
 import edu.pengli.nlp.platform.pipe.CharSequenceCoreNLPAnnotation;
 import edu.pengli.nlp.platform.pipe.Input2CharSequence;
 import edu.pengli.nlp.platform.pipe.PipeLine;
@@ -40,7 +40,7 @@ public class OurMethod {
 		pipeLine.addPipe(new CharSequenceExtractContent(
 				"<TEXT>[\\p{Graph}\\p{Space}]*</TEXT>"));
 		pipeLine.addPipe(new CharSequenceCoreNLPAnnotation());
-		pipeLine.addPipe(new RelationExtraction());*/
+		pipeLine.addPipe(new RelationExtractionbyOpenIE());*/
 		
 		for (int i = 0; i < 1; i++) {
 			System.out.println("Corpus id is "+i);

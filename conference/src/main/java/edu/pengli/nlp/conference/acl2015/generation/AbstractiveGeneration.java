@@ -2,57 +2,31 @@ package edu.pengli.nlp.conference.acl2015.generation;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Set;
 import java.util.Stack;
 
-import org.apache.commons.httpclient.DefaultHttpMethodRetryHandler;
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpException;
-import org.apache.commons.httpclient.HttpMethod;
-import org.apache.commons.httpclient.HttpStatus;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.params.HttpMethodParams;
-import org.apache.log4j.Logger;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import edu.knowitall.openie.Argument;
-import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
-import edu.pengli.nlp.conference.acl2015.pipe.RelationExtraction;
 import edu.pengli.nlp.conference.acl2015.types.InformationItem;
-import edu.pengli.nlp.conference.acl2015.types.Pattern;
+import edu.pengli.nlp.conference.acl2015.types.Predicate;
 import edu.pengli.nlp.conference.acl2015.types.Tuple;
-import edu.pengli.nlp.platform.pipe.CharSequenceCoreNLPAnnotation;
-import edu.pengli.nlp.platform.pipe.Input2CharSequence;
 import edu.pengli.nlp.platform.pipe.PipeLine;
 import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerFileIterator;
-import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerLineIterator;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.types.InstanceList;
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.RankMap;
-import edu.stanford.nlp.ling.CoreAnnotations.NamedEntityTagAnnotation;
-import edu.stanford.nlp.ling.CoreAnnotations.PartOfSpeechAnnotation;
-import edu.stanford.nlp.ling.CoreAnnotations.TextAnnotation;
-import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.IndexedWord;
+import edu.stanford.nlp.ling.CoreAnnotations.TextAnnotation;
+import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.BasicDependenciesAnnotation;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
@@ -77,18 +51,13 @@ public class AbstractiveGeneration {
 	NLGFactory nlgFactory;
 	Realiser realiser;
 
-	private final static String API_URL = "http://spotlight.dbpedia.org/";
-	private static final double CONFIDENCE = 0.0;
-	private static final int SUPPORT = 0;
-	private static HttpClient client;
-	private Logger LOG;
+
 
 	public AbstractiveGeneration() {
 		Lexicon lexicon = Lexicon.getDefaultLexicon();
 		nlgFactory = new NLGFactory(lexicon);
 		realiser = new Realiser(lexicon);
-		LOG = Logger.getLogger(this.getClass());
-		client = new HttpClient();
+
 	}
 
 	/*
@@ -500,408 +469,131 @@ public class AbstractiveGeneration {
 		ppp.setObject(npp);
 		return ppp;
 	}
-
-	private String request(HttpMethod method) {
-
-		String response = null;
-
-		// Provide custom retry handler is necessary
-		method.getParams().setParameter(HttpMethodParams.RETRY_HANDLER,
-				new DefaultHttpMethodRetryHandler(3, false));
-
-		try {
-			// Execute the method.
-			int statusCode = client.executeMethod(method);
-
-			if (statusCode != HttpStatus.SC_OK) {
-				LOG.error("Method failed: " + method.getStatusLine());
-			}
-
-			// Read the response body.
-			byte[] responseBody = method.getResponseBody(); // TODO Going to
-															// buffer response
-															// body of large or
-															// unknown size.
-															// Using
-															// getResponseBodyAsStream
-															// instead is
-															// recommended.
-
-			// Deal with the response.
-			// Use caution: ensure correct character encoding and is not binary
-			// data
-			response = new String(responseBody);
-
-		} catch (HttpException e) {
-			LOG.error("Fatal protocol violation: " + e.getMessage());
-			System.out.println("Fatal protocol violation");
-			System.exit(0);
-
-		} catch (IOException e) {
-			LOG.error("Fatal transport error: " + e.getMessage());
-			LOG.error(method.getQueryString());
-			System.out.println("Fatal transport error");
-			System.exit(0);
-		} finally {
-			// Release the connection.
-			method.releaseConnection();
-		}
-		return response;
-
-	}
-
-	private String NameEntityRecognition(String sentMention) {
-		String spotlightResponse = null;
-
-		GetMethod getMethod;
-
-		try {
-			getMethod = new GetMethod(API_URL + "rest/annotate/?"
-					+ "confidence=" + CONFIDENCE + "&support=" + SUPPORT
-					+ "&text=" + URLEncoder.encode(sentMention, "utf-8"));
-
-			getMethod
-					.addRequestHeader(new Header("Accept", "application/json"));
-
-			spotlightResponse = request(getMethod);
-			assert spotlightResponse != null;
-
-		} catch (UnsupportedEncodingException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
-		return spotlightResponse;
-
-	}
-
-	private void extractionSerialization(String outputSummaryDir,
-			String corpusName, InstanceList corpus)
-			throws FileNotFoundException, IOException, ClassNotFoundException {
-
-		for (Instance doc : corpus) {
-			HashMap<CoreMap, ArrayList<Tuple>> map = (HashMap<CoreMap, ArrayList<Tuple>>) doc
-					.getData();
-
-			HashMap<CoreMap, String> ner = new HashMap<CoreMap, String>();
-
-			Set<CoreMap> sentences = map.keySet();
-			for (CoreMap sent : sentences) {
-				String response = NameEntityRecognition(sent.toString());
-				ner.put(sent, response);
-			}
-			doc.setTarget(ner);
-		}
-
-		ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(
-				outputSummaryDir + "/" + corpusName + ".ser"));
-		corpus.writeObject(out);
-		out.close();
-	}
-
-	private String labelVoting(String mention) {
-
-		String[] toks = mention.split(",");
-		HashMap<String, Integer> counts = new HashMap<String, Integer>();
-		for (String s : toks) {
-			if (s.startsWith("DBpedia")) {
-				String label = s.replaceAll("DBpedia:", "");
-				label = label.toLowerCase();
-				if (!counts.containsKey(label)) {
-					counts.put(label, 1);
-				} else {
-					int c = counts.get(label);
-					counts.put(label, ++c);
-				}
-
-			} else if (s.startsWith("Freebase")) {
-				String tmp = s.replaceAll("Freebase:/", "");
-				String[] ls = tmp.split("/");
-				for (String label : ls) {
-					label = label.toLowerCase();
-					if (!counts.containsKey(label)) {
-						counts.put(label, 1);
-					} else {
-						int c = counts.get(label);
-						counts.put(label, ++c);
-					}
-				}
-			}
-		}
-		LinkedHashMap map = RankMap.sortHashMapByValues(counts, false);
-		String ret = (String) map.keySet().iterator().next();
-		return ret;
-	}
-
-	public static void dfs(Tree node, Tree parent, HeadFinder headFinder,
-			HashMap<String, String> map) {
-		if (node == null || node.isLeaf()) {
-			return;
-		}
-		// if node is a NP - Get the terminal nodes to get the words in the NP
-		if (node.value().equals("NP")) {
-
-			// System.out.println(" Noun Phrase is ");
-			List<Tree> leaves = node.getLeaves();
-			StringBuilder np = new StringBuilder();
-			for (Tree leaf : leaves) {
-				// System.out.print(leaf.toString()+" ");
-				np.append(leaf.toString() + " ");
-			}
-
-			// System.out.println();
-			// System.out.println(" Head string is ");
-			// System.out.println(node.headTerminal(headFinder, parent));
-			String head = node.headTerminal(headFinder, parent).toString();
-			String nounPhrase = np.toString().trim();
-			nounPhrase = nounPhrase.replaceAll("\\s,", ",");
-			nounPhrase = nounPhrase.replaceAll(" '", "'");
-			
-			map.put(nounPhrase, head);
-
-		}
-		for (Tree child : node.children()) {
-			dfs(child, node, headFinder, map);
-		}
-	}
 	
-	private ArrayList<String> filteredArgument(String argument, CoreMap sent){
+	private String findPrePhrase(String argument, CoreMap sent){
 		
-		SPhraseSpec newSent = nlgFactory.createClause();
+		SemanticGraph graph = sent.get(BasicDependenciesAnnotation.class);
+		String[] words = argument.split("\\s|,");
+		if(words.length == 1)
+			return null;
 		
-	    SemanticGraph graph = sent.get(BasicDependenciesAnnotation.class);
-	        
-	    String[] words = argument.split("\\s|,");
-	    ArrayList<String> npList = new ArrayList<String>();
-	    for(String s : words){
-	    	if(s.equals(""))
-	    		continue;
-	    	IndexedWord iw = graph.getNodeByWordPattern(s);
-	    	if(iw == null)
-	    		continue;
-	    	if(iw.tag().startsWith("NN")){ 		
-	    		NPPhraseSpec npSpec = generateNP(graph, iw);
-	    		newSent.setSubject(npSpec);   		
-	    		String np  = realiser.realiseSentence(newSent);
-	    		np = np.substring(0, np.length()-1);
-	    		np = np.replaceAll(",", " ");
-	    		np = np.replaceAll("\\s+", " ");
-	    		String head = npSpec.getHead().getRealisation();
-	    		npList.add(head);
-	    		npList.add(np);
-	    	}
-	    }	
-	    	    
-	    if(npList != null)
-	    	return npList;
-	    else{
-	    	npList.add(argument);
-	    	return npList;
-	    }
-	}
-
-	private ArrayList<Pattern> generatePatterns(CoreMap sent,
-			ArrayList<Tuple> tuples, String spotlightResponse, PrintWriter out)
-			throws JSONException {
-		
-		//step 1: remove all tuples which relation contain said. 
-		
-		//how about relation extraction and headNp mutual reinforcement. 
-		//first we need to noun phrase merge. 
-		//noun phrase replacement by head noun only if noun phrase contains arguments.
-		
-		JSONObject resultJSON = null;
-		JSONArray entities = null;
-		resultJSON = new JSONObject(spotlightResponse);
-		String originalSent = resultJSON.getString("@text");
-		out.println("ORGI: "+originalSent);
-		
-		//for bettern match, the argument should not contain prep, 
-		//and need extract head and np;
-		ArrayList<Tuple> filter_tuples = new ArrayList<Tuple>();
-		Set<String> argumentSet = new HashSet<String>();
-		for (Tuple t : tuples) {
-			if(!t.gerRel().equals("said")){
-				ArrayList<String> s1 = filteredArgument(t.getArg1(), sent);
-				for(String s : s1)
-					argumentSet.add(s);
-				
-				ArrayList<String> s2 = filteredArgument(t.getArg2(), sent);	
-				for(String s : s2)
-					argumentSet.add(s);
-	             
-				filter_tuples.add(t);
+		for(int i=0; i<words.length; i++){
+			String tok = words[i];
+			IndexedWord iw = graph.getNodeByWordPattern(tok);
+			Iterable<SemanticGraphEdge> edges = graph.outgoingEdgeIterable(iw);
+			for(SemanticGraphEdge e : edges){
+				GrammaticalRelation gr = e.getRelation();
+				if (gr.toString().equals("pobj")) {
+					StringBuilder sb = new StringBuilder();
+					for(int j=0; j<=i; j++){
+						sb.append(words[j]+" ");
+					}
+					return sb.toString().trim();
+				}
+				if(gr.toString().equals("nsubj")){
+					return null;
+				}
 			}
 		}
-		
-		for(Tuple t : filter_tuples){
-			out.println(t);
-		}
-
-		Tree tree = sent.get(TreeAnnotation.class);
-		HeadFinder headFinder = new CollinsHeadFinder();
-		HashMap<String, String> npheadMap = new HashMap<String, String>();
-		dfs(tree, tree, headFinder, npheadMap);
-
-        HashMap<String, Integer> npSizeMap = new HashMap<String, Integer>();
-        for(String np : npheadMap.keySet()){
-        	npSizeMap.put(np, np.split(" ").length);
-        }
-        
-        LinkedHashMap<String, Integer> rankedNpSizeMap = 
-        		RankMap.sortHashMapByValues(npSizeMap, false);
-        
-        ArrayList<String> npList = new ArrayList<String>();
-        for(String np : rankedNpSizeMap.keySet()){
-        	npList.add(np);
-        }
-        ArrayList<Integer> rmIdxList = new ArrayList<Integer>();
-        for(int i=0; i<npList.size()-1; i++){
-        	String np_i = npList.get(i);
-        	for(int j= i+1; j<npList.size(); j++){
-        		String np_j = npList.get(j);
-        		if(np_i.contains(np_j) && !rmIdxList.contains(j)){
-        			rmIdxList.add(j);
-        		}
-        	}
-        }  
-        ArrayList<String> mergedNpList = new ArrayList<String>();
-        for(int i=0; i<npList.size(); i++){
-        	if(!rmIdxList.contains(i))
-        		mergedNpList.add(npList.get(i));
-        }
-
-        
-		for(String np : mergedNpList){
-			out.println(np+"--->"+npheadMap.get(np)+"  ");
-		}
-        
-        String compressedSent = originalSent;
-        for(String np : mergedNpList){
-        	for(String arg : argumentSet){
-        		if(np.toLowerCase().contains(arg.toLowerCase()) || 
-        				arg.toLowerCase().contains(np.toLowerCase())){
-        			compressedSent = compressedSent.replace(np, npheadMap.get(np));
-        			break;
-        		}
-        	}	
-        }
-        
-        out.println("COMSENT: "+compressedSent);
-        	
-		out.println();
-		out.println();
-		out.println();
-		
-
-		
-/*		StringBuilder sb = new StringBuilder();
-		HashMap<String, String> headStanfordNERmap = new HashMap<String, String>();
-		for (CoreLabel token : sent.get(TokensAnnotation.class)) {
-			String word = token.get(TextAnnotation.class);
-			String pos = token.get(PartOfSpeechAnnotation.class);
-			String ne = token.get(NamedEntityTagAnnotation.class);
-			sb.append(word + "/" + ne + " ");
-			headStanfordNERmap.put(word, ne);
-		}
-		System.out.println(sb.toString());
-		System.out.println("_______________________________________________");*/
-		
-/*		HashMap<String, String> headDBpediaNERmap = new HashMap<String, String>();
-
-		entities = resultJSON.getJSONArray("Resources");
-		for (int i = 0; i < entities.length(); i++) {
-			JSONObject entity = entities.getJSONObject(i);
-			String types = entity.getString("@types");
-			if (types.length() != 0) {
-				String tok = entity.getString("@surfaceForm");
-				System.out.print( tok + "-->");
-				String type = labelVoting(types);
-				System.out.print(type + "        " + types);
-				System.out.println();
-				headDBpediaNERmap.put(tok, type);
-			}
-		}
-		System.out.println("_______________________________________________");*/
-		
-
-
 		return null;
+
 	}
 
-	private ArrayList<Pattern> patternSelection(ArrayList<Pattern> patterns) {
-
-		return null;
-	}
-
-	private ArrayList<Pattern> generateEventSchema(String outputSummaryDir,
+	private void generatePatterns(String outputSummaryDir,
 			String corpusName, InstanceList corpus) throws IOException,
-			ClassNotFoundException, JSONException {
+			ClassNotFoundException{
 
 		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
 				outputSummaryDir + "/" + corpusName + ".ser"));
 
 		corpus.readObject(in);
-		
-		PrintWriter out = FileOperation.getPrintWriter(new File(outputSummaryDir), corpusName+".ana");
 
-		ArrayList<Pattern> allPatterns = new ArrayList<Pattern>();
+		PrintWriter out = FileOperation.getPrintWriter(new File(
+				outputSummaryDir), corpusName + ".patterns");
+				
 		for (Instance doc : corpus) {
-
-			HashMap<CoreMap, ArrayList<Tuple>> map = (HashMap<CoreMap, ArrayList<Tuple>>) doc
+			
+			HashMap<CoreMap, ArrayList<Tuple>> map = 
+					(HashMap<CoreMap, ArrayList<Tuple>>) doc
 					.getData();
 
-			HashMap<CoreMap, String> ner = (HashMap<CoreMap, String>) doc
-					.getTarget();
-
 			for (CoreMap sent : map.keySet()) {
+				out.println(sent.toString());
+				HashMap<String, CoreLabel> wordLabelMap = new HashMap<String, CoreLabel>();
+				for (CoreLabel token: sent.get(TokensAnnotation.class)) {
+			        String word = token.get(TextAnnotation.class);
+			        wordLabelMap.put(word, token);
+			    }
 
 				ArrayList<Tuple> tuples = map.get(sent);
-				String spotlightResponse = ner.get(sent);
-				ArrayList<Pattern> patterns = generatePatterns(sent, tuples,
-						spotlightResponse, out);
-				// allPatterns.addAll(patterns);
+				for(Tuple t : tuples){
+					String arg2 = t.getArg2().toString();
+					if(t.gerRel().toString().equals("said"))
+						continue;
+					String prep = findPrePhrase(arg2, sent);
+					if(prep != null){
+//						System.out.println(t);
+						String rel = t.gerRel().toString()+" "+prep;
+						String[] relToks = rel.split("\\s|,");
+						edu.pengli.nlp.conference.acl2015.types.Predicate Rel = 
+								new edu.pengli.nlp.conference.acl2015.types.Predicate();
+						for(int i=0; i<relToks.length; i++){
+							if(wordLabelMap.containsKey(relToks[i])){
+								Rel.add(wordLabelMap.get(relToks[i]));
+							}
+						}
+						
+						t.setRel(Rel);
+						arg2 = arg2.replace(prep+" ", " ").trim();
+						String[] arg2Toks = arg2.split("\\s|,");
+						edu.pengli.nlp.conference.acl2015.types.Argument Arg2 = 
+								new edu.pengli.nlp.conference.acl2015.types.Argument();
+						for(int i=0; i<arg2Toks.length; i++){
+							if(wordLabelMap.containsKey(arg2Toks[i])){
+								Arg2.add(wordLabelMap.get(arg2Toks[i]));
+							}
+						}
+						
+						t.setArg2(Arg2);
+//						System.out.println(t);
+					}
+					Predicate pre = t.gerRel();
+					StringBuilder sb = new StringBuilder();
+					for(CoreLabel cor : pre){
+						sb.append(cor.lemma()+" ");
+					}
+					
+					out.println(t.gerRel());
+					out.println(sb.toString().trim());
+					out.println();
+				}
+				
 			}
 		}
-
+		
 		out.close();
-		// pattern clustering
-		ArrayList<Pattern> ret = patternSelection(allPatterns);
-		return ret;
-	}
 
-	private List<String> generateSummary(ArrayList<Pattern> schema) {
 
-		return null;
 	}
 
 	public void run(String inputCorpusDir, String outputSummaryDir,
 			String corpusName, PipeLine pipeLine) throws IOException,
-			ClassNotFoundException, JSONException {
+			ClassNotFoundException{
 
 		OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
 				inputCorpusDir + "/" + corpusName);
 
 		InstanceList docs = new InstanceList(pipeLine);
 
-		
 /*		docs.addThruPipe(fIter);
-		  
-		System.out.println("Begin extraction serialization");
-		extractionSerialization(outputSummaryDir, corpusName, docs);*/
-		
+		ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(
+				outputSummaryDir + "/" + corpusName + ".ser"));
+		docs.writeObject(out);
+		out.close();*/
 
-		System.out.println("Begin generate envent schema");
-		ArrayList<Pattern> schema = generateEventSchema(outputSummaryDir,
-				corpusName, docs);
+//		System.out.println("Begin generate patterns");
+//		generatePatterns(outputSummaryDir, corpusName, docs);
 
-		/*
-		 * System.out.println("Begin generate final summary"); List<String>
-		 * summary = generateSummary(schema); PrintWriter out =
-		 * FileOperation.getPrintWriter(new File( outputSummaryDir),
-		 * corpusName); for (String sentence : summary) { out.println(sentence);
-		 * } out.close();
-		 */
 	}
 
 }

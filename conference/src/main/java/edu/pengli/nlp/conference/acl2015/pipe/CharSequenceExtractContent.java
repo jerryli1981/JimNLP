@@ -34,6 +34,8 @@ public class CharSequenceExtractContent extends CharSequenceRemoveHTML {
         	content = content.replaceAll("<.*?>", "");
         	content = content.replaceAll("\"", "");
         	content = content.replaceAll("\\s?\\(.*?\\)\\s?", " ");
+        	content = content.replaceAll("'ll", " will");
+        	content = content.replaceAll("``", "");
         }
 		carrier.setData((CharSequence) content.trim());
 		return carrier;
