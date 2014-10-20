@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Stack;
 
+import edu.pengli.nlp.conference.acl2015.pipe.HeadExtractor;
 import edu.pengli.nlp.conference.acl2015.types.InformationItem;
 import edu.pengli.nlp.conference.acl2015.types.Predicate;
 import edu.pengli.nlp.conference.acl2015.types.Tuple;
@@ -483,7 +484,7 @@ public class AbstractiveGeneration {
 			Iterable<SemanticGraphEdge> edges = graph.outgoingEdgeIterable(iw);
 			for(SemanticGraphEdge e : edges){
 				GrammaticalRelation gr = e.getRelation();
-				if (gr.toString().equals("pobj")) {
+				if (gr.toString().equals("pobj") || gr.toString().equals("pcomp")) {
 					StringBuilder sb = new StringBuilder();
 					for(int j=0; j<=i; j++){
 						sb.append(words[j]+" ");
@@ -500,7 +501,7 @@ public class AbstractiveGeneration {
 	}
 
 	private void generatePatterns(String outputSummaryDir,
-			String corpusName, InstanceList corpus) throws IOException,
+			String corpusName, InstanceList corpus, HeadExtractor headExtractor) throws IOException,
 			ClassNotFoundException{
 
 		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
@@ -553,21 +554,22 @@ public class AbstractiveGeneration {
 								Arg2.add(wordLabelMap.get(arg2Toks[i]));
 							}
 						}
-						
 						t.setArg2(Arg2);
-//						System.out.println(t);
-					}
-					Predicate pre = t.gerRel();
-					StringBuilder sb = new StringBuilder();
-					for(CoreLabel cor : pre){
-						sb.append(cor.lemma()+" ");
 					}
 					
-					out.println(t.gerRel());
-					out.println(sb.toString().trim());
-					out.println();
-				}
-				
+					edu.pengli.nlp.conference.acl2015.types.Argument arg1Head = 
+							headExtractor.extract(t.getArg1(), sent, "1");
+					
+					edu.pengli.nlp.conference.acl2015.types.Argument arg2Head = 
+							headExtractor.extract(t.getArg2(), sent, "2");
+					
+					out.println("Original Tuple  "+t);
+					if(arg1Head != null && arg2Head != null){
+						t.setArg1(arg1Head);
+						t.setArg2(arg2Head);
+					    out.println(t);
+					}
+				}		
 			}
 		}
 		
@@ -592,7 +594,8 @@ public class AbstractiveGeneration {
 		out.close();*/
 
 //		System.out.println("Begin generate patterns");
-//		generatePatterns(outputSummaryDir, corpusName, docs);
+		HeadExtractor headExtractor = new HeadExtractor();
+		generatePatterns(outputSummaryDir, corpusName, docs, headExtractor);
 
 	}
 
