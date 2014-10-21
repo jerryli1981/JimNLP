@@ -558,10 +558,10 @@ public class AbstractiveGeneration {
 					}
 					
 					edu.pengli.nlp.conference.acl2015.types.Argument arg1Head = 
-							headExtractor.extract(t.getArg1(), sent, "1");
+							headExtractor.extract(t.getArg1(), sent);
 					
 					edu.pengli.nlp.conference.acl2015.types.Argument arg2Head = 
-							headExtractor.extract(t.getArg2(), sent, "2");
+							headExtractor.extract(t.getArg2(), sent);
 					
 					out.println("Original Tuple  "+t);
 					if(arg1Head != null && arg2Head != null){
@@ -587,15 +587,15 @@ public class AbstractiveGeneration {
 
 		InstanceList docs = new InstanceList(pipeLine);
 
-/*		docs.addThruPipe(fIter);
+		docs.addThruPipe(fIter);
 		ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(
 				outputSummaryDir + "/" + corpusName + ".ser"));
 		docs.writeObject(out);
-		out.close();*/
+		out.close();
 
 //		System.out.println("Begin generate patterns");
-		HeadExtractor headExtractor = new HeadExtractor();
-		generatePatterns(outputSummaryDir, corpusName, docs, headExtractor);
+//		HeadExtractor headExtractor = new HeadExtractor();
+//		generatePatterns(outputSummaryDir, corpusName, docs, headExtractor);
 
 	}
 
