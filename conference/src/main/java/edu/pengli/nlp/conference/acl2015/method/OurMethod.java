@@ -36,11 +36,11 @@ public class OurMethod {
 		String outputSummaryDir = "../data/ACL2015/Output";
 		
 		PipeLine pipeLine = new PipeLine();
-		pipeLine.addPipe(new Input2CharSequence("UTF-8"));
+/*		pipeLine.addPipe(new Input2CharSequence("UTF-8"));
 		pipeLine.addPipe(new CharSequenceExtractContent(
 				"<TEXT>[\\p{Graph}\\p{Space}]*</TEXT>"));
 		pipeLine.addPipe(new CharSequenceCoreNLPAnnotation());
-		pipeLine.addPipe(new RelationExtractionbyOpenIE());
+		pipeLine.addPipe(new RelationExtractionbyOpenIE());*/
 		
 		for (int i = 0; i < corpusList.size(); i++) {
 			System.out.println("Corpus id is "+i);

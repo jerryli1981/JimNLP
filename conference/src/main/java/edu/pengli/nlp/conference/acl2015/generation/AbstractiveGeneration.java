@@ -471,35 +471,6 @@ public class AbstractiveGeneration {
 		return ppp;
 	}
 	
-	private String findPrePhrase(String argument, CoreMap sent){
-		
-		SemanticGraph graph = sent.get(BasicDependenciesAnnotation.class);
-		String[] words = argument.split("\\s|,");
-		if(words.length == 1)
-			return null;
-		
-		for(int i=0; i<words.length; i++){
-			String tok = words[i];
-			IndexedWord iw = graph.getNodeByWordPattern(tok);
-			Iterable<SemanticGraphEdge> edges = graph.outgoingEdgeIterable(iw);
-			for(SemanticGraphEdge e : edges){
-				GrammaticalRelation gr = e.getRelation();
-				if (gr.toString().equals("pobj") || gr.toString().equals("pcomp")) {
-					StringBuilder sb = new StringBuilder();
-					for(int j=0; j<=i; j++){
-						sb.append(words[j]+" ");
-					}
-					return sb.toString().trim();
-				}
-				if(gr.toString().equals("nsubj")){
-					return null;
-				}
-			}
-		}
-		return null;
-
-	}
-
 	private void generatePatterns(String outputSummaryDir,
 			String corpusName, InstanceList corpus, HeadExtractor headExtractor) throws IOException,
 			ClassNotFoundException{
@@ -520,43 +491,11 @@ public class AbstractiveGeneration {
 
 			for (CoreMap sent : map.keySet()) {
 				out.println(sent.toString());
-				HashMap<String, CoreLabel> wordLabelMap = new HashMap<String, CoreLabel>();
-				for (CoreLabel token: sent.get(TokensAnnotation.class)) {
-			        String word = token.get(TextAnnotation.class);
-			        wordLabelMap.put(word, token);
-			    }
-
+				
 				ArrayList<Tuple> tuples = map.get(sent);
 				for(Tuple t : tuples){
-					String arg2 = t.getArg2().toString();
 					if(t.gerRel().toString().equals("said"))
 						continue;
-					String prep = findPrePhrase(arg2, sent);
-					if(prep != null){
-//						System.out.println(t);
-						String rel = t.gerRel().toString()+" "+prep;
-						String[] relToks = rel.split("\\s|,");
-						edu.pengli.nlp.conference.acl2015.types.Predicate Rel = 
-								new edu.pengli.nlp.conference.acl2015.types.Predicate();
-						for(int i=0; i<relToks.length; i++){
-							if(wordLabelMap.containsKey(relToks[i])){
-								Rel.add(wordLabelMap.get(relToks[i]));
-							}
-						}
-						
-						t.setRel(Rel);
-						arg2 = arg2.replace(prep+" ", " ").trim();
-						String[] arg2Toks = arg2.split("\\s|,");
-						edu.pengli.nlp.conference.acl2015.types.Argument Arg2 = 
-								new edu.pengli.nlp.conference.acl2015.types.Argument();
-						for(int i=0; i<arg2Toks.length; i++){
-							if(wordLabelMap.containsKey(arg2Toks[i])){
-								Arg2.add(wordLabelMap.get(arg2Toks[i]));
-							}
-						}
-						t.setArg2(Arg2);
-					}
-					
 					edu.pengli.nlp.conference.acl2015.types.Argument arg1Head = 
 							headExtractor.extract(t.getArg1(), sent);
 					
@@ -575,7 +514,6 @@ public class AbstractiveGeneration {
 		
 		out.close();
 
-
 	}
 
 	public void run(String inputCorpusDir, String outputSummaryDir,
@@ -587,15 +525,15 @@ public class AbstractiveGeneration {
 
 		InstanceList docs = new InstanceList(pipeLine);
 
-		docs.addThruPipe(fIter);
+/*		docs.addThruPipe(fIter);
 		ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(
 				outputSummaryDir + "/" + corpusName + ".ser"));
 		docs.writeObject(out);
-		out.close();
+		out.close();*/
 
-//		System.out.println("Begin generate patterns");
-//		HeadExtractor headExtractor = new HeadExtractor();
-//		generatePatterns(outputSummaryDir, corpusName, docs, headExtractor);
+		System.out.println("Begin generate patterns");
+		HeadExtractor headExtractor = new HeadExtractor();
+		generatePatterns(outputSummaryDir, corpusName, docs, headExtractor);
 
 	}
 
