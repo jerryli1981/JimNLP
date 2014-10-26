@@ -17,7 +17,6 @@ import edu.knowitall.tool.postag.ClearPostagger;
 import edu.knowitall.tool.srl.ClearSrl;
 import edu.knowitall.tool.tokenize.ClearTokenizer;
 import edu.pengli.nlp.conference.acl2015.types.Tuple;
-import edu.pengli.nlp.platform.algorithms.miscellaneous.LongestCommonSubstring;
 import edu.pengli.nlp.platform.pipe.Pipe;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
@@ -46,6 +45,7 @@ public class RelationExtractionbyOpenIE extends Pipe {
 		Properties props = new Properties();
 		props.put("annotators", "tokenize");
 		pipeline = new StanfordCoreNLP(props);
+		
 	}
 
 	private void debug() {

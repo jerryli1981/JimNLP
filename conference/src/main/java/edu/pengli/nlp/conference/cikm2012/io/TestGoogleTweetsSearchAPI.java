@@ -1,6 +1,6 @@
 package edu.pengli.nlp.conference.cikm2012.io;
 
-import java.io.File;
+/*import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.List;
@@ -56,4 +56,4 @@ public class TestGoogleTweetsSearchAPI {
 		System.out.println("done");
 
 	}
-}
+}*/

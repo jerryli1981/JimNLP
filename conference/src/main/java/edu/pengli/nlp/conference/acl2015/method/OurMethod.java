@@ -24,7 +24,7 @@ import edu.pengli.nlp.platform.util.RougeEvaluationWrapper;
 
 public class OurMethod {
 
-	public static void main(String[] args) throws JDOMException, IOException, ClassNotFoundException, JSONException {
+	public static void main(String[] args) throws Exception {
 
 		SAXBuilder builder = new SAXBuilder();
 		String inputCorpusDir = "../data/ACL2015/testData";
@@ -42,7 +42,7 @@ public class OurMethod {
 		pipeLine.addPipe(new CharSequenceCoreNLPAnnotation());
 		pipeLine.addPipe(new RelationExtractionbyOpenIE());*/
 		
-		for (int i = 0; i < corpusList.size(); i++) {
+		for (int i = 0; i < 1; i++) {
 			System.out.println("Corpus id is "+i);
 			Element topic = corpusList.get(i);
 			List<Element> docSets = topic.getChildren();

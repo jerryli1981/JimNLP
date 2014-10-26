@@ -10,14 +10,14 @@ import java.util.LinkedHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.google.api.client.http.HttpRequestInitializer;
-import com.google.api.client.http.HttpTransport;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.jackson2.*;
-import com.google.api.services.customsearch.Customsearch;
-import com.google.api.services.customsearch.model.Search;
-import com.google.api.services.customsearch.model.Search.SearchInformation;
+//import com.google.api.client.http.HttpRequestInitializer;
+//import com.google.api.client.http.HttpTransport;
+//import com.google.api.client.http.javanet.NetHttpTransport;
+//import com.google.api.client.json.JsonFactory;
+//import com.google.api.client.json.jackson2.*;
+//import com.google.api.services.customsearch.Customsearch;
+//import com.google.api.services.customsearch.model.Search;
+//import com.google.api.services.customsearch.model.Search.SearchInformation;
 
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.RankMap;
@@ -31,13 +31,13 @@ public class GetHotTopics {
 		String cx = "009063622200028507080:jcothwteflu";
 
 		// Set up the HTTP transport and JSON factory
-		HttpTransport httpTransport = new NetHttpTransport();
-		JsonFactory jsonFactory = new JacksonFactory();
+//		HttpTransport httpTransport = new NetHttpTransport();
+//		JsonFactory jsonFactory = new JacksonFactory();
 		
-		HttpRequestInitializer httpRequestInitializer = null;
+//		HttpRequestInitializer httpRequestInitializer = null;
 		
 
-		Customsearch cs = new Customsearch(httpTransport, jsonFactory, httpRequestInitializer);
+//		Customsearch cs = new Customsearch(httpTransport, jsonFactory, httpRequestInitializer);
 		
 		String dir = "../data/EMNLP2012";
 		String fileName = "wikinews.list";
@@ -56,14 +56,14 @@ public class GetHotTopics {
 			}
 			String topic = input.replace(link, "").trim();
 			
-			com.google.api.services.customsearch.Customsearch.Cse.List list = cs.cse().list
-					(topic);
-			list.setCx(cx);
-			list.setKey(apiKey);
-			Search results = list.execute();
-			SearchInformation si = results.getSearchInformation();
-			Long totalResults = si.getTotalResults();
-			map.put(topic, totalResults);
+//			com.google.api.services.customsearch.Customsearch.Cse.List list = cs.cse().list
+//					(topic);
+//			list.setCx(cx);
+//			list.setKey(apiKey);
+//			Search results = list.execute();
+//			SearchInformation si = results.getSearchInformation();
+//			Long totalResults = si.getTotalResults();
+//			map.put(topic, totalResults);
 			System.out.println(i++);
 		}
 

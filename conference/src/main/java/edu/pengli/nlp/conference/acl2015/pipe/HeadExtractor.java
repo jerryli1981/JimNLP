@@ -116,8 +116,7 @@ public class HeadExtractor {
 		for (SemanticGraphEdge edge : path) {
 			GrammaticalRelation gr = edge.getRelation();
 			if (gr.toString().equals("nsubj") || gr.toString().equals("ccomp")
-					|| gr.toString().equals("nsubjpass")
-					|| gr.toString().equals("dobj")) {
+					|| gr.toString().equals("nsubjpass")) {
 				return true;
 			}
 		}
