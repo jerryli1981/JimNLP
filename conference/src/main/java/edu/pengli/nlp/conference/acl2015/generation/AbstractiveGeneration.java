@@ -14,7 +14,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Stack;
 
+import org.json.JSONException;
+
+import edu.pengli.nlp.conference.acl2015.pipe.FramenetTagger;
+import edu.pengli.nlp.conference.acl2015.pipe.FreebaseTagger;
 import edu.pengli.nlp.conference.acl2015.pipe.HeadExtractor;
+import edu.pengli.nlp.conference.acl2015.pipe.DBpediaTagger;
+import edu.pengli.nlp.conference.acl2015.pipe.WordnetTagger;
 import edu.pengli.nlp.conference.acl2015.types.InformationItem;
 import edu.pengli.nlp.conference.acl2015.types.Predicate;
 import edu.pengli.nlp.conference.acl2015.types.Tuple;
@@ -33,9 +39,13 @@ import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.BasicDependenciesA
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
 import edu.stanford.nlp.trees.CollinsHeadFinder;
 import edu.stanford.nlp.trees.GrammaticalRelation;
+import edu.stanford.nlp.trees.GrammaticalStructure;
+import edu.stanford.nlp.trees.GrammaticalStructureFactory;
 import edu.stanford.nlp.trees.HeadFinder;
+import edu.stanford.nlp.trees.PennTreebankLanguagePack;
 import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
+import edu.stanford.nlp.trees.TreebankLanguagePack;
 import edu.stanford.nlp.util.CoreMap;
 import scala.collection.Seq;
 import scala.collection.Iterator;
@@ -52,12 +62,24 @@ public class AbstractiveGeneration {
 	NLGFactory nlgFactory;
 	Realiser realiser;
 
+	DBpediaTagger dbpediaTagger;
 
+	FreebaseTagger freebaseTagger;
+
+	WordnetTagger wordnetTagger;
+	
+	FramenetTagger framenetTagger;
 
 	public AbstractiveGeneration() {
+
 		Lexicon lexicon = Lexicon.getDefaultLexicon();
 		nlgFactory = new NLGFactory(lexicon);
 		realiser = new Realiser(lexicon);
+
+		dbpediaTagger = new DBpediaTagger();
+		wordnetTagger = new WordnetTagger();
+		freebaseTagger = new FreebaseTagger();
+		framenetTagger = new FramenetTagger();
 
 	}
 
@@ -470,10 +492,10 @@ public class AbstractiveGeneration {
 		ppp.setObject(npp);
 		return ppp;
 	}
-	
-	private void generatePatterns(String outputSummaryDir,
-			String corpusName, InstanceList corpus, HeadExtractor headExtractor) throws IOException,
-			ClassNotFoundException{
+
+	private void generatePatterns(String outputSummaryDir, String corpusName,
+			InstanceList corpus, HeadExtractor headExtractor)
+			throws IOException, ClassNotFoundException, JSONException {
 
 		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
 				outputSummaryDir + "/" + corpusName + ".ser"));
@@ -482,54 +504,123 @@ public class AbstractiveGeneration {
 
 		PrintWriter out = FileOperation.getPrintWriter(new File(
 				outputSummaryDir), corpusName + ".patterns");
-				
+		
+		HashSet<String> tupleMentions = new HashSet<String>();
+
 		for (Instance doc : corpus) {
-			
-			HashMap<CoreMap, ArrayList<Tuple>> map = 
-					(HashMap<CoreMap, ArrayList<Tuple>>) doc
+
+			HashMap<CoreMap, ArrayList<Tuple>> map = (HashMap<CoreMap, ArrayList<Tuple>>) doc
 					.getData();
 
 			for (CoreMap sent : map.keySet()) {
-				out.println(sent.toString());
-				
+								
+//				out.println(sent.toString());
 				ArrayList<Tuple> tuples = map.get(sent);
-				for(Tuple t : tuples){
-					if(t.gerRel().toString().equals("said"))
+				for (Tuple t : tuples) {
+					if (t.gerRel().toString().equals("said"))
 						continue;
-					edu.pengli.nlp.conference.acl2015.types.Argument arg1Head = 
-							headExtractor.extract(t.getArg1(), sent);
 					
-					edu.pengli.nlp.conference.acl2015.types.Argument arg2Head = 
-							headExtractor.extract(t.getArg2(), sent);
+					edu.pengli.nlp.conference.acl2015.types.Argument arg1Head = headExtractor
+							.extract(t.getArg1(), sent);
+
+					edu.pengli.nlp.conference.acl2015.types.Argument arg2Head = headExtractor
+							.extract(t.getArg2(), sent);
+
 					
-					out.println("Original Tuple  "+t);
-					if(arg1Head != null && arg2Head != null){
+
+					if (arg1Head != null && arg2Head != null) {
 						t.setArg1(arg1Head);
 						t.setArg2(arg2Head);
-					    out.println(t);
-					}
-				}		
+
+					
+						boolean ar1Prp = false;
+						if(arg1Head.get(0).tag().equals("PRP"))
+							ar1Prp = true;
+						
+						boolean ar2Prp = false;
+						if(arg2Head.get(0).tag().equals("PRP"))
+							ar2Prp = true;
+						
+						
+						if((!arg1Head.get(0).ner().equals("O") || ar1Prp) 
+								&& (!arg2Head.get(0).ner().equals("O") || ar2Prp))
+							continue;
+						
+						if(arg1Head.get(0).ner().equals("O") && arg2Head.get(0).ner().equals("O")){
+							tupleMentions.add(t.getArg1()+" "+t.gerRel()+" "+t.getArg2());
+						}
+/*						if (arg1Head.get(0).ner().equals("O")) {
+							String arg1Mention = arg1Head.get(0).lemma();
+							if (arg1Head.get(0).tag().startsWith("NN")) {
+								out.println(arg1Mention + "/"
+										+ arg1Head.get(0).tag() + "->"
+										+ arg1Head.get(0).ner());
+								ArrayList<String> label1s = wordnetTagger
+										.getNounTypes(arg1Mention);
+								out.println(arg1Mention + "<-wordNet->"
+										+ label1s);
+								String label1ByDB = dbpediaTagger
+										.NameEntityRecognition(arg1Mention);
+								System.out.println(arg1Mention + "<-dbpedia->"
+										+ label1ByDB);
+
+								ArrayList<String> freeLabels = freebaseTagger
+										.search(arg1Mention);
+								out.println(arg1Mention + "<-freebase->"
+										+ freeLabels);
+
+							}
+						}
+
+						if (arg2Head.get(0).ner().equals("O")) {
+							String arg2Mention = arg2Head.get(0).lemma();
+							if (arg2Head.get(0).tag().startsWith("NN")) {
+								out.println(arg2Mention + "/"
+									+ arg2Head.get(0).tag() + "->"
+										+ arg2Head.get(0).ner());
+								ArrayList<String> label2s = wordnetTagger
+										.getNounTypes(arg2Mention);
+								out
+										.println(arg2Mention + "<-wordnet->" + label2s);
+								String label2ByDB = dbpediaTagger
+										.NameEntityRecognition(arg2Mention);
+								System.out.println(arg2Mention + "<-dbpedia->"
+										+ label2ByDB);
+
+								ArrayList<String> freeLabels = freebaseTagger
+										.search(arg2Mention);
+								out.println(arg2Mention + "<-freebase->"
+										+ freeLabels);
+							}
+
+						}*/
+
+						//out.println(t);
+						//framenetTagger
+						out.println(t);
+					}		
+				}
 			}
 		}
-		
+
 		out.close();
 
 	}
 
 	public void run(String inputCorpusDir, String outputSummaryDir,
 			String corpusName, PipeLine pipeLine) throws IOException,
-			ClassNotFoundException{
+			ClassNotFoundException, JSONException {
 
 		OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
 				inputCorpusDir + "/" + corpusName);
 
 		InstanceList docs = new InstanceList(pipeLine);
 
-/*		docs.addThruPipe(fIter);
-		ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(
-				outputSummaryDir + "/" + corpusName + ".ser"));
-		docs.writeObject(out);
-		out.close();*/
+		/*
+		 * docs.addThruPipe(fIter); ObjectOutputStream out = new
+		 * ObjectOutputStream(new FileOutputStream( outputSummaryDir + "/" +
+		 * corpusName + ".ser")); docs.writeObject(out); out.close();
+		 */
 
 		System.out.println("Begin generate patterns");
 		HeadExtractor headExtractor = new HeadExtractor();
