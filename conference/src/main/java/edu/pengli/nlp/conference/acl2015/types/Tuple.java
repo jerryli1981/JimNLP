@@ -32,7 +32,7 @@ public class Tuple implements Serializable{
 		this.arg1 = argument;
 	}
 
-	public Predicate gerRel() {
+	public Predicate getRel() {
 		return rel;
 	}
 	
@@ -75,7 +75,7 @@ public class Tuple implements Serializable{
 	public int hashCode() {
 
 		return this.getArg1().hashCode()+
-				this.gerRel().hashCode()+
+				this.getRel().hashCode()+
 				this.getArg2().hashCode();
 
 	}
@@ -85,7 +85,7 @@ public class Tuple implements Serializable{
 		if (compare instanceof Tuple) {
 			Tuple obj = (Tuple) compare;
 			if (this.getArg1().equals(obj.getArg1()) &&
-					this.gerRel().equals(obj.gerRel()) &&
+					this.getRel().equals(obj.getRel()) &&
 					this.getArg2().equals(this.getArg2()))
 				return true;
 		}

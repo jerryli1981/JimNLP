@@ -22,6 +22,7 @@ import edu.pengli.nlp.conference.acl2015.pipe.HeadExtractor;
 import edu.pengli.nlp.conference.acl2015.pipe.DBpediaTagger;
 import edu.pengli.nlp.conference.acl2015.pipe.WordnetTagger;
 import edu.pengli.nlp.conference.acl2015.types.InformationItem;
+import edu.pengli.nlp.conference.acl2015.types.Pattern;
 import edu.pengli.nlp.conference.acl2015.types.Predicate;
 import edu.pengli.nlp.conference.acl2015.types.Tuple;
 import edu.pengli.nlp.platform.pipe.PipeLine;
@@ -505,9 +506,7 @@ public class AbstractiveGeneration {
 
 		PrintWriter out = FileOperation.getPrintWriter(new File(
 				outputSummaryDir), corpusName + ".patterns");
-		
-		HashSet<String> tupleMentions = new HashSet<String>();
-
+		HashSet<Pattern> patternSet = new HashSet<Pattern>();
 		for (Instance doc : corpus) {
 			HashMap<CoreMap, ArrayList<Tuple>> map = (HashMap<CoreMap, ArrayList<Tuple>>) doc
 					.getData();
@@ -515,7 +514,7 @@ public class AbstractiveGeneration {
 								
 				ArrayList<Tuple> tuples = map.get(sent);
 				for (Tuple t : tuples) {
-					if (t.gerRel().toString().equals("said"))
+					if (t.getRel().toString().equals("said"))
 						continue;
 					
 					edu.pengli.nlp.conference.acl2015.types.Argument arg1Head = headExtractor
@@ -525,44 +524,27 @@ public class AbstractiveGeneration {
 							.extract(t.getArg2(), sent);
 
 					if (arg1Head != null && arg2Head != null) {
-						t.setArg1(arg1Head);
-						t.setArg2(arg2Head);
-
-					
-						boolean ar1Prp = false;
-						if(arg1Head.get(0).tag().equals("PRP"))
-							ar1Prp = true;
 						
-						boolean ar2Prp = false;
-						if(arg2Head.get(0).tag().equals("PRP"))
-							ar2Prp = true;
+						framenetTagger.annotate(arg1Head.get(0), arg2Head.get(0), t);	
 						
-						
-						if((!arg1Head.get(0).ner().equals("O") || ar1Prp) 
-								&& (!arg2Head.get(0).ner().equals("O") || ar2Prp))
-							continue;
-						
-						if(arg1Head.get(0).ner().equals("O") && arg2Head.get(0).ner().equals("O")){
-							tupleMentions.add(t.getArg1()+" "+t.gerRel()+" "+t.getArg2());
+						if(!arg1Head.get(0).ner().equals("O") 
+								&& !arg2Head.get(0).ner().equals("O")){
+							
+							Pattern p = new Pattern(arg1Head.get(0).ner(), 
+									t.getRel().toString(), arg2Head.get(0).ner());
+							patternSet.add(p);
+							
 						}
 					}		
 				}
 			}
 		}
 		
-		ArrayList<String> tuples = new ArrayList<String>();
-		for(String tm : tupleMentions){
-			out.println(tm);
-			tuples.add(tm);
+		for(Pattern p : patternSet){
+			out.println(p);
 		}
 		out.close();
 		
-		System.out.println("Begin framenet tagging");
-		framenetTagger.generateSemaforInput(tuples, 
-				new File(outputSummaryDir), corpusName + ".conll");
-		framenetTagger.getAnnotation(new File(outputSummaryDir), 
-				corpusName + ".conll", corpusName + ".ann");
-
 	}
 
 	public void run(String inputCorpusDir, String outputSummaryDir,

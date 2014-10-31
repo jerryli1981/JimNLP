@@ -329,7 +329,7 @@ public class RelationExtractionbyOpenIE extends Pipe {
 				edu.pengli.nlp.conference.acl2015.types.Argument Arg2 = t.getArg2();
 				ArrayList<CoreLabel> prep = findPrePhrase(Arg2, sentence);
 				if(prep != null){
-					edu.pengli.nlp.conference.acl2015.types.Predicate Rel = t.gerRel();
+					edu.pengli.nlp.conference.acl2015.types.Predicate Rel = t.getRel();
 					Rel.addAll(prep);			
 					t.setRel(Rel);
 					for(CoreLabel p : prep){
