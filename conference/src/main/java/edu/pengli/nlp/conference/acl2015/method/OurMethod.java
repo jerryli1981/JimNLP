@@ -45,17 +45,18 @@ public class OurMethod {
 		for (int i = 0; i < 1; i++) {
 			System.out.println("Corpus id is "+i);
 			Element topic = corpusList.get(i);
+			String categoryId = topic.getAttributeValue("category");
 			List<Element> docSets = topic.getChildren();
 			Element docSetA = docSets.get(1);
 			String corpusName = docSetA.getAttributeValue("id");
 			corpusNameList.add(corpusName);
 			AbstractiveGeneration ag = new AbstractiveGeneration();
 			ag.run(inputCorpusDir + "/" + topic.getAttributeValue("id"),
-					outputSummaryDir, corpusName, pipeLine);
+					outputSummaryDir, corpusName, pipeLine, categoryId);
 		}
 
 		// Rouge Evaluation
-/*		String modelSummaryDir = "../data/ACL2015/ROUGE/models";
+		String modelSummaryDir = "../data/ACL2015/ROUGE/models";
 		ArrayList<File> files = FileOperation.travelFileList(new File(
 				modelSummaryDir));
 		HashMap<String, ArrayList<String>> modelSummariesMap = new HashMap<String, ArrayList<String>>();
@@ -85,7 +86,7 @@ public class OurMethod {
 				confFilePath);
 		String metric = "ROUGE-SU4";
 		HashMap map = RougeEvaluationWrapper.runRough(confFilePath, metric);
-		System.out.println(metric + " is " + (Double) map.get(metric));*/
+		System.out.println(metric + " is " + (Double) map.get(metric));
 
 		System.out.println("Our method is done");
 

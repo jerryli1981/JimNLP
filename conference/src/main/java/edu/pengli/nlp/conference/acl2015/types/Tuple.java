@@ -19,6 +19,13 @@ public class Tuple implements Serializable{
 		this.arg2 = arg2;
 		this.confidence = confidence;
 	}
+	
+	public Tuple(Argument arg1, Predicate rel,
+			Argument arg2) {
+		this.arg1 = arg1;
+		this.rel = rel;
+		this.arg2 = arg2;
+	}
 
 	public double getConfidence() {
 		return confidence;

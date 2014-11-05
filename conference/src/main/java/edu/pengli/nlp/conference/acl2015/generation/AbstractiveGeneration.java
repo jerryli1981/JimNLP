@@ -3,53 +3,47 @@ package edu.pengli.nlp.conference.acl2015.generation;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Stack;
 
-import org.json.JSONException;
-
+import edu.pengli.nlp.conference.acl2015.pipe.FeatureVectorGenerator;
 import edu.pengli.nlp.conference.acl2015.pipe.FramenetTagger;
-import edu.pengli.nlp.conference.acl2015.pipe.FreebaseTagger;
 import edu.pengli.nlp.conference.acl2015.pipe.HeadExtractor;
-import edu.pengli.nlp.conference.acl2015.pipe.DBpediaTagger;
-import edu.pengli.nlp.conference.acl2015.pipe.WordnetTagger;
+import edu.pengli.nlp.conference.acl2015.pipe.FeatureVectorGenerator.WordEntry;
+import edu.pengli.nlp.conference.acl2015.types.Category;
 import edu.pengli.nlp.conference.acl2015.types.InformationItem;
 import edu.pengli.nlp.conference.acl2015.types.Pattern;
 import edu.pengli.nlp.conference.acl2015.types.Predicate;
 import edu.pengli.nlp.conference.acl2015.types.Tuple;
+import edu.pengli.nlp.platform.algorithms.classify.Clustering;
+import edu.pengli.nlp.platform.algorithms.classify.KMeans;
+import edu.pengli.nlp.platform.pipe.Noop;
 import edu.pengli.nlp.platform.pipe.PipeLine;
 import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerFileIterator;
+import edu.pengli.nlp.platform.types.FeatureVector;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.types.InstanceList;
+import edu.pengli.nlp.platform.types.Metric;
+import edu.pengli.nlp.platform.types.NormalizedDotProductMetric;
+import edu.pengli.nlp.platform.types.SparseVector;
 import edu.pengli.nlp.platform.util.FileOperation;
-import edu.pengli.nlp.platform.util.RankMap;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.IndexedWord;
-import edu.stanford.nlp.ling.CoreAnnotations.TextAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.BasicDependenciesAnnotation;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
-import edu.stanford.nlp.trees.CollinsHeadFinder;
 import edu.stanford.nlp.trees.GrammaticalRelation;
-import edu.stanford.nlp.trees.GrammaticalStructure;
-import edu.stanford.nlp.trees.GrammaticalStructureFactory;
-import edu.stanford.nlp.trees.HeadFinder;
-import edu.stanford.nlp.trees.PennTreebankLanguagePack;
-import edu.stanford.nlp.trees.Tree;
-import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
-import edu.stanford.nlp.trees.TreebankLanguagePack;
 import edu.stanford.nlp.util.CoreMap;
-import scala.collection.Seq;
-import scala.collection.Iterator;
 import simplenlg.framework.NLGFactory;
 import simplenlg.lexicon.Lexicon;
 import simplenlg.phrasespec.NPPhraseSpec;
@@ -63,26 +57,20 @@ public class AbstractiveGeneration {
 	NLGFactory nlgFactory;
 	Realiser realiser;
 
-	DBpediaTagger dbpediaTagger;
+//	DBpediaTagger dbpediaTagger;
 
-	FreebaseTagger freebaseTagger;
+//	FreebaseTagger freebaseTagger;
 
-	WordnetTagger wordnetTagger;
+//	WordnetTagger wordnetTagger;
 	
 	FramenetTagger framenetTagger;
-
-	public AbstractiveGeneration() {
-	}
 	
-	public void init(){
+	FeatureVectorGenerator fvGenerator;
+	
+	public AbstractiveGeneration(){
 		Lexicon lexicon = Lexicon.getDefaultLexicon();
 		nlgFactory = new NLGFactory(lexicon);
 		realiser = new Realiser(lexicon);
-
-		dbpediaTagger = new DBpediaTagger();
-		wordnetTagger = new WordnetTagger();
-		freebaseTagger = new FreebaseTagger();
-		framenetTagger = new FramenetTagger();
 	}
 
 	/*
@@ -250,34 +238,73 @@ public class AbstractiveGeneration {
 
 	}
 
-	private ArrayList<String> generate(SemanticGraph graph) {
-
+	private String realization(Pattern p, SemanticGraph graph) {
+		
+        Tuple t = p.getTuple();
 		SPhraseSpec newSent = nlgFactory.createClause();
-		ArrayList<String> comSents = new ArrayList<String>();
 
-		ArrayList<InformationItem> items = extractInformationItems(graph);
+		int arg1CoreLabelIdx = t.getArg1().get(0).index();
+		IndexedWord arg1iw = graph.getNodeByIndexSafe(arg1CoreLabelIdx);
+		
+		int arg2CoreLabelIdx = t.getArg2().get(0).index();
+		IndexedWord arg2iw = graph.getNodeByIndexSafe(arg2CoreLabelIdx);
+		ArrayList<IndexedWord> objects = new ArrayList<IndexedWord>();
+		objects.add(arg2iw);
 
-		if (items.size() != 0)
-			for (InformationItem item : items) {
+		NPPhraseSpec subjectNp = generateNP(graph, arg1iw);
 
-				System.out.println("Information Item is: " + item.toString());
+		newSent.setSubject(subjectNp);
 
-				NPPhraseSpec subjectNp = generateNP(graph, item.getSubject());
+		Predicate pred = t.getRel();
+		IndexedWord headVp = null;
+		
+		Stack<Integer> stack = new Stack<Integer>();
+		boolean[] marked = new boolean[graph.size() * 2]; 
+		int rootIdx = graph.getFirstRoot().index();
+		marked[rootIdx] = true;
+		stack.add(rootIdx);
+		while (!stack.isEmpty()) {
+			int s = stack.pop();
+			Iterable<SemanticGraphEdge> iter = graph.outgoingEdgeIterable(graph
+					.getNodeByIndex(s));
+			for (SemanticGraphEdge edge : iter) {
+				GrammaticalRelation gr = edge.getRelation();
+				IndexedWord gov = edge.getGovernor();
+				if (gr.toString().equals("nsubj")
+						|| gr.toString().equals("dobj")
+						|| (gr.toString().equals("prep") && gov.tag()
+								.startsWith("VB"))) {
+					
+					for(CoreLabel tok : pred){
+						int preCoreLabelIdx = tok.index();
+						IndexedWord preiw = graph.getNodeByIndexSafe(preCoreLabelIdx);
+						if(preiw.equals(edge.getGovernor())){
+							headVp = preiw;
+						}
+					}
+				}
 
-				newSent.setSubject(subjectNp);
-
-				VPPhraseSpec vp = generateVP(graph, item.getPredicate(),
-						item.getObject());
-
-				newSent.setVerbPhrase(vp);
-
-				String output = realiser.realiseSentence(newSent);
-
-				System.out.println("Generated sent is: " + output);
-
-				comSents.add(output);
+				int depIdx = edge.getDependent().index();
+				if (!marked[depIdx]) {
+					marked[depIdx] = true;
+					stack.add(depIdx);
+				}
 			}
-		return comSents;
+		}
+		
+		if(headVp == null){
+			System.out.println("head vp is null");
+			System.exit(0);
+		}
+		
+		VPPhraseSpec vp = generateVP(graph, headVp, objects);
+
+		newSent.setVerbPhrase(vp);
+
+		String output = realiser.realiseSentence(newSent);
+
+		return output;
+
 	}
 
 	// search the tree recursively
@@ -503,9 +530,11 @@ public class AbstractiveGeneration {
 				outputSummaryDir + "/" + corpusName + ".ser"));
 
 		corpus.readObject(in);
+		
+		in.close();
 
-		PrintWriter out = FileOperation.getPrintWriter(new File(
-				outputSummaryDir), corpusName + ".patterns");
+		ObjectOutputStream  out = new ObjectOutputStream(new 
+				FileOutputStream(outputSummaryDir + "/" + corpusName + ".patterns"));
 		HashSet<Pattern> patternSet = new HashSet<Pattern>();
 		for (Instance doc : corpus) {
 			HashMap<CoreMap, ArrayList<Tuple>> map = (HashMap<CoreMap, ArrayList<Tuple>>) doc
@@ -527,11 +556,13 @@ public class AbstractiveGeneration {
 						
 						framenetTagger.annotate(arg1Head.get(0), arg2Head.get(0), t);	
 						
+						Tuple tmpTuple = new Tuple(arg1Head, t.getRel(), arg2Head);
+						
 						if(!arg1Head.get(0).ner().equals("O") 
 								&& !arg2Head.get(0).ner().equals("O")){
 							
 							Pattern p = new Pattern(arg1Head.get(0).ner(), 
-									t.getRel().toString(), arg2Head.get(0).ner());
+									t.getRel().toString(), arg2Head.get(0).ner(), sent, tmpTuple);
 							patternSet.add(p);
 							
 						}
@@ -540,33 +571,113 @@ public class AbstractiveGeneration {
 			}
 		}
 		
-		for(Pattern p : patternSet){
-			out.println(p);
-		}
+		out.writeObject(patternSet);
 		out.close();
+	}
+	
+	private InstanceList featureEngineering(HashSet<Pattern> patternSet){
 		
+		InstanceList instances = new InstanceList(new Noop());
+		
+		for(Pattern p : patternSet){
+			FeatureVector fv = fvGenerator.getFeatureVector(p);
+			Instance inst = new Instance(fv, null, null, p);
+			instances.add(inst);			
+		}
+		
+		return instances;
+	}
+	
+	private InstanceList featureEngineeringOnCategory(String categoryId){
+		
+		InstanceList seeds = new InstanceList(new Noop());
+		Category[] cats = Category.values();
+		for(Category cat : cats){
+			if(cat.getId() == Integer.parseInt(categoryId)){
+				HashMap<String, String[]> aspects = cat.getAspects(cat.getId());
+				Set<String> keys = aspects.keySet();
+				for(String key : keys){
+					String[] keywords = aspects.get(key);
+					FeatureVector fv = fvGenerator.getFeatureVector(keywords);
+					Instance inst = new Instance(fv, null, null, key);
+					seeds.add(inst);
+				}
+			}
+		}
+		
+		return seeds;
+	}
+	
+	private void generateFinalSummary( String outputSummaryDir,
+			String corpusName, Clustering predicted, InstanceList seeds){
+		PrintWriter out = FileOperation.getPrintWriter(new File(outputSummaryDir), corpusName);
+		for(Instance seed : seeds){
+			FeatureVector seedFv = (FeatureVector) seed.getData();
+			InstanceList[] clusters = predicted.getClusters();
+			float Max = Float.MIN_VALUE;
+			InstanceList bestCluster = null;
+			for(InstanceList cluster : clusters){
+				SparseVector meanVec = KMeans.mean(cluster);
+				float dist = 0;
+				for (int i = 0; i < meanVec.getIndices().length; i++) {
+						dist += seedFv.getValues()[i] * meanVec.getValues()[i];
+				}
+				if(dist >= Max){
+					Max = dist;
+					bestCluster = cluster;
+				}
+			}
+			out.println(seed.getSource());
+			for(int i=0; i < bestCluster.size(); i++){
+				Instance inst = bestCluster.get(i);
+				Pattern p = (Pattern) inst.getSource();
+/*				CoreMap annotation = p.getCoreMap();
+				SemanticGraph graph = annotation.get(BasicDependenciesAnnotation.class);
+				String summarySent = realization(p, graph);*/
+				String summarySent = p.getCoreMap().toString();
+				out.println(summarySent);
+				if(i > 2)break;
+			}
+			out.println();
+		}
+		
+		out.close();
 	}
 
 	public void run(String inputCorpusDir, String outputSummaryDir,
-			String corpusName, PipeLine pipeLine) throws Exception {
-
-		OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
-				inputCorpusDir + "/" + corpusName);
+			String corpusName, PipeLine pipeLine, String categoryId) throws Exception {
 
 		InstanceList docs = new InstanceList(pipeLine);
-
 		
-/*		docs.addThruPipe(fIter); 
+/*		OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
+				inputCorpusDir + "/" + corpusName);
+		docs.addThruPipe(fIter); 
 		ObjectOutputStream out = new ObjectOutputStream(new 
 				FileOutputStream( outputSummaryDir + "/" +corpusName + ".ser")); 
 		docs.writeObject(out); 
 		out.close();*/
+		
 
-		init();
-		System.out.println("Begin generate patterns");
+/*		System.out.println("Begin generate patterns");
 		HeadExtractor headExtractor = new HeadExtractor();
-		generatePatterns(outputSummaryDir, corpusName, docs, headExtractor);
-
+		framenetTagger = new FramenetTagger();
+	    generatePatterns(outputSummaryDir, corpusName, docs, headExtractor);*/
+		
+		
+		
+	    System.out.println("Begin summary generation");
+	    fvGenerator = new FeatureVectorGenerator();
+        ObjectInputStream in = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + corpusName + ".patterns"));
+        HashSet<Pattern> patternSet = (HashSet<Pattern>) in.readObject();
+        in.close();
+		InstanceList instances = featureEngineering(patternSet);
+		InstanceList seeds = featureEngineeringOnCategory(categoryId);
+		int numClusters = 20;
+		Metric metric = new NormalizedDotProductMetric();
+		KMeans kmeans = new KMeans(new Noop(), numClusters, metric);
+		Clustering predicted = kmeans.cluster(instances);
+		generateFinalSummary(outputSummaryDir, corpusName, predicted, seeds);
 	}
 
 }

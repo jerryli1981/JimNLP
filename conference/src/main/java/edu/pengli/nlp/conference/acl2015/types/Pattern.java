@@ -1,15 +1,23 @@
 package edu.pengli.nlp.conference.acl2015.types;
 
-public class Pattern {
+import java.io.Serializable;
+
+import edu.stanford.nlp.util.CoreMap;
+
+public class Pattern implements Serializable{
 	
 	String arg1;
 	String predicate;
 	String arg2;
+	CoreMap sent;
+	Tuple t;
 	
-	public Pattern(String arg1, String predicate, String arg2){
+	public Pattern(String arg1, String predicate, String arg2, CoreMap sent, Tuple t){
 		this.arg1 = arg1;
 		this.predicate = predicate;
 		this.arg2 = arg2;
+		this.sent = sent;
+		this.t = t;
 	}
 	
 	public String getArg1(){
@@ -24,7 +32,17 @@ public class Pattern {
 		return arg2;
 	}
 	
+	public CoreMap getCoreMap(){
+		return sent;
+	}
+	
+	public Tuple getTuple(){
+		return t;
+	}
+	
 	public String toString(){
+		//Pattern p = new Pattern(arg1Head.get(0).ner(), 
+		//t.getRel().toString(), arg2Head.get(0).ner(), sent);
 		return arg1.toUpperCase()+" "+predicate+" "+arg2.toUpperCase();
 	}
 	

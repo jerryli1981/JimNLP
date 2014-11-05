@@ -14,7 +14,7 @@ public class Predicate extends ArrayList<CoreLabel>{
 		
 		StringBuilder sb = new StringBuilder();
 		for(CoreLabel tok : this){
-			sb.append(tok.originalText()+" ");
+			sb.append(tok.lemma()+" ");
 		}
 		return sb.toString().trim();	
 	}
