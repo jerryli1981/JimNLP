@@ -12,6 +12,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
@@ -63,9 +64,9 @@ public class AbstractiveGeneration {
 
 //	WordnetTagger wordnetTagger;
 	
-	FramenetTagger framenetTagger;
+	static FramenetTagger framenetTagger;
 	
-	FeatureVectorGenerator fvGenerator;
+	static FeatureVectorGenerator fvGenerator;
 	
 	public AbstractiveGeneration(){
 		Lexicon lexicon = Lexicon.getDefaultLexicon();
@@ -293,7 +294,14 @@ public class AbstractiveGeneration {
 		}
 		
 		if(headVp == null){
-			System.out.println("head vp is null");
+			for(CoreLabel cl : pred){
+				if(cl.tag().startsWith("VB")){
+					headVp = graph.getNodeByIndexSafe(cl.index());
+				}
+			}
+		}
+		if(headVp == null){
+			System.out.println("wired");
 			System.exit(0);
 		}
 		
@@ -549,8 +557,10 @@ public class AbstractiveGeneration {
 					edu.pengli.nlp.conference.acl2015.types.Argument arg1Head = headExtractor
 							.extract(t.getArg1(), sent);
 
+					
 					edu.pengli.nlp.conference.acl2015.types.Argument arg2Head = headExtractor
 							.extract(t.getArg2(), sent);
+				
 
 					if (arg1Head != null && arg2Head != null) {
 						
@@ -566,10 +576,13 @@ public class AbstractiveGeneration {
 							patternSet.add(p);
 							
 						}
-					}		
+					}
+
 				}
 			}
 		}
+		
+	
 		
 		out.writeObject(patternSet);
 		out.close();
@@ -594,7 +607,7 @@ public class AbstractiveGeneration {
 		Category[] cats = Category.values();
 		for(Category cat : cats){
 			if(cat.getId() == Integer.parseInt(categoryId)){
-				HashMap<String, String[]> aspects = cat.getAspects(cat.getId());
+				Map<String, String[]> aspects = cat.getAspects(cat.getId());
 				Set<String> keys = aspects.keySet();
 				for(String key : keys){
 					String[] keywords = aspects.get(key);
@@ -611,6 +624,7 @@ public class AbstractiveGeneration {
 	private void generateFinalSummary( String outputSummaryDir,
 			String corpusName, Clustering predicted, InstanceList seeds){
 		PrintWriter out = FileOperation.getPrintWriter(new File(outputSummaryDir), corpusName);
+		HashSet<InstanceList> set = new HashSet<InstanceList>();
 		for(Instance seed : seeds){
 			FeatureVector seedFv = (FeatureVector) seed.getData();
 			InstanceList[] clusters = predicted.getClusters();
@@ -622,19 +636,21 @@ public class AbstractiveGeneration {
 				for (int i = 0; i < meanVec.getIndices().length; i++) {
 						dist += seedFv.getValues()[i] * meanVec.getValues()[i];
 				}
-				if(dist >= Max){
+				if(dist >= Max && !set.contains(cluster)){
 					Max = dist;
 					bestCluster = cluster;
+				
 				}
 			}
-			out.println(seed.getSource());
+			set.add(bestCluster);
 			for(int i=0; i < bestCluster.size(); i++){
 				Instance inst = bestCluster.get(i);
 				Pattern p = (Pattern) inst.getSource();
-/*				CoreMap annotation = p.getCoreMap();
+				CoreMap annotation = p.getCoreMap();
 				SemanticGraph graph = annotation.get(BasicDependenciesAnnotation.class);
-				String summarySent = realization(p, graph);*/
-				String summarySent = p.getCoreMap().toString();
+				String summarySent = realization(p, graph);
+//				String summarySent = p.getCoreMap().toString();
+				out.println(p.toString());
 				out.println(summarySent);
 				if(i > 2)break;
 			}
@@ -658,14 +674,15 @@ public class AbstractiveGeneration {
 		out.close();*/
 		
 
-/*		System.out.println("Begin generate patterns");
+		System.out.println("Begin generate patterns");
 		HeadExtractor headExtractor = new HeadExtractor();
-		framenetTagger = new FramenetTagger();
-	    generatePatterns(outputSummaryDir, corpusName, docs, headExtractor);*/
+		if(framenetTagger == null)
+			framenetTagger = new FramenetTagger();
+	    generatePatterns(outputSummaryDir, corpusName, docs, headExtractor);
 		
 		
 		
-	    System.out.println("Begin summary generation");
+/*	    System.out.println("Begin summary generation");
 	    fvGenerator = new FeatureVectorGenerator();
         ObjectInputStream in = new ObjectInputStream(new FileInputStream(
 				outputSummaryDir + "/" + corpusName + ".patterns"));
@@ -677,7 +694,7 @@ public class AbstractiveGeneration {
 		Metric metric = new NormalizedDotProductMetric();
 		KMeans kmeans = new KMeans(new Noop(), numClusters, metric);
 		Clustering predicted = kmeans.cluster(instances);
-		generateFinalSummary(outputSummaryDir, corpusName, predicted, seeds);
+		generateFinalSummary(outputSummaryDir, corpusName, predicted, seeds);*/
 	}
 
 }

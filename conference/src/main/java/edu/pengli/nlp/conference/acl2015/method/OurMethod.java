@@ -42,7 +42,8 @@ public class OurMethod {
 		pipeLine.addPipe(new CharSequenceCoreNLPAnnotation());
 		pipeLine.addPipe(new RelationExtractionbyOpenIE());*/
 		
-		for (int i = 0; i < 1; i++) {
+		
+		for (int i = 0; i < corpusList.size(); i++) {
 			System.out.println("Corpus id is "+i);
 			Element topic = corpusList.get(i);
 			String categoryId = topic.getAttributeValue("category");
@@ -56,7 +57,7 @@ public class OurMethod {
 		}
 
 		// Rouge Evaluation
-		String modelSummaryDir = "../data/ACL2015/ROUGE/models";
+/*		String modelSummaryDir = "../data/ACL2015/ROUGE/models";
 		ArrayList<File> files = FileOperation.travelFileList(new File(
 				modelSummaryDir));
 		HashMap<String, ArrayList<String>> modelSummariesMap = new HashMap<String, ArrayList<String>>();
@@ -86,7 +87,7 @@ public class OurMethod {
 				confFilePath);
 		String metric = "ROUGE-SU4";
 		HashMap map = RougeEvaluationWrapper.runRough(confFilePath, metric);
-		System.out.println(metric + " is " + (Double) map.get(metric));
+		System.out.println(metric + " is " + (Double) map.get(metric));*/
 
 		System.out.println("Our method is done");
 

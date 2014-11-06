@@ -333,6 +333,8 @@ public class RelationExtractionbyOpenIE extends Pipe {
 					Rel.addAll(prep);			
 					t.setRel(Rel);
 					for(CoreLabel p : prep){
+						if(Arg2.size() ==1)
+							break;
 						Arg2.remove(p);
 					}
 					t.setArg2(Arg2);

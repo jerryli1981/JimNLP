@@ -1,6 +1,8 @@
 package edu.pengli.nlp.conference.acl2015.types;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.TreeMap;
 
 public enum Category {
 
@@ -11,17 +13,17 @@ public enum Category {
 	Investigations_and_Trials(5,generateAspectsFor5());
 
 	private int idx;
-	private static HashMap<String, String[]> type1aspects;
-	private static HashMap<String, String[]> type2aspects;
-	private static HashMap<String, String[]> type3aspects;
-	private static HashMap<String, String[]> type4aspects;
-	private static HashMap<String, String[]> type5aspects;
+	private static Map<String, String[]> type1aspects;
+	private static Map<String, String[]> type2aspects;
+	private static Map<String, String[]> type3aspects;
+	private static Map<String, String[]> type4aspects;
+	private static Map<String, String[]> type5aspects;
 
 	public int getId() {
 		return idx;
 	}
 
-	public static HashMap<String, String[]> getAspects(int id) {
+	public static Map<String, String[]> getAspects(int id) {
 		switch (id) {
 		case 1:
 			return generateAspectsFor1();
@@ -38,8 +40,8 @@ public enum Category {
 		}
 	}
 
-	private static HashMap<String, String[]> generateAspectsFor1() {
-		type1aspects = new HashMap<String, String[]>();
+	private static Map<String, String[]> generateAspectsFor1() {
+		type1aspects = new LinkedHashMap<String, String[]>();
 		String[] keywordsForWhat = { "d", "d" };
 		type1aspects.put("what", keywordsForWhat);
 
@@ -63,8 +65,8 @@ public enum Category {
 		return type1aspects;
 	}
 
-	private static HashMap<String, String[]> generateAspectsFor2() {
-		type2aspects = new HashMap<String, String[]>();
+	private static Map<String, String[]> generateAspectsFor2() {
+		type2aspects = new LinkedHashMap<String, String[]>();
 		String[] keywordsForWhat = { "riot", "violence", "raid", "ambush",
 				"assault", "revolt", "violence", "massacre", "slaughter" };
 		type2aspects.put("what", keywordsForWhat);
@@ -98,8 +100,8 @@ public enum Category {
 		return type2aspects;
 	}
 
-	private static HashMap<String, String[]> generateAspectsFor3() {
-		type3aspects = new HashMap<String, String[]>();
+	private static Map<String, String[]> generateAspectsFor3() {
+		type3aspects = new LinkedHashMap<String, String[]>();
 		String[] keywordsForWhat = { "calamity", "casualty", "collision",
 				"crash", "wreck", "incident", "pile", "smash", "catastrophe",
 				"explosion", "nuclear", "earthquake", "eruption", "flash",
@@ -121,8 +123,8 @@ public enum Category {
 		return type3aspects;
 	}
 
-	private static HashMap<String, String[]> generateAspectsFor4() {
-		type4aspects = new HashMap<String, String[]>();
+	private static Map<String, String[]> generateAspectsFor4() {
+		type4aspects = new LinkedHashMap<String, String[]>();
 		String[] keywordsForWhat = { "d", "d" };
 		type4aspects.put("what", keywordsForWhat);
 
@@ -137,8 +139,8 @@ public enum Category {
 		return type4aspects;
 	}
 
-	private static HashMap<String, String[]> generateAspectsFor5() {
-		type5aspects = new HashMap<String, String[]>();
+	private static Map<String, String[]> generateAspectsFor5() {
+		type5aspects = new LinkedHashMap<String, String[]>();
 		String[] keywordsForWho = { "d", "d" };
 		type5aspects.put("who", keywordsForWho);
 
@@ -159,27 +161,27 @@ public enum Category {
 		return type5aspects;
 	}
 
-	private Category(int idx, HashMap<String, String[]> aspects) {
+	private Category(int idx, Map<String, String[]> aspects) {
 		this.idx = idx;
 	}
 
-	private HashMap<String, String[]> getType1Aspects() {
+	private Map<String, String[]> getType1Aspects() {
 		return type1aspects;
 	}
 
-	private HashMap<String, String[]> getType2Aspects() {
+	private Map<String, String[]> getType2Aspects() {
 		return type2aspects;
 	}
 
-	private HashMap<String, String[]> getType3Aspects() {
+	private Map<String, String[]> getType3Aspects() {
 		return type3aspects;
 	}
 
-	private HashMap<String, String[]> getType4Aspects() {
+	private Map<String, String[]> getType4Aspects() {
 		return type4aspects;
 	}
 
-	private HashMap<String, String[]> getType5Aspects() {
+	private Map<String, String[]> getType5Aspects() {
 		return type5aspects;
 	}
 }
