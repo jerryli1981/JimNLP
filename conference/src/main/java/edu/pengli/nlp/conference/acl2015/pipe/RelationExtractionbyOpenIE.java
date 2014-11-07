@@ -57,36 +57,17 @@ public class RelationExtractionbyOpenIE extends Pipe {
 		Iterator<edu.knowitall.openie.Instance> iteratorX = xx.iterator();
 		while (iteratorX.hasNext()) {
 			edu.knowitall.openie.Instance inst = iteratorX.next();
-			Seq<Interval> offsets = inst.extr().arg1().offsets();
-			Iterator<Interval> ii = offsets.iterator();
-			while (ii.hasNext()) {
-				Interval in = ii.next();
-				int start = in.start();
-				int end = in.end();
-				System.out.println(yy.substring(start, end));
-			}
-
-			Seq<Interval> offsets2 = inst.extr().rel().offsets();
-			Iterator<Interval> ii2 = offsets2.iterator();
-			while (ii2.hasNext()) {
-				Interval in = ii2.next();
-				int start = in.start();
-				int end = in.end();
-				System.out.println(yy.substring(start, end));
-			}
+			System.out.print("["+inst.extr().arg1().text()+"]");
+			System.out.print("["+inst.extr().rel().text()+"]");
 
 			Iterator<Argument> argIter = inst.extr().arg2s().iterator();
 			while (argIter.hasNext()) {
+				
 				Argument arg2 = argIter.next();
-				Seq<Interval> offsets3 = arg2.offsets();
-				Iterator<Interval> ii3 = offsets3.iterator();
-				while (ii3.hasNext()) {
-					Interval in = ii3.next();
-					int start = in.start();
-					int end = in.end();
-					System.out.println(yy.substring(start, end));
-				}
+				System.out.print("["+arg2.text()+"]");
 			}
+			
+			System.out.println();
 
 		}
 
@@ -108,17 +89,44 @@ public class RelationExtractionbyOpenIE extends Pipe {
 		edu.pengli.nlp.conference.acl2015.types.Argument Arg = 
 				new edu.pengli.nlp.conference.acl2015.types.Argument();
 		
-
-		Arg.add(positionCoreLabelMap.get(startPositionArg));
-
 		Annotation argAnn = new Annotation(argMention);
 		pipeline.annotate(argAnn);
 		ArrayList<String> argToks = new ArrayList<String>();
 		for (CoreLabel token : argAnn.get(TokensAnnotation.class)) {
 			argToks.add(token.originalText());
 		}
-
 		
+		CoreLabel st = positionCoreLabelMap.get(startPositionArg);
+		
+		if(st == null){
+			for(int posi : positionCoreLabelMap.keySet()){
+				CoreLabel tok = positionCoreLabelMap.get(posi);
+				if(tok.originalText().contains(argToks.get(0))){
+					char[] cs = tok.originalText().toCharArray();
+					boolean containsPunc = false;
+					for(char c : cs){
+						StringBuilder sb = new StringBuilder();
+						sb.append(c);
+						String charMention = sb.toString();
+						if(charMention.matches("\\p{Punct}"))
+							containsPunc = true;
+					}
+					if(containsPunc == true){
+						startPositionArg = posi;
+						st = tok;
+						break;
+					}
+				}
+			}
+		}
+		
+		if(st == null){
+			System.out.println("Argument 3 sucks");
+			System.exit(0);
+		}
+        
+		Arg.add(st);
+
 		int flagPosition = startPositionArg;	
 		if (originalSent.contains(argMention)) {
 			for (int i = 0; i < argToks.size() - 1; i++) {
@@ -169,8 +177,6 @@ public class RelationExtractionbyOpenIE extends Pipe {
 
 		edu.pengli.nlp.conference.acl2015.types.Predicate Rel = 
 				new edu.pengli.nlp.conference.acl2015.types.Predicate();
-
-		Rel.add(positionCoreLabelMap.get(startPositionRel));
 		
 		Annotation relAnn = new Annotation(relMention);
 		pipeline.annotate(relAnn);
@@ -179,7 +185,37 @@ public class RelationExtractionbyOpenIE extends Pipe {
 			relToks.add(token.originalText());
 
 		}
-
+        //us-led, stanford don't separate, however openIE separate
+		CoreLabel st = positionCoreLabelMap.get(startPositionRel);
+		if(st == null){
+			for(int posi : positionCoreLabelMap.keySet()){
+				CoreLabel tok = positionCoreLabelMap.get(posi);
+				if(tok.originalText().contains(relToks.get(0))){
+					char[] cs = tok.originalText().toCharArray();
+					boolean containsPunc = false;
+					for(char c : cs){
+						StringBuilder sb = new StringBuilder();
+						sb.append(c);
+						String charMention = sb.toString();
+						if(charMention.matches("\\p{Punct}"))
+							containsPunc = true;
+					}
+					if(containsPunc == true){
+						startPositionRel = posi;
+						st = tok;
+						break;
+					}
+				}
+			}
+		}
+		
+		if(st == null){
+			System.out.println("Relation 3 sucks");
+			System.exit(0);
+		}
+		
+		Rel.add(st);
+	
 		// prevent 're be separate by below
 		if (relMention.split(" ").length == 1) {
 			return Rel;
@@ -278,6 +314,7 @@ public class RelationExtractionbyOpenIE extends Pipe {
 				edu.pengli.nlp.conference.acl2015.types.Argument Arg1 = getArgument(
 						arg1, beginPositionCoreLabelMap, sentenceMention,
 						pipeline);
+				
 
 				if (itemSize == 3 || itemSize == 4) {
 
@@ -293,7 +330,7 @@ public class RelationExtractionbyOpenIE extends Pipe {
 						edu.pengli.nlp.conference.acl2015.types.Argument Arg2 = getArgument(
 								arg2, beginPositionCoreLabelMap,
 								sentenceMention, pipeline);
-
+						
 						Tuple t = new Tuple(confidence, Arg1, Rel, Arg2);
 						tuples.add(t);
 					}
@@ -310,7 +347,7 @@ public class RelationExtractionbyOpenIE extends Pipe {
 					edu.pengli.nlp.conference.acl2015.types.Predicate Rel = getRelation(
 							rel, beginPositionCoreLabelMap, newRel,
 							sentenceMention, pipeline);
-
+					
 					for (int i = 1; i < arg2List.size(); i++) {
 
 						Argument arg2 = arg2List.get(i);

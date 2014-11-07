@@ -279,6 +279,8 @@ public class AbstractiveGeneration {
 					for(CoreLabel tok : pred){
 						int preCoreLabelIdx = tok.index();
 						IndexedWord preiw = graph.getNodeByIndexSafe(preCoreLabelIdx);
+						if(preiw == null)
+							continue;
 						if(preiw.equals(edge.getGovernor())){
 							headVp = preiw;
 						}
@@ -301,8 +303,10 @@ public class AbstractiveGeneration {
 			}
 		}
 		if(headVp == null){
-			System.out.println("wired");
-			System.exit(0);
+//			System.out.println("wired");
+//			System.out.println(p.getCoreMap().toString());
+//			System.exit(0);
+			return null;
 		}
 		
 		VPPhraseSpec vp = generateVP(graph, headVp, objects);
@@ -573,6 +577,7 @@ public class AbstractiveGeneration {
 							
 							Pattern p = new Pattern(arg1Head.get(0).ner(), 
 									t.getRel().toString(), arg2Head.get(0).ner(), sent, tmpTuple);
+							System.out.println(p);
 							patternSet.add(p);
 							
 						}
@@ -581,9 +586,7 @@ public class AbstractiveGeneration {
 				}
 			}
 		}
-		
-	
-		
+				
 		out.writeObject(patternSet);
 		out.close();
 	}
@@ -649,10 +652,12 @@ public class AbstractiveGeneration {
 				CoreMap annotation = p.getCoreMap();
 				SemanticGraph graph = annotation.get(BasicDependenciesAnnotation.class);
 				String summarySent = realization(p, graph);
+				if(summarySent == null)
+					continue;
 //				String summarySent = p.getCoreMap().toString();
-				out.println(p.toString());
+//				out.println(p.toString());
 				out.println(summarySent);
-				if(i > 2)break;
+				if(i > 1)break;
 			}
 			out.println();
 		}
@@ -674,16 +679,17 @@ public class AbstractiveGeneration {
 		out.close();*/
 		
 
-		System.out.println("Begin generate patterns");
+/*		System.out.println("Begin generate patterns");
 		HeadExtractor headExtractor = new HeadExtractor();
 		if(framenetTagger == null)
 			framenetTagger = new FramenetTagger();
-	    generatePatterns(outputSummaryDir, corpusName, docs, headExtractor);
+	    generatePatterns(outputSummaryDir, corpusName, docs, headExtractor);*/
 		
 		
 		
-/*	    System.out.println("Begin summary generation");
-	    fvGenerator = new FeatureVectorGenerator();
+	    System.out.println("Begin summary generation");
+	    if(fvGenerator == null)
+		    fvGenerator = new FeatureVectorGenerator();
         ObjectInputStream in = new ObjectInputStream(new FileInputStream(
 				outputSummaryDir + "/" + corpusName + ".patterns"));
         HashSet<Pattern> patternSet = (HashSet<Pattern>) in.readObject();
@@ -694,7 +700,7 @@ public class AbstractiveGeneration {
 		Metric metric = new NormalizedDotProductMetric();
 		KMeans kmeans = new KMeans(new Noop(), numClusters, metric);
 		Clustering predicted = kmeans.cluster(instances);
-		generateFinalSummary(outputSummaryDir, corpusName, predicted, seeds);*/
+		generateFinalSummary(outputSummaryDir, corpusName, predicted, seeds);
 	}
 
 }

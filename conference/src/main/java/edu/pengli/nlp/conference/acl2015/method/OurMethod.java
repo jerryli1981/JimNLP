@@ -43,7 +43,7 @@ public class OurMethod {
 		pipeLine.addPipe(new RelationExtractionbyOpenIE());*/
 		
 		
-		for (int i = 0; i < corpusList.size(); i++) {
+		for (int i = 24; i < corpusList.size(); i++) {
 			System.out.println("Corpus id is "+i);
 			Element topic = corpusList.get(i);
 			String categoryId = topic.getAttributeValue("category");

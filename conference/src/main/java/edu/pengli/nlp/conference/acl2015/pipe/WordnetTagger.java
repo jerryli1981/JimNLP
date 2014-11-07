@@ -21,6 +21,8 @@ public class WordnetTagger {
 		database = WordNetDatabase.getFileInstance();
 	}
 	
+
+
 	public static ArrayList<String> getNounTypes(String noun){
 		
 		ArrayList<String> ret = new ArrayList<String>();
@@ -61,6 +63,6 @@ public class WordnetTagger {
 	public static void main(String[] args){
 		//suspect
 		WordnetTagger obj = new WordnetTagger();
-		obj.getNounTypes("suspect");
+//		obj.getNounTypes("location");
 	}
 }
