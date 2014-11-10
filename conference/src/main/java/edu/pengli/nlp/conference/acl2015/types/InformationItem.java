@@ -3,8 +3,6 @@ package edu.pengli.nlp.conference.acl2015.types;
 import java.util.ArrayList;
 
 import edu.stanford.nlp.ling.IndexedWord;
-import edu.stanford.nlp.trees.TreeGraphNode;
-
 //this is pattern
 public class InformationItem {
 	

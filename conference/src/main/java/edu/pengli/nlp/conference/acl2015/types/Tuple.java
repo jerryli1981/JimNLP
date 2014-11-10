@@ -3,7 +3,7 @@ package edu.pengli.nlp.conference.acl2015.types;
 import java.io.Serializable;
 import java.util.ArrayList;
 
-import edu.stanford.nlp.ling.CoreLabel;
+import edu.stanford.nlp.ling.IndexedWord;
 
 public class Tuple implements Serializable{
 
@@ -58,17 +58,17 @@ public class Tuple implements Serializable{
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		StringBuilder arg1Mention = new StringBuilder();
-		for(CoreLabel tok : arg1){
+		for(IndexedWord tok : arg1){
 			arg1Mention.append(tok.originalText()+" ");
 		}
 		
 		StringBuilder arg2Mention = new StringBuilder();
-		for(CoreLabel tok : arg2){
+		for(IndexedWord tok : arg2){
 			arg2Mention.append(tok.originalText()+" ");
 		}
 		
 		StringBuilder relMention = new StringBuilder();
-		for(CoreLabel tok : rel){
+		for(IndexedWord tok : rel){
 			relMention.append(tok.originalText()+" ");
 		}
 		

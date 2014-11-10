@@ -75,11 +75,10 @@ public class RelationExtractionbyOpenIE extends Pipe {
 
 	// may not be continuous
 	private edu.pengli.nlp.conference.acl2015.types.Argument getArgument(
-			Argument arg, TreeMap<Integer, CoreLabel> positionCoreLabelMap,
+			Argument arg, TreeMap<Integer, IndexedWord> positionWordMap,
 			String originalSent, StanfordCoreNLP pipeline) {
 
 		String argMention = arg.text();
-
 		Iterator<Interval> iiArg = arg.offsets().iterator();
 		int startPositionArg = -1;
 		if(iiArg.hasNext()) {
@@ -90,17 +89,20 @@ public class RelationExtractionbyOpenIE extends Pipe {
 				new edu.pengli.nlp.conference.acl2015.types.Argument();
 		
 		Annotation argAnn = new Annotation(argMention);
+		
 		pipeline.annotate(argAnn);
 		ArrayList<String> argToks = new ArrayList<String>();
 		for (CoreLabel token : argAnn.get(TokensAnnotation.class)) {
 			argToks.add(token.originalText());
 		}
 		
-		CoreLabel st = positionCoreLabelMap.get(startPositionArg);
+		IndexedWord st = positionWordMap.get(startPositionArg);
 		
 		if(st == null){
-			for(int posi : positionCoreLabelMap.keySet()){
-				CoreLabel tok = positionCoreLabelMap.get(posi);
+			for(int posi : positionWordMap.keySet()){
+				IndexedWord tok = positionWordMap.get(posi);
+				if(tok == null)
+					continue;
 				if(tok.originalText().contains(argToks.get(0))){
 					char[] cs = tok.originalText().toCharArray();
 					boolean containsPunc = false;
@@ -132,7 +134,7 @@ public class RelationExtractionbyOpenIE extends Pipe {
 			for (int i = 0; i < argToks.size() - 1; i++) {
 				String argTok = argToks.get(i);
 				int start = flagPosition + argTok.length() + 1;
-				CoreLabel lab = positionCoreLabelMap.get(start);
+				IndexedWord lab = positionWordMap.get(start);
 				if (lab == null) {
 					System.out.println("Argument sucks");
 					System.exit(0);
@@ -148,7 +150,7 @@ public class RelationExtractionbyOpenIE extends Pipe {
 			for (int i = 1; i < argToks.size(); i++) {
 				String argTok = argToks.get(i);
 				int start = subSentence.indexOf(" " + argTok)+flagPosition+1;
-				CoreLabel lab = positionCoreLabelMap.get(start);
+				IndexedWord lab = positionWordMap.get(start);
 				if (lab == null) {
 					System.out.println("Argument 2 sucks");
 					System.exit(0);
@@ -161,7 +163,7 @@ public class RelationExtractionbyOpenIE extends Pipe {
 	}
 
 	private edu.pengli.nlp.conference.acl2015.types.Predicate getRelation(
-			Relation rel, TreeMap<Integer, CoreLabel> positionCoreLabelMap,
+			Relation rel, TreeMap<Integer, IndexedWord> positionWordMap,
 			String relMention, String originalSent, StanfordCoreNLP pipeline) {
 
 		if (relMention == null) {
@@ -186,10 +188,12 @@ public class RelationExtractionbyOpenIE extends Pipe {
 
 		}
         //us-led, stanford don't separate, however openIE separate
-		CoreLabel st = positionCoreLabelMap.get(startPositionRel);
+		IndexedWord st = positionWordMap.get(startPositionRel);
 		if(st == null){
-			for(int posi : positionCoreLabelMap.keySet()){
-				CoreLabel tok = positionCoreLabelMap.get(posi);
+			for(int posi : positionWordMap.keySet()){
+				IndexedWord tok = positionWordMap.get(posi);
+				if(tok == null)
+					continue;
 				if(tok.originalText().contains(relToks.get(0))){
 					char[] cs = tok.originalText().toCharArray();
 					boolean containsPunc = false;
@@ -228,7 +232,7 @@ public class RelationExtractionbyOpenIE extends Pipe {
 				String relTok = relToks.get(i);
 				int start = flagPosition + relTok.length() + 1;
 
-				CoreLabel lab = positionCoreLabelMap.get(start);
+				IndexedWord lab = positionWordMap.get(start);
 				if (lab == null) {
 					System.out.println("Relation sucks");
 					System.exit(0);
@@ -245,13 +249,12 @@ public class RelationExtractionbyOpenIE extends Pipe {
 			for (int i = 1; i < relToks.size(); i++) {
 				String relTok = relToks.get(i);
 				int start = subSentence.indexOf(" " + relTok)+flagPosition+1;
-				CoreLabel lab = positionCoreLabelMap.get(start);
+				IndexedWord lab = positionWordMap.get(start);
 				if (lab == null) {
 					System.out.println("Relation 2 sucks");
 					System.exit(0);
 				}
 				Rel.add(lab);
-
 			}
 		}
 
@@ -266,23 +269,34 @@ public class RelationExtractionbyOpenIE extends Pipe {
 		HashMap<CoreMap, ArrayList<Tuple>> map = new HashMap<CoreMap, ArrayList<Tuple>>();
 
 		for (CoreMap sentence : sentences) {
-			TreeMap<Integer, CoreLabel> beginPositionCoreLabelMap = new TreeMap<Integer, CoreLabel>();
+			TreeMap<Integer, IndexedWord> beginPositionWordMap = new TreeMap<Integer, IndexedWord>();
+
 			// Using beginPosition due to openIE arguemnt and relation
 			// can have offset. OpenIE don't have index.
-			int beginPosition = 0;
+
+			SemanticGraph graph = sentence.get(BasicDependenciesAnnotation.class);
 			List<CoreLabel> labels = sentence.get(TokensAnnotation.class);
-			beginPositionCoreLabelMap.put(beginPosition, labels.get(0));
+			int beginPosition = 0;
+			beginPositionWordMap.put(beginPosition, graph.getNodeByIndexSafe(labels.get(0).index()));
 			StringBuilder sb = new StringBuilder();
 			for (int i = 0; i < labels.size() - 1; i++) {
 				CoreLabel token = labels.get(i);
 				sb.append(token.originalText() + " ");
+				CoreLabel nextToken = labels.get(i+1);
+				//token may contain punc, however graph may not contain punc, so word may be null
+				IndexedWord word = graph.getNodeByIndexSafe(nextToken.index());
 				int range = token.originalText().length() + 1;
 				beginPosition += range;
-				beginPositionCoreLabelMap.put(beginPosition, labels.get(i + 1));
+				if(word != null)
+					beginPositionWordMap.put(beginPosition, word);
+				else{
+					IndexedWord punc = new IndexedWord(nextToken);
+					beginPositionWordMap.put(beginPosition, punc);
+				}
 			}
-
+								
+			//here need use tokenized sentence to input openIE to keep beginPosition mapping correct.
 			String sentenceMention = sb.toString().trim();
-
 			Seq<edu.knowitall.openie.Instance> extractions = openIE
 					.extract(sentenceMention);
 
@@ -291,35 +305,35 @@ public class RelationExtractionbyOpenIE extends Pipe {
 			ArrayList<Tuple> tuples = new ArrayList<Tuple>();
 			while (iterator.hasNext()) {
 				edu.knowitall.openie.Instance inst = iterator.next();
-				int itemSize = 2;
+				
 				Iterator<Argument> argiter = inst.extr().arg2s().iterator();
+				if(!argiter.hasNext())// if there is no argument2
+					continue;
+				
+				int arg2ItemSize = 0;
 				while (argiter.hasNext()) {
 					argiter.next();
-					itemSize++;
+					arg2ItemSize++;
 				}
+				
 				double confidence = inst.confidence();
-				// if there is no argument2
-				if (itemSize == 2) {
-					continue;
-				}
-
+				
 				Argument arg1 = inst.extr().arg1();
 
 				Relation rel = inst.extr().rel();
 				String relMention = rel.text();
-				if (relMention.matches(".*\\[.*?\\].*")) {
+				if (relMention.matches(".*\\[.*?\\].*"))
 					continue;
-				}
-
+				
 				edu.pengli.nlp.conference.acl2015.types.Argument Arg1 = getArgument(
-						arg1, beginPositionCoreLabelMap, sentenceMention,
+						arg1, beginPositionWordMap, sentenceMention,
 						pipeline);
 				
 
-				if (itemSize == 3 || itemSize == 4) {
+				if (arg2ItemSize == 1 || arg2ItemSize == 2) {
 
 					edu.pengli.nlp.conference.acl2015.types.Predicate Rel = getRelation(
-							rel, beginPositionCoreLabelMap, null,
+							rel, beginPositionWordMap, null,
 							sentenceMention, pipeline);
 
 					Iterator<Argument> argIter = inst.extr().arg2s().iterator();
@@ -328,14 +342,14 @@ public class RelationExtractionbyOpenIE extends Pipe {
 						Argument arg2 = argIter.next();
 
 						edu.pengli.nlp.conference.acl2015.types.Argument Arg2 = getArgument(
-								arg2, beginPositionCoreLabelMap,
+								arg2, beginPositionWordMap,
 								sentenceMention, pipeline);
 						
 						Tuple t = new Tuple(confidence, Arg1, Rel, Arg2);
 						tuples.add(t);
 					}
 
-				} else if (itemSize > 4) {
+				} else if (arg2ItemSize > 2) {
 
 					Iterator<Argument> argIter = inst.extr().arg2s().iterator();
 					ArrayList<Argument> arg2List = new ArrayList<Argument>();
@@ -345,82 +359,28 @@ public class RelationExtractionbyOpenIE extends Pipe {
 					}
 					String newRel = relMention + " " + arg2List.get(0).text();
 					edu.pengli.nlp.conference.acl2015.types.Predicate Rel = getRelation(
-							rel, beginPositionCoreLabelMap, newRel,
+							rel, beginPositionWordMap, newRel,
 							sentenceMention, pipeline);
 					
 					for (int i = 1; i < arg2List.size(); i++) {
 
 						Argument arg2 = arg2List.get(i);
 						edu.pengli.nlp.conference.acl2015.types.Argument Arg2 = getArgument(
-								arg2, beginPositionCoreLabelMap,
+								arg2, beginPositionWordMap,
 								sentenceMention, pipeline);
 
 						Tuple t = new Tuple(confidence, Arg1, Rel, Arg2);
 						tuples.add(t);
 					}
-
 				}
 			}
 			
-			for(Tuple t : tuples){
-				edu.pengli.nlp.conference.acl2015.types.Argument Arg2 = t.getArg2();
-				ArrayList<CoreLabel> prep = findPrePhrase(Arg2, sentence);
-				if(prep != null){
-					edu.pengli.nlp.conference.acl2015.types.Predicate Rel = t.getRel();
-					Rel.addAll(prep);			
-					t.setRel(Rel);
-					for(CoreLabel p : prep){
-						if(Arg2.size() ==1)
-							break;
-						Arg2.remove(p);
-					}
-					t.setArg2(Arg2);
-				}	
-			}	
-			map.put(sentence, tuples);
+			map.put(sentence, tuples);			
 		}
 		instance.setData(map);
 		return instance;
 	}
 	
-	private ArrayList<CoreLabel> findPrePhrase(edu.pengli.nlp.conference.acl2015.types.Argument 
-			Arg, CoreMap sent){
-		
-		SemanticGraph graph = sent.get(BasicDependenciesAnnotation.class);
-		
-		if(Arg.size() == 1)
-			return null;
-		
-		ArrayList<CoreLabel> ret = null;
-		
-		for(int i=0; i<Arg.size(); i++){
-			CoreLabel tok = Arg.get(i);
-			if(tok == null){
-				return null;
-			}
-			IndexedWord iw = graph.getNodeByIndexSafe(tok.index());
-			if(iw == null){// some punctuation don't map to the graph 
-				continue;
-			}
-			Iterable<SemanticGraphEdge> edges = graph.outgoingEdgeIterable(iw);
-			for(SemanticGraphEdge e : edges){
-				GrammaticalRelation gr = e.getRelation();
-				if (gr.toString().equals("pobj") || gr.toString().equals("pcomp")) {
-					ret = new ArrayList<CoreLabel>();
-					for(int j=0; j<=i; j++){
-						ret.add(Arg.get(j));
-					}
-					return ret;
-				}
-				if(gr.toString().equals("nsubj")){
-					return null;
-				}
-			}
-		}
-		
-		return ret;
-	}
-
 	// for testing
 	public static void main(String[] args) {
 		RelationExtractionbyOpenIE xx = new RelationExtractionbyOpenIE();
