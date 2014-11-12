@@ -4,7 +4,6 @@ import java.util.Properties;
 
 import edu.pengli.nlp.platform.types.Instance;
 import edu.stanford.nlp.pipeline.Annotation;
-import edu.stanford.nlp.pipeline.AnnotationPipeline;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 
 public class CharSequenceCoreNLPAnnotation extends Pipe {

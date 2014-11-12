@@ -105,10 +105,6 @@ public class SparseVector implements Serializable {
 		return values == null;
 	}
 
-	public int getNumDimensions() {
-		return 1;
-	}
-
 	public int[] getIndices() {
 		return indices;
 	}
@@ -168,7 +164,6 @@ public class SparseVector implements Serializable {
 				values[loc] = value;
 		}
 	}
-
 
 	/***********************************************************************
 	 * VECTOR OPERATIONS
@@ -302,7 +297,6 @@ public class SparseVector implements Serializable {
 		this.values = newValues;
 	}
 
-
 	public String toString() {
 
 		StringBuffer sb = new StringBuffer();
@@ -315,6 +309,37 @@ public class SparseVector implements Serializable {
 		}
 
 		return sb.toString();
+	}
+
+	public double dotProduct(SparseVector v) {
+		double ret = 0;
+		for (int i = 0; i < indices.length; i++)
+			ret += values[i] * v.values[indices[i]];
+
+		return ret;
+	}
+
+	public void plusEqualsSparse(SparseVector v, double factor) {
+
+		int loc1 = 0;
+		int loc2 = 0;
+		int numLocations1 = numLocations();
+		int numLocations2 = v.numLocations();
+
+		while ((loc1 < numLocations1) && (loc2 < numLocations2)) {
+			int idx1 = indexAtLocation(loc1);
+			int idx2 = v.indexAtLocation(loc2);
+			if (idx1 == idx2) {
+				values[loc1] += v.valueAtLocation(loc2) * factor;
+				++loc1;
+				++loc2;
+			} else if (idx1 < idx2) {
+				++loc1;
+			} else {
+				// idx2 not present in this. Ignore.
+				++loc2;
+			}
+		}
 	}
 
 }
