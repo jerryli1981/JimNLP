@@ -3,6 +3,7 @@ package edu.pengli.nlp.conference.acl2015.pipe;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Stack;
 
 import edu.pengli.nlp.conference.acl2015.types.Argument;
@@ -96,22 +97,38 @@ public class HeadAnnotation {
 
 		Tree tree = sent.get(TreeAnnotation.class);
 		HashMap<String, String> npheadMap = new HashMap<String, String>();
+	
+		//there are some inconsistence here need attention and modify 
 		dfs(tree, tree, headFinder, npheadMap);
-
+		
 		String argMention = arg.originaltext();
+		String[] phrases = argMention.split(",");
 		boolean find = false;
 
 		for (String np : npheadMap.keySet()) {
-			if (npheadMap.containsKey(argMention)) {
+			if (npheadMap.containsKey(argMention) || np.contains(argMention)) {
 				find = true;
 				String headMention = npheadMap.get(np);
 				for (IndexedWord lab : arg) {
 					if (lab.originalText().equals(headMention)) {
 						arg.setHead(lab);
+						break;
+					}
+				}
+			}else if(phrases.length > 1){
+				if (np.contains(phrases[0].trim()) || np.contains(phrases[1].trim())) {
+					find = true;
+					String headMention = npheadMap.get(np);
+					for (IndexedWord lab : arg) {
+						if (lab.originalText().equals(headMention)) {
+							arg.setHead(lab);
+							break;
+						}
 					}
 				}
 			}
 		}
+		
 
 		if (find == true)
 			return arg;
@@ -216,8 +233,6 @@ public class HeadAnnotation {
 			// System.out.println(node.headTerminal(headFinder, parent));
 			String head = node.headTerminal(headFinder, parent).toString();
 			String nounPhrase = np.toString().trim();
-			nounPhrase = nounPhrase.replaceAll("\\s,", ",");
-			nounPhrase = nounPhrase.replaceAll(" '", "'");
 
 			map.put(nounPhrase, head);
 		}
