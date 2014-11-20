@@ -1,9 +1,9 @@
 package edu.pengli.nlp.conference.acl2015.types;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 
 import edu.stanford.nlp.ling.IndexedWord;
+import edu.stanford.nlp.util.CoreMap;
 
 public class Tuple implements Serializable{
 
@@ -11,20 +11,23 @@ public class Tuple implements Serializable{
 	Argument arg1;
 	Predicate rel;
 	Argument arg2;
+	CoreMap annotatedSentence;
 
 	public Tuple(double confidence, Argument arg1, Predicate rel,
-			Argument arg2) {
+			Argument arg2, CoreMap sent) {
 		this.arg1 = arg1;
 		this.rel = rel;
 		this.arg2 = arg2;
 		this.confidence = confidence;
+		this.annotatedSentence = sent;
 	}
 	
 	public Tuple(Argument arg1, Predicate rel,
-			Argument arg2) {
+			Argument arg2, CoreMap sent) {
 		this.arg1 = arg1;
 		this.rel = rel;
 		this.arg2 = arg2;
+		this.annotatedSentence = sent;
 	}
 
 	public double getConfidence() {
@@ -54,29 +57,29 @@ public class Tuple implements Serializable{
 	public void setArg2(Argument argument){
 		this.arg2 = argument;
 	}
-
-	public String toString() {
+	
+	public CoreMap getAnnotatedSentence(){
+		return annotatedSentence;
+	}
+	
+	public String originaltext() {
 		StringBuilder sb = new StringBuilder();
-		StringBuilder arg1Mention = new StringBuilder();
-		for(IndexedWord tok : arg1){
-			arg1Mention.append(tok.originalText()+" ");
-		}
-		
-		StringBuilder arg2Mention = new StringBuilder();
-		for(IndexedWord tok : arg2){
-			arg2Mention.append(tok.originalText()+" ");
-		}
-		
-		StringBuilder relMention = new StringBuilder();
-		for(IndexedWord tok : rel){
-			relMention.append(tok.originalText()+" ");
-		}
-		
-		sb.append("["+arg1Mention.toString().trim()+"]").append('\t').
-		append("["+relMention.toString().trim()+"]").append('\t').
-		append("["+arg2Mention.toString().trim()+"]");
+	
+		sb.append("["+arg1.originaltext()+"]").append('\t').
+		append("["+rel.originaltext()+"]").append('\t').
+		append("["+arg2.originaltext()+"]");
 
 		return sb.toString();
+	}
+	
+	public String toString(){
+		try {
+			throw new NoSuchMethodException();
+		} catch (NoSuchMethodException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return null;
 	}
 	
 	public int hashCode() {

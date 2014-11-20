@@ -2,7 +2,6 @@ package edu.pengli.nlp.conference.acl2015.types;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.TreeMap;
 
 public enum Category {
 

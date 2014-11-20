@@ -33,7 +33,7 @@ public class WordnetTagger {
 		    for(int j=0; j<nounHyponyms.length; j++){
 		    	String[] wordForms = nounHyponyms[j].getWordForms();
 		    	for(int k=0; k<wordForms.length; k++){
-//		    		System.out.println(noun +" is a kind of "+ wordForms[k]);
+		    		System.out.println(noun +" is a kind of "+ wordForms[k]);
 		    		ret.add(wordForms[k]);
 		    	}	
 		    }
@@ -61,8 +61,8 @@ public class WordnetTagger {
 	}
 	
 	public static void main(String[] args){
-		//suspect
+		
 		WordnetTagger obj = new WordnetTagger();
-//		obj.getNounTypes("location");
+		System.out.println(obj.getNounTypes("beef"));
 	}
 }

@@ -9,8 +9,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -18,13 +16,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
+import matlabcontrol.MatlabProxy;
 import edu.pengli.nlp.conference.acl2015.pipe.FeatureVectorGenerator;
 import edu.pengli.nlp.conference.acl2015.pipe.FramenetTagger;
 import edu.pengli.nlp.conference.acl2015.pipe.HeadAnnotation;
-import edu.pengli.nlp.conference.acl2015.pipe.FeatureVectorGenerator.WordEntry;
 import edu.pengli.nlp.conference.acl2015.types.Argument;
 import edu.pengli.nlp.conference.acl2015.types.Category;
-import edu.pengli.nlp.conference.acl2015.types.InformationItem;
 import edu.pengli.nlp.conference.acl2015.types.Pattern;
 import edu.pengli.nlp.conference.acl2015.types.Predicate;
 import edu.pengli.nlp.conference.acl2015.types.Tuple;
@@ -41,9 +38,7 @@ import edu.pengli.nlp.platform.types.NormalizedDotProductMetric;
 import edu.pengli.nlp.platform.types.SparseVector;
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.TimeWait;
-import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.IndexedWord;
-import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.BasicDependenciesAnnotation;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
@@ -74,14 +69,12 @@ public class AbstractiveGeneration {
 
 	private String realization(Pattern p, SemanticGraph graph) {
 
-		Tuple t = p.getTuple();
 		SPhraseSpec newSent = nlgFactory.createClause();
-
-		IndexedWord arg1iw = t.getArg1().getHead();
+		IndexedWord arg1iw = p.getArg1().getHead();
 		NPPhraseSpec subjectNp = generateNP(graph, arg1iw);
 		newSent.setSubject(subjectNp);
 
-		VPPhraseSpec vp = generateVP(graph, t.getRel(), t.getArg2());
+		VPPhraseSpec vp = generateVP(graph, p.getRel(), p.getArg2());
 		newSent.setVerbPhrase(vp);
 
 		String output = realiser.realiseSentence(newSent);
@@ -409,8 +402,8 @@ public class AbstractiveGeneration {
 		corpus.readObject(in);
 		in.close();
 
-		HashMap<String, Double> nbestmap = getNbestMap(outputSummaryDir,
-				corpusName, corpus);
+/*		HashMap<String, Double> nbestmap = getNbestMap(outputSummaryDir,
+				corpusName, corpus);*/
 
 		HashSet<Pattern> patternSet = new HashSet<Pattern>();
 
@@ -428,13 +421,14 @@ public class AbstractiveGeneration {
 				ArrayList<Tuple> tuples = map.get(sent);
 				for (Tuple t : tuples) {
 					
-					if (t.getRel().toString().equals("say"))
+					if (t.getRel().lemmatext().equals("say"))
 						continue;	
-					double score = nbestmap.get(t.getRel().toString());
+/*					double score = nbestmap.get(t.getRel().toString());
 					if (score < threshould)
-						continue;
+						continue;*/
 					
-					outt.println(t.toString());
+					outt.println(t.originaltext());
+					
 					edu.pengli.nlp.conference.acl2015.types.Argument arg1 = headAnnotator
 							.annotateArgHead(t.getArg1(), sent);
 					t.setArg1(arg1);
@@ -465,9 +459,7 @@ public class AbstractiveGeneration {
 
 							//here is ok, just for clustering,
 							//when realization we use tuple in pattern. 
-							Pattern p = new Pattern(arg1.getHead().ner(), t
-									.getRel().toString(),
-									arg2.getHead().ner(), sent, t);
+							Pattern p = new Pattern(arg1, t.getRel(), arg2, sent);
 							patternSet.add(p);
 						}
 					}
@@ -492,7 +484,7 @@ public class AbstractiveGeneration {
 
 		return instances;
 	}
-
+	
 	private InstanceList featureEngineeringOnCategory(String categoryId) {
 
 		InstanceList seeds = new InstanceList(new Noop());
@@ -512,12 +504,32 @@ public class AbstractiveGeneration {
 
 		return seeds;
 	}
+	
+	private void patternFusion(InstanceList patternCluster){
+		
+		for (int i = 0; i < patternCluster.size(); i++) {
+			Instance inst = patternCluster.get(i);
+			Pattern p = (Pattern) inst.getSource();
+			System.out.println(p.getAnnotatedSentence().toString());
+			System.out.println(((Tuple)p).originaltext());
+			System.out.println(p.toSpecificForm());
+			System.out.println(p.toGeneralizedForm());
+			
+/*			SemanticGraph graph = annotation
+					.get(BasicDependenciesAnnotation.class);
+			String summarySent = realization(p, graph);*/
+		}
+		System.out.println();
+		System.out.println();
+		
+	}
 
 	private void generateFinalSummary(String outputSummaryDir,
 			String corpusName, Clustering predicted, InstanceList seeds) {
 		PrintWriter out = FileOperation.getPrintWriter(new File(
 				outputSummaryDir), corpusName);
 		HashSet<InstanceList> set = new HashSet<InstanceList>();
+	
 		for (Instance seed : seeds) {
 			FeatureVector seedFv = (FeatureVector) seed.getData();
 			InstanceList[] clusters = predicted.getClusters();
@@ -536,38 +548,17 @@ public class AbstractiveGeneration {
 				}
 			}
 			set.add(bestCluster);
-			for (int i = 0; i < bestCluster.size(); i++) {
-				Instance inst = bestCluster.get(i);
-				Pattern p = (Pattern) inst.getSource();
+			if(bestCluster == null)
+				continue;
+			
+			patternFusion(bestCluster);
 
-				CoreMap annotation = p.getCoreMap();
-				if(annotation.toString().contains("Two relatives of the man"
-						+ " who attacked Amish school girls said Monday they were not molested by him 20 years ago"))
-					System.out.println();
-				SemanticGraph graph = annotation
-						.get(BasicDependenciesAnnotation.class);
-				String summarySent = realization(p, graph);
-				System.out.println(p.getCoreMap().toString());
-				System.out.println(p.getTuple().toString());
-				System.out.println(p);
-				System.out.println(summarySent);
-				System.out.println();
-				if (summarySent == null)
-					continue;
-				// String summarySent = p.getCoreMap().toString();
-				// out.println(p.toString());
-				// out.println(summarySent);
-				// if(i > 1)break;
-			}
-			System.out.println();
-			out.println();
 		}
-
 		out.close();
 	}
 
 	public void run(String inputCorpusDir, String outputSummaryDir,
-			String corpusName, PipeLine pipeLine, String categoryId)
+			String corpusName, PipeLine pipeLine, String categoryId,  MatlabProxy proxy)
 			throws Exception {
 
 		InstanceList docs = new InstanceList(pipeLine);
@@ -585,7 +576,6 @@ public class AbstractiveGeneration {
 			framenetTagger = new FramenetTagger();
 		generatePatterns(outputSummaryDir, corpusName, docs, headAnnotator );*/
 
-
 		System.out.println("Begin summary generation");
 		if (fvGenerator == null)
 			fvGenerator = new FeatureVectorGenerator();
@@ -593,13 +583,31 @@ public class AbstractiveGeneration {
 				outputSummaryDir + "/" + corpusName + ".patterns"));
 		HashSet<Pattern> patternSet = (HashSet<Pattern>) in.readObject();
 		in.close();
-		InstanceList instances = featureEngineering(patternSet);
+		
+		InstanceList instances = featureEngineering(patternSet);	    
 		InstanceList seeds = featureEngineeringOnCategory(categoryId);
-		int numClusters = 20;
+		
+		
+		int numClusters = 7;
 		Metric metric = new NormalizedDotProductMetric();
+		
 		KMeans kmeans = new KMeans(new Noop(), numClusters, metric);
 		Clustering predicted = kmeans.cluster(instances);
+		//ROUGE-SU4 is 0.0727 (k = 4)
+		//ROUGE-SU4 is 0.10735 (k = 5)
+		//ROUGE-SU4 is 0.0989 (k = 6)
+		//ROUGE-SU4 is 0.09172 (k = 7)
+		
+//		Spectral spectral = new Spectral(new Noop(), numClusters, metric, proxy);
+//		Clustering predicted = spectral.cluster(instances); 
+		//ROUGE-SU4 is 0.10228(kmean matlab k=5)  
+		//ROUGE-SU4 is 0.10947(spectral k=5)
+		//ROUGE-SU4 is 0.13271(spectral k=6)
+		//ROUGE-SU4 is 0.13652(spectral k=7)
+		//ROUGE-SU4 is 0.13102(spectral k=8)
+		//ROUGE-SU4 is 0.10355(spectral k=9)
+		
 		generateFinalSummary(outputSummaryDir, corpusName, predicted, seeds);
-	}
 
+	}
 }

@@ -345,7 +345,7 @@ public class RelationExtractionbyOpenIE extends Pipe {
 								arg2, beginPositionWordMap,
 								sentenceMention, pipeline);
 						
-						Tuple t = new Tuple(confidence, Arg1, Rel, Arg2);
+						Tuple t = new Tuple(confidence, Arg1, Rel, Arg2, sentence);
 						tuples.add(t);
 					}
 
@@ -369,7 +369,7 @@ public class RelationExtractionbyOpenIE extends Pipe {
 								arg2, beginPositionWordMap,
 								sentenceMention, pipeline);
 
-						Tuple t = new Tuple(confidence, Arg1, Rel, Arg2);
+						Tuple t = new Tuple(confidence, Arg1, Rel, Arg2, sentence);
 						tuples.add(t);
 					}
 				}

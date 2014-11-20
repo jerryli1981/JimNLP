@@ -98,7 +98,7 @@ public class HeadAnnotation {
 		HashMap<String, String> npheadMap = new HashMap<String, String>();
 		dfs(tree, tree, headFinder, npheadMap);
 
-		String argMention = arg.toString();
+		String argMention = arg.originaltext();
 		boolean find = false;
 
 		for (String np : npheadMap.keySet()) {

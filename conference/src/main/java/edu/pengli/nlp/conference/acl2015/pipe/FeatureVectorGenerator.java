@@ -39,6 +39,10 @@ public class FeatureVectorGenerator {
 		}
 	}
 	
+	public int getDimension(){
+		return dimension;
+	}
+	
 	private void loadModel(String modelPath) throws IOException{
 		
 		BufferedInputStream bis = new BufferedInputStream(new FileInputStream(
@@ -101,7 +105,7 @@ public class FeatureVectorGenerator {
 	}
 	
 	public FeatureVector getFeatureVector(Pattern p){
-		String sentence = p.toString();
+		String sentence = p.toGeneralizedForm();
 		String[] words = sentence.split(" ");
 		double[] vec = new double[dimension];
 		for(String word : words){

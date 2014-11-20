@@ -20,13 +20,32 @@ public class Argument extends ArrayList<IndexedWord>{
 		return head;
 	}
 	
-	public String toString(){
+	public String originaltext(){
 		
 		StringBuilder sb = new StringBuilder();
 		for(IndexedWord tok : this){
 			sb.append(tok.originalText()+" ");
 		}
 		return sb.toString().trim();	
+	}
+	
+	public String lemmatext(){
+		
+		StringBuilder sb = new StringBuilder();
+		for(IndexedWord tok : this){
+			sb.append(tok.lemma()+" ");
+		}
+		return sb.toString().trim();	
+	}
+	
+	public String toString(){
+		try {
+			throw new NoSuchMethodException();
+		} catch (NoSuchMethodException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return null;
 	}
 
 }

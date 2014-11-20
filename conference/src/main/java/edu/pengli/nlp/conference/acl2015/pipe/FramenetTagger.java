@@ -106,7 +106,8 @@ public class FramenetTagger {
 	
 	public void annotate(Argument arg1, Argument arg2, Tuple t) throws Exception{
 		
-		String tupleMention = arg1.toString()+" "+t.getRel().toString()+" "+arg2.toString();
+		String tupleMention = arg1.originaltext()+" "+t.getRel().originaltext()+
+				" "+arg2.originaltext();
 		
 		String conllFormat = generateSemaforInput(tupleMention);
 		
@@ -130,11 +131,17 @@ public class FramenetTagger {
 						JSONObject span = spans.getJSONObject(l);
 						String text = span.getString("text");
 						if(text.equals(arg1.getHead().originalText()) && arg1.getHead().ner().equals("O")){
-							arg1.getHead().setNER(labelName);
+							if(arg1.getHead().tag().equals("PRP")){
+								arg1.getHead().setNER("PERSON");
+							}else
+								arg1.getHead().setNER(labelName);
 						}
 						
 						if(text.equals(arg2.getHead().originalText()) && arg2.getHead().ner().equals("O")){
-							arg2.getHead().setNER(labelName);
+							if(arg2.getHead().tag().equals("PRP")){
+								arg2.getHead().setNER("PERSON");
+							}else
+								arg2.getHead().setNER(labelName);
 						}
 					}
 				}	
