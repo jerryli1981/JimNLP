@@ -20,6 +20,7 @@ import matlabcontrol.MatlabProxy;
 import edu.pengli.nlp.conference.acl2015.pipe.FeatureVectorGenerator;
 import edu.pengli.nlp.conference.acl2015.pipe.FramenetTagger;
 import edu.pengli.nlp.conference.acl2015.pipe.HeadAnnotation;
+import edu.pengli.nlp.conference.acl2015.pipe.WordnetTagger;
 import edu.pengli.nlp.conference.acl2015.types.Argument;
 import edu.pengli.nlp.conference.acl2015.types.Category;
 import edu.pengli.nlp.conference.acl2015.types.Pattern;
@@ -38,6 +39,7 @@ import edu.pengli.nlp.platform.types.NormalizedDotProductMetric;
 import edu.pengli.nlp.platform.types.SparseVector;
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.TimeWait;
+import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.BasicDependenciesAnnotation;
@@ -58,6 +60,8 @@ public class AbstractiveGeneration {
 	Realiser realiser;
 
 	static FramenetTagger framenetTagger;
+	
+	static WordnetTagger wordnetTagger;
 
 	static FeatureVectorGenerator fvGenerator;
 
@@ -412,14 +416,24 @@ public class AbstractiveGeneration {
 		PrintWriter outt = FileOperation.getPrintWriter(new File(
 				outputSummaryDir), corpusName + ".tuples");
 		
-		double threshould = -20.0;
+//		double threshould = -20.0;
+		int docID = 0;
 		for (Instance doc : corpus) {
 			HashMap<CoreMap, ArrayList<Tuple>> map = (HashMap<CoreMap, ArrayList<Tuple>>) doc
 					.getData();
 			for (CoreMap sent : map.keySet()) {
-				outt.println(sent.toString());
+				outt.println(sent.toString());					
 				ArrayList<Tuple> tuples = map.get(sent);
 				for (Tuple t : tuples) {
+					ArrayList<IndexedWord> toks = new ArrayList<IndexedWord>();
+					toks.addAll(t.getArg1());
+					toks.addAll(t.getRel());
+					toks.addAll(t.getArg2());
+					
+					//tuple fusion need know docID to compare IndexedWord
+					for(IndexedWord iw : toks){
+						iw.setDocID(Integer.toString(docID));
+					}
 					
 					if (t.getRel().lemmatext().equals("say"))
 						continue;	
@@ -427,8 +441,7 @@ public class AbstractiveGeneration {
 					if (score < threshould)
 						continue;*/
 					
-					outt.println(t.originaltext());
-					
+					outt.println(t.originaltext());					
 					edu.pengli.nlp.conference.acl2015.types.Argument arg1 = headAnnotator
 							.annotateArgHead(t.getArg1(), sent);
 					t.setArg1(arg1);
@@ -452,21 +465,39 @@ public class AbstractiveGeneration {
 
 					if (arg1.getHead() != null && arg2.getHead() != null) {
 
-						framenetTagger.annotate(arg1, arg2, t);
-
-						if (!arg1.getHead().ner().equals("O")
-								&& !arg2.getHead().ner().equals("O")) {
-
-							//here is ok, just for clustering,
-							//when realization we use tuple in pattern. 
-							Pattern p = new Pattern(arg1, t.getRel(), arg2, sent);
+						//stanford NER tagger
+						if(!arg1.getHead().ner().equals("O") && 
+								!arg2.getHead().ner().equals("O")){
+		
+							Pattern p = new Pattern(arg1, pre, arg2, sent);
 							patternSet.add(p);
+							
+						}else{
+							
+							wordnetTagger.annotatePerson(arg1, arg2);
+							framenetTagger.annotate(arg1, pre, arg2);
+							
+							if(arg1.getHead().ner().equals("O")
+									|| arg2.getHead().ner().equals("O")){	
+								wordnetTagger.annotateNoun(arg1, arg2, t);
+							}
+							
+							if(!arg1.getHead().ner().equals("O") && 
+									!arg2.getHead().ner().equals("O")){
+								Pattern p = new Pattern(arg1, pre, arg2, sent);
+								patternSet.add(p);
+							}
+							
 						}
+							
 					}
 				}
 			}
+			
+			docID++;
 		}
 
+		
 		outt.close();
 		out.writeObject(patternSet);
 		out.close();
@@ -505,23 +536,82 @@ public class AbstractiveGeneration {
 		return seeds;
 	}
 	
-	private void patternFusion(InstanceList patternCluster){
+	// if not exist similar vertex to merger, then reture null
+	private IndexedWord getSimilarVertex(SemanticGraph graph, IndexedWord vertex){
 		
+		if(graph.containsVertex(vertex))
+			return vertex;
+		else{
+			String pattern = "^"+vertex.lemma();
+			List<IndexedWord> similarWords = graph.getAllNodesByWordPattern(pattern);
+			if(similarWords.isEmpty())
+				return null;
+			else{
+				IndexedWord iw = similarWords.get(0);
+				if(iw.docID().equals(vertex.docID()) && iw.sentIndex() == vertex.sentIndex())
+					return null;
+				else
+					return iw;
+			}
+		}
+	}
+	
+	private void tupleFusion(InstanceList patternCluster){
+				
+		//Node Alignment
+		SemanticGraph graph = new SemanticGraph();
+		IndexedWord startNode = new IndexedWord();
+		startNode.setIndex(-1);
+		startNode.setDocID("-1");
+		startNode.setSentIndex(-1);
+		startNode.setLemma("ROOT");
+		startNode.setValue("ROOT");
+		graph.addRoot(startNode);
+		
+		//still have some problem
 		for (int i = 0; i < patternCluster.size(); i++) {
 			Instance inst = patternCluster.get(i);
 			Pattern p = (Pattern) inst.getSource();
-			System.out.println(p.getAnnotatedSentence().toString());
-			System.out.println(((Tuple)p).originaltext());
-			System.out.println(p.toSpecificForm());
-			System.out.println(p.toGeneralizedForm());
-			
-/*			SemanticGraph graph = annotation
-					.get(BasicDependenciesAnnotation.class);
-			String summarySent = realization(p, graph);*/
-		}
-		System.out.println();
-		System.out.println();
+//			System.out.println(p.getAnnotatedSentence().toString());
+//			System.out.println(((Tuple)p).originaltext());
+			Tuple t = (Tuple)p;
+			ArrayList<IndexedWord> wordList = new ArrayList<IndexedWord>();
+			wordList.addAll(t.getArg1());
+			wordList.addAll(t.getRel());
+			wordList.addAll(t.getArg2());
+			IndexedWord firstVertex = wordList.get(0);
+			IndexedWord flag = getSimilarVertex(graph, firstVertex);
+			if(flag == null){
+				graph.addEdge(startNode, firstVertex, null, 0.0, false);
+			}
 		
+			for(int j=0; j<wordList.size()-1; j++){	
+				IndexedWord source = wordList.get(j);
+				IndexedWord flagSource = getSimilarVertex(graph, source);
+				IndexedWord dest = wordList.get(j+1);
+				IndexedWord flagdest = getSimilarVertex(graph, dest);		
+				if(flagSource == null){			
+					
+					graph.addEdge(source, dest, null, 0.0, false);		
+					
+				}else if(flagSource != null && flagdest == null){
+					
+					graph.addEdge(flagSource, dest, null, 0.0, false);	
+					
+				}else if(flagSource != null && flagdest != null){
+					SemanticGraphEdge edge = graph.getEdge(flagSource, flagdest);
+					if(edge == null){
+						graph.addEdge(flagSource, flagdest, null, 0.0, false);	
+					}
+				}
+			}
+			
+//			System.out.println(p.toSpecificForm());
+//			System.out.println(p.toGeneralizedForm());
+			
+//			SemanticGraph graph = annotation.get(BasicDependenciesAnnotation.class);
+//			String summarySent = realization(p, graph);
+		}	
 	}
 
 	private void generateFinalSummary(String outputSummaryDir,
@@ -551,7 +641,7 @@ public class AbstractiveGeneration {
 			if(bestCluster == null)
 				continue;
 			
-			patternFusion(bestCluster);
+			tupleFusion(bestCluster);
 
 		}
 		out.close();
@@ -564,7 +654,7 @@ public class AbstractiveGeneration {
 		InstanceList docs = new InstanceList(pipeLine);
 
 		
-/*		OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
+/*    	OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
 				inputCorpusDir + "/" + corpusName); docs.addThruPipe(fIter);
 		ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(
 				outputSummaryDir + "/" +corpusName + ".ser")); docs.writeObject(out);	
@@ -574,6 +664,8 @@ public class AbstractiveGeneration {
 		HeadAnnotation headAnnotator = new HeadAnnotation(); 
 		if(framenetTagger == null)
 			framenetTagger = new FramenetTagger();
+		if(wordnetTagger == null)
+			wordnetTagger = new WordnetTagger();
 		generatePatterns(outputSummaryDir, corpusName, docs, headAnnotator );*/
 
 		System.out.println("Begin summary generation");
@@ -588,7 +680,7 @@ public class AbstractiveGeneration {
 		InstanceList seeds = featureEngineeringOnCategory(categoryId);
 		
 		
-		int numClusters = 7;
+		int numClusters = 5;
 		Metric metric = new NormalizedDotProductMetric();
 		
 		KMeans kmeans = new KMeans(new Noop(), numClusters, metric);
