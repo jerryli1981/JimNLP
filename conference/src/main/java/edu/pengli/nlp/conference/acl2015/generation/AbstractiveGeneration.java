@@ -556,6 +556,50 @@ public class AbstractiveGeneration {
 		}
 	}
 	
+	
+	private void printAllPaths(SemanticGraph graph){
+		
+		Stack<IndexedWord> stack = new Stack<IndexedWord>();
+		Stack<IndexedWord> path = new Stack<IndexedWord>();
+		stack.add(graph.getFirstRoot());
+		while (!stack.isEmpty()) {
+			IndexedWord top = stack.peek();
+			
+			//if reach end
+			if(top.index() == -2){
+				StringBuilder sb = new StringBuilder();
+				for(IndexedWord iw : path){
+					sb.append(iw.originalText()+" ");
+				}
+				System.out.println(sb.toString().trim());
+				
+				//pop end
+				stack.pop();
+				if(stack.isEmpty())
+					break;
+
+				//traceback
+				while(!path.isEmpty()){
+					IndexedWord iw = path.peek();
+					int flag = graph.commonAncestor(stack.peek(), iw);
+					path.pop();
+					if(flag == 1){
+						path.push(stack.peek());
+						break;
+					}
+				}	
+			}else
+				path.push(top);
+						
+			Iterable<SemanticGraphEdge> iter = graph.outgoingEdgeIterable(stack.pop());
+			for (SemanticGraphEdge edge : iter) {
+				if (!stack.contains(edge.getDependent())) {
+					stack.push(edge.getDependent());
+				}
+			}	
+			
+		}	
+	}
 	private void tupleFusion(InstanceList patternCluster){
 				
 		//Node Alignment
@@ -567,6 +611,13 @@ public class AbstractiveGeneration {
 		startNode.setLemma("ROOT");
 		startNode.setValue("ROOT");
 		graph.addRoot(startNode);
+		
+		IndexedWord endNode = new IndexedWord();
+		endNode.setIndex(-2);
+		endNode.setDocID("-2");
+		endNode.setSentIndex(-2);
+		endNode.setLemma("END");
+		endNode.setValue("END");
 		
 		//still have some problem
 		for (int i = 0; i < patternCluster.size(); i++) {
@@ -605,6 +656,22 @@ public class AbstractiveGeneration {
 					}
 				}
 			}
+			
+			IndexedWord lastWord = wordList.get(wordList.size()-1);
+			IndexedWord flagLastWord = getSimilarVertex(graph, lastWord);
+			IndexedWord flagEndRoot = getSimilarVertex(graph, endNode);
+			
+			if(flagLastWord != null && flagEndRoot == null){
+				
+				graph.addEdge(flagLastWord, endNode, null, 0.0, false);	
+				
+			}else if(flagLastWord != null && flagEndRoot != null){
+				SemanticGraphEdge edge = graph.getEdge(flagLastWord, flagEndRoot);
+				if(edge == null){
+					graph.addEdge(flagLastWord, flagEndRoot, null, 0.0, false);	
+				}
+			}
+			printAllPaths(graph);
 			
 //			System.out.println(p.toSpecificForm());
 //			System.out.println(p.toGeneralizedForm());
