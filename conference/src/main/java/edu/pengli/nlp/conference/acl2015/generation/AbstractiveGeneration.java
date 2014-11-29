@@ -542,7 +542,7 @@ public class AbstractiveGeneration {
 		if(graph.containsVertex(vertex))
 			return vertex;
 		else{
-			String pattern = "^"+vertex.lemma();
+			String pattern = "^"+vertex.originalText();
 			List<IndexedWord> similarWords = graph.getAllNodesByWordPattern(pattern);
 			if(similarWords.isEmpty())
 				return null;
@@ -562,15 +562,18 @@ public class AbstractiveGeneration {
 		Stack<IndexedWord> stack = new Stack<IndexedWord>();
 		Stack<IndexedWord> path = new Stack<IndexedWord>();
 		stack.add(graph.getFirstRoot());
+		
 		while (!stack.isEmpty()) {
 			IndexedWord top = stack.peek();
 			
+			boolean cycle = false;
 			//if reach end
 			if(top.index() == -2){
 				StringBuilder sb = new StringBuilder();
 				for(IndexedWord iw : path){
 					sb.append(iw.originalText()+" ");
 				}
+				
 				System.out.println(sb.toString().trim());
 				
 				//pop end
@@ -584,14 +587,38 @@ public class AbstractiveGeneration {
 					int flag = graph.commonAncestor(stack.peek(), iw);
 					path.pop();
 					if(flag == 1){
-						path.push(stack.peek());
-						break;
+						if(!path.contains(stack.peek())){
+							path.push(stack.peek());
+							break;
+						}else{
+							cycle = true;
+							break;
+						}
+							
 					}
 				}	
-			}else
-				path.push(top);
-						
-			Iterable<SemanticGraphEdge> iter = graph.outgoingEdgeIterable(stack.pop());
+				
+			}else{
+				if(!path.contains(top))
+					path.push(top);
+				else{
+					
+					StringBuilder sbb = new StringBuilder();
+					for(IndexedWord iw : path){
+						sbb.append(iw.originalText()+" ");
+					}
+					System.out.println(sbb.toString().trim());
+					//choose another way
+					stack.pop();
+					cycle = true;
+				}
+			}
+			
+			if(cycle ==true)
+				continue;
+					
+			Iterable<SemanticGraphEdge> iter = 
+					graph.outgoingEdgeIterable(stack.pop());
 			for (SemanticGraphEdge edge : iter) {
 				if (!stack.contains(edge.getDependent())) {
 					stack.push(edge.getDependent());
@@ -626,6 +653,7 @@ public class AbstractiveGeneration {
 //			System.out.println(p.getAnnotatedSentence().toString());
 //			System.out.println(((Tuple)p).originaltext());
 			Tuple t = (Tuple)p;
+			System.out.println(t);
 			ArrayList<IndexedWord> wordList = new ArrayList<IndexedWord>();
 			wordList.addAll(t.getArg1());
 			wordList.addAll(t.getRel());
@@ -670,15 +698,18 @@ public class AbstractiveGeneration {
 				if(edge == null){
 					graph.addEdge(flagLastWord, flagEndRoot, null, 0.0, false);	
 				}
-			}
-			printAllPaths(graph);
+			}		
 			
+//			if(t.toString().contains("[American servicemen and women]"))
+			printAllPaths(graph);
 //			System.out.println(p.toSpecificForm());
 //			System.out.println(p.toGeneralizedForm());
 			
 //			SemanticGraph graph = annotation.get(BasicDependenciesAnnotation.class);
 //			String summarySent = realization(p, graph);
 		}	
+		
+		
 	}
 
 	private void generateFinalSummary(String outputSummaryDir,
