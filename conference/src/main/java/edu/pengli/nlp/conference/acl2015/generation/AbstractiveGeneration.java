@@ -28,6 +28,7 @@ import edu.pengli.nlp.conference.acl2015.types.Predicate;
 import edu.pengli.nlp.conference.acl2015.types.Tuple;
 import edu.pengli.nlp.platform.algorithms.classify.Clustering;
 import edu.pengli.nlp.platform.algorithms.classify.KMeans;
+import edu.pengli.nlp.platform.algorithms.miscellaneous.Merger;
 import edu.pengli.nlp.platform.pipe.Noop;
 import edu.pengli.nlp.platform.pipe.PipeLine;
 import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerFileIterator;
@@ -539,15 +540,19 @@ public class AbstractiveGeneration {
 	// if not exist similar vertex to merger, then reture null
 	private IndexedWord getSimilarVertex(SemanticGraph graph, IndexedWord vertex){
 		
+		//the word are appear in the same tuple that have the same docId, sentId, and index
 		if(graph.containsVertex(vertex))
 			return vertex;
 		else{
+			//the word are appear in different tuple that have the same mention. 
 			String pattern = "^"+vertex.originalText();
 			List<IndexedWord> similarWords = graph.getAllNodesByWordPattern(pattern);
 			if(similarWords.isEmpty())
 				return null;
 			else{
 				IndexedWord iw = similarWords.get(0);
+				if(iw.originalText().equals("the") || iw.originalText().equals("to"))
+					return null;
 				if(iw.docID().equals(vertex.docID()) && iw.sentIndex() == vertex.sentIndex())
 					return null;
 				else
@@ -556,8 +561,9 @@ public class AbstractiveGeneration {
 		}
 	}
 	
-	
-	private void printAllPaths(SemanticGraph graph){
+	private ArrayList<ArrayList<IndexedWord>> travelAllPaths(SemanticGraph graph){
+		
+		ArrayList<ArrayList<IndexedWord>> ret = new ArrayList<ArrayList<IndexedWord>>();
 		
 		Stack<IndexedWord> stack = new Stack<IndexedWord>();
 		Stack<IndexedWord> path = new Stack<IndexedWord>();
@@ -569,13 +575,11 @@ public class AbstractiveGeneration {
 			boolean cycle = false;
 			//if reach end
 			if(top.index() == -2){
-				StringBuilder sb = new StringBuilder();
+				ArrayList<IndexedWord> pa = new ArrayList<IndexedWord>();
 				for(IndexedWord iw : path){
-					sb.append(iw.originalText()+" ");
+					pa.add(iw);
 				}
-				
-				System.out.println(sb.toString().trim());
-				
+				ret.add(pa);	
 				//pop end
 				stack.pop();
 				if(stack.isEmpty())
@@ -586,7 +590,9 @@ public class AbstractiveGeneration {
 					IndexedWord iw = path.peek();
 					int flag = graph.commonAncestor(stack.peek(), iw);
 					path.pop();
-					if(flag == 1){
+					boolean containsEdge = graph.containsEdge(path.peek(), stack.peek());
+					//they might have more than one ancestor, so need ancestor on the path.
+					if(flag == 1 && containsEdge){
 						if(!path.contains(stack.peek())){
 							path.push(stack.peek());
 							break;
@@ -603,11 +609,11 @@ public class AbstractiveGeneration {
 					path.push(top);
 				else{
 					
-					StringBuilder sbb = new StringBuilder();
+					ArrayList<IndexedWord> pa = new ArrayList<IndexedWord>();
 					for(IndexedWord iw : path){
-						sbb.append(iw.originalText()+" ");
+						pa.add(iw);
 					}
-					System.out.println(sbb.toString().trim());
+					ret.add(pa);
 					//choose another way
 					stack.pop();
 					cycle = true;
@@ -623,11 +629,12 @@ public class AbstractiveGeneration {
 				if (!stack.contains(edge.getDependent())) {
 					stack.push(edge.getDependent());
 				}
-			}	
-			
+			}		
 		}	
+		
+		return ret;
 	}
-	private void tupleFusion(InstanceList patternCluster){
+	private ArrayList<String> tupleFusion(InstanceList patternCluster){
 				
 		//Node Alignment
 		SemanticGraph graph = new SemanticGraph();
@@ -646,14 +653,12 @@ public class AbstractiveGeneration {
 		endNode.setLemma("END");
 		endNode.setValue("END");
 		
-		//still have some problem
+		
+		//construct graph to merge tuples
 		for (int i = 0; i < patternCluster.size(); i++) {
 			Instance inst = patternCluster.get(i);
 			Pattern p = (Pattern) inst.getSource();
-//			System.out.println(p.getAnnotatedSentence().toString());
-//			System.out.println(((Tuple)p).originaltext());
 			Tuple t = (Tuple)p;
-			System.out.println(t);
 			ArrayList<IndexedWord> wordList = new ArrayList<IndexedWord>();
 			wordList.addAll(t.getArg1());
 			wordList.addAll(t.getRel());
@@ -700,8 +705,23 @@ public class AbstractiveGeneration {
 				}
 			}		
 			
-//			if(t.toString().contains("[American servicemen and women]"))
-			printAllPaths(graph);
+			
+			System.out.println(t);
+			ArrayList<ArrayList<IndexedWord>> paths = travelAllPaths(graph);
+			HashSet<String> set = new HashSet<String>();
+			for(ArrayList<IndexedWord> path : paths){
+				StringBuilder sb = new StringBuilder();
+				for(IndexedWord iw : path){
+					sb.append(iw.originalText()+" ");
+				}
+				if(!set.contains(sb.toString().trim())){
+					System.out.println(sb.toString().trim());
+					set.add(sb.toString().trim());
+				}
+			}
+
+				
+
 //			System.out.println(p.toSpecificForm());
 //			System.out.println(p.toGeneralizedForm());
 			
@@ -709,7 +729,34 @@ public class AbstractiveGeneration {
 //			String summarySent = realization(p, graph);
 		}	
 		
+/*		ArrayList<ArrayList<IndexedWord>> paths = travelAllPaths(graph);
+		ArrayList<ArrayList<IndexedWord>> filteredPaths = new 
+				ArrayList<ArrayList<IndexedWord>>();
+		HashSet<String> set = new HashSet<String>();
+		for(int i=0; i<paths.size(); i++){
+			ArrayList<IndexedWord> path = paths.get(i);
+			StringBuilder sb = new StringBuilder();
+			for(IndexedWord iw : path){
+				sb.append(iw.originalText()+" ");
+			}
+			if(!set.contains(sb.toString().trim())){
+				filteredPaths.add(path);
+				set.add(sb.toString().trim());
+			}
+		}
+				
+		ArrayList<String> xx = new ArrayList<String>();
+		for(ArrayList<IndexedWord> path : filteredPaths){
+			StringBuilder sb = new StringBuilder();
+			for(IndexedWord iw : path){
+				sb.append(iw.originalText()+" ");
+			}
+			xx.add(sb.toString().trim());
+		}
 		
+		return Merger.process(xx);*/
+		
+		return null;
 	}
 
 	private void generateFinalSummary(String outputSummaryDir,
@@ -740,6 +787,13 @@ public class AbstractiveGeneration {
 				continue;
 			
 			tupleFusion(bestCluster);
+			
+/*			ArrayList<String> summary = tupleFusion(bestCluster);
+			for(String s : summary){
+				System.out.println(s);
+			}
+			System.out.println();
+			System.out.println();*/
 
 		}
 		out.close();
