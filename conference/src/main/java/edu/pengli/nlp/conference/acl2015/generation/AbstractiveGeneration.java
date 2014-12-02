@@ -426,6 +426,7 @@ public class AbstractiveGeneration {
 				outt.println(sent.toString());					
 				ArrayList<Tuple> tuples = map.get(sent);
 				for (Tuple t : tuples) {
+											
 					ArrayList<IndexedWord> toks = new ArrayList<IndexedWord>();
 					toks.addAll(t.getArg1());
 					toks.addAll(t.getRel());
@@ -545,18 +546,26 @@ public class AbstractiveGeneration {
 			return vertex;
 		else{
 			//the word are appear in different tuple that have the same mention. 
-			String pattern = "^"+vertex.originalText();
+			String pattern = null;
+			if(vertex.tag().startsWith("PRP") || vertex.tag().startsWith("DT")){ //his he should be not alignment. his/PRP$
+				pattern = "^"+vertex.originalText();
+			}else
+				pattern = "^"+vertex.lemma();
+			
 			List<IndexedWord> similarWords = graph.getAllNodesByWordPattern(pattern);
 			if(similarWords.isEmpty())
 				return null;
 			else{
 				IndexedWord iw = similarWords.get(0);
-				if(iw.originalText().equals("the") || iw.originalText().equals("to"))
+				if(iw.originalText().equals("the") || iw.originalText().equals("to") 
+						|| iw.originalText().equals("of") || iw.originalText().equals("have"))
 					return null;
 				if(iw.docID().equals(vertex.docID()) && iw.sentIndex() == vertex.sentIndex())
 					return null;
-				else
+				else{
 					return iw;
+				}
+					
 			}
 		}
 	}
@@ -567,69 +576,152 @@ public class AbstractiveGeneration {
 		
 		Stack<IndexedWord> stack = new Stack<IndexedWord>();
 		Stack<IndexedWord> path = new Stack<IndexedWord>();
+		
+		//insert START
 		stack.add(graph.getFirstRoot());
 		
 		while (!stack.isEmpty()) {
-			IndexedWord top = stack.peek();
 			
-			boolean cycle = false;
-			//if reach end
-			if(top.index() == -2){
+			boolean end = false;
+			boolean stackEmpty = false;					
+			//if path arrive end
+			if(!path.isEmpty() && stack.peek().index() == -2){
+
 				ArrayList<IndexedWord> pa = new ArrayList<IndexedWord>();
+				StringBuilder sb = new StringBuilder();
 				for(IndexedWord iw : path){
 					pa.add(iw);
+					sb.append(iw.originalText()+" ");
 				}
+				System.out.println(ret.size()+" "+sb.toString());
 				ret.add(pa);	
 				//pop end
 				stack.pop();
 				if(stack.isEmpty())
 					break;
-
-				//traceback
+				//Backtracking path, using top element of stack to decide backtracking point.
 				while(!path.isEmpty()){
-					IndexedWord iw = path.peek();
-					int flag = graph.commonAncestor(stack.peek(), iw);
-					path.pop();
-					boolean containsEdge = graph.containsEdge(path.peek(), stack.peek());
-					//they might have more than one ancestor, so need ancestor on the path.
-					if(flag == 1 && containsEdge){
-						if(!path.contains(stack.peek())){
-							path.push(stack.peek());
-							break;
-						}else{
-							cycle = true;
+					
+					if(!stack.isEmpty()){
+						boolean isSibing = graph.getSiblings(path.peek()).contains(stack.peek());
+						boolean isParent = graph.containsEdge(path.peek(), stack.peek());
+						if(stack.peek().index() == -2){
+							end = true;
 							break;
 						}
+						if(isParent && !path.contains(stack.peek())){
+							path.push(stack.peek());
+							break;
+						}else if(isSibing && !path.contains(stack.peek())){
+							path.pop();
+							boolean containsEdge = graph.containsEdge(path.peek(), stack.peek());
+							if(containsEdge){
+								path.push(stack.peek());
+								break;
+							}else{
+								path.pop();
+								path.push(stack.peek());
+								break;
+							}
+								
+						}else if(stack.peek().equals(path.peek())){
+							IndexedWord flag = null;
+							do{
+								flag = path.pop();
+							}while(path.peek().index() != -1);
 							
-					}
-				}	
-				
+							
+							do{
+								stack.pop();
+								if(stack.isEmpty()){
+									stackEmpty = true;
+									break;
+								}
+							}while(graph.containsEdge(path.peek(), stack.peek()) && !flag.equals(stack.peek()));
+
+							if(stackEmpty == false)
+								path.push(stack.peek());	
+							break;
+						}else
+							path.pop();
+					}else
+						break;
+				}
+																
 			}else{
-				if(!path.contains(top))
-					path.push(top);
+
+				if(!path.contains(stack.peek()))
+					path.push(stack.peek());
 				else{
-					
-					ArrayList<IndexedWord> pa = new ArrayList<IndexedWord>();
-					for(IndexedWord iw : path){
-						pa.add(iw);
-					}
-					ret.add(pa);
+
 					//choose another way
+
 					stack.pop();
-					cycle = true;
+					
+					//Backtracking path, using top element of stack to decide backtracking point.
+					while(!path.isEmpty()){
+						
+						if(!stack.isEmpty()){
+							boolean isSibing = graph.getSiblings(path.peek()).contains(stack.peek());
+							boolean isParent = graph.containsEdge(path.peek(), stack.peek());
+							if(stack.peek().index() == -2){
+								end = true;
+								break;
+							}
+							if(isParent && !path.contains(stack.peek())){
+								path.push(stack.peek());
+								break;
+							}else if(isSibing && !path.contains(stack.peek())){
+								path.pop();
+								boolean containsEdge = graph.containsEdge(path.peek(), stack.peek());
+								if(containsEdge){
+									path.push(stack.peek());
+									break;
+								}else{
+									path.pop();
+									path.push(stack.peek());
+									break;
+								}
+									
+							}else if(stack.peek().equals(path.peek())){
+								IndexedWord flag = null;
+								do{
+									flag = path.pop();
+								}while(path.peek().index() != -1);
+								
+								
+								do{
+									stack.pop();
+									if(stack.isEmpty()){
+										stackEmpty = true;
+										break;
+									}
+									
+								}while(graph.containsEdge(path.peek(), stack.peek()) && !flag.equals(stack.peek()));
+
+								if(stackEmpty == false)
+									path.push(stack.peek());	
+								break;
+								
+							}else
+								path.pop();
+						}else
+							break;
+					}
 				}
 			}
 			
-			if(cycle ==true)
+			if(end == true)
 				continue;
-					
+			
+			if(stackEmpty == true)
+				continue;
+			
 			Iterable<SemanticGraphEdge> iter = 
-					graph.outgoingEdgeIterable(stack.pop());
-			for (SemanticGraphEdge edge : iter) {
-				if (!stack.contains(edge.getDependent())) {
-					stack.push(edge.getDependent());
-				}
-			}		
+					graph.outgoingEdgeIterable(stack.pop());	
+			for (SemanticGraphEdge edge : iter) 
+				stack.push(edge.getDependent());
+					
 		}	
 		
 		return ret;
@@ -642,8 +734,9 @@ public class AbstractiveGeneration {
 		startNode.setIndex(-1);
 		startNode.setDocID("-1");
 		startNode.setSentIndex(-1);
-		startNode.setLemma("ROOT");
-		startNode.setValue("ROOT");
+		startNode.setLemma("START");
+		startNode.setValue("START");
+		startNode.setTag("START");
 		graph.addRoot(startNode);
 		
 		IndexedWord endNode = new IndexedWord();
@@ -652,6 +745,7 @@ public class AbstractiveGeneration {
 		endNode.setSentIndex(-2);
 		endNode.setLemma("END");
 		endNode.setValue("END");
+		endNode.setTag("END");
 		
 		
 		//construct graph to merge tuples
@@ -705,20 +799,39 @@ public class AbstractiveGeneration {
 				}
 			}		
 			
-			
-			System.out.println(t);
-			ArrayList<ArrayList<IndexedWord>> paths = travelAllPaths(graph);
-			HashSet<String> set = new HashSet<String>();
-			for(ArrayList<IndexedWord> path : paths){
-				StringBuilder sb = new StringBuilder();
-				for(IndexedWord iw : path){
-					sb.append(iw.originalText()+" ");
+			ArrayList<ArrayList<IndexedWord>> paths = null;
+			if(t.toString().equals("[I]	[hope]	[they stay around here and they will have a lot of friends and a lot of support]")){
+				System.out.println(t);
+				paths = travelAllPaths(graph);
+				HashSet<String> set = new HashSet<String>();
+				for(ArrayList<IndexedWord> path : paths){
+					StringBuilder sb = new StringBuilder();
+					for(IndexedWord iw : path){
+						if(iw.index()==-2){
+							System.out.println("contains END");
+						}
+						sb.append(iw.originalText()+" ");
+					}
+					if(!set.contains(sb.toString().trim())){
+						System.out.println(sb.toString().trim());
+						set.add(sb.toString().trim());
+					}
 				}
-				if(!set.contains(sb.toString().trim())){
-					System.out.println(sb.toString().trim());
-					set.add(sb.toString().trim());
+				
+				boolean contains = false;
+				String mentionT = t.getArg1().originaltext()+" "+
+				t.getRel().originaltext()+" "+t.getArg2().originaltext();
+				for(String s : set){
+					if(s.contains(mentionT))
+						contains = true;
+				}
+				
+				if(contains == false){
+					System.out.println("Wired");
 				}
 			}
+
+
 
 				
 
