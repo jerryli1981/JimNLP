@@ -576,6 +576,7 @@ public class AbstractiveGeneration {
 		
 		Stack<IndexedWord> stack = new Stack<IndexedWord>();
 		Stack<IndexedWord> path = new Stack<IndexedWord>();
+		HashSet<IndexedWord> candidatePoints = new HashSet<IndexedWord>();
 		
 		//insert START
 		stack.add(graph.getFirstRoot());
@@ -583,17 +584,16 @@ public class AbstractiveGeneration {
 		while (!stack.isEmpty()) {
 			
 			boolean end = false;
-			boolean stackEmpty = false;					
+			boolean stackEmpty = false;		
+			boolean containsCandidate = false;
 			//if path arrive end
 			if(!path.isEmpty() && stack.peek().index() == -2){
 
 				ArrayList<IndexedWord> pa = new ArrayList<IndexedWord>();
-				StringBuilder sb = new StringBuilder();
 				for(IndexedWord iw : path){
 					pa.add(iw);
-					sb.append(iw.originalText()+" ");
 				}
-				System.out.println(ret.size()+"  "+sb.toString());
+
 				ret.add(pa);	
 				//pop end
 				stack.pop();
@@ -629,7 +629,8 @@ public class AbstractiveGeneration {
 								//find the parent of stack.peek on path
 								do{
 									path.pop();
-								}while(graph.isAncestor(stack.peek(), path.peek()) == 1);
+									
+								}while(graph.isAncestor(stack.peek(), path.peek()) != 1);
 								
 								path.push(stack.peek());
 								break;
@@ -637,6 +638,7 @@ public class AbstractiveGeneration {
 							
 						//case 3: stack.peek() equals path.peek()
 						}else if(stack.peek().equals(path.peek())){
+					
 							IndexedWord flag = null;
 							do{
 								flag = path.pop();
@@ -650,10 +652,30 @@ public class AbstractiveGeneration {
 									break;
 								}
 								
-							}while(graph.isAncestor(stack.peek(), path.peek()) == 1);
+							}while(graph.isAncestor(stack.peek(), path.peek()) != 1 
+									|| flag.equals(stack.peek()));
 							
-							if(stackEmpty == false && !flag.equals(stack.peek()))
-								path.push(stack.peek());	
+							if(stackEmpty == false){
+								if(!candidatePoints.contains(stack.peek())){
+									candidatePoints.add(stack.peek());
+									path.push(stack.peek());	
+								}else{
+									containsCandidate = true;
+									//choose candidate stack.peek
+									do{
+										stack.pop();
+										if(stack.isEmpty()){
+											stackEmpty = true;
+											break;
+										}
+										
+									}while(graph.isAncestor(stack.peek(), path.peek()) != 1 
+											|| flag.equals(stack.peek()) || candidatePoints.contains(stack.peek()));
+								}
+									
+								
+							}	
+								
 							break;
 							
 						}else
@@ -701,7 +723,8 @@ public class AbstractiveGeneration {
 									//find the parent of stack.peek on path
 									do{
 										path.pop();
-									}while(graph.isAncestor(stack.peek(), path.peek()) == 1);
+										
+									}while(graph.isAncestor(stack.peek(), path.peek()) != 1);
 									
 									path.push(stack.peek());
 									break;
@@ -722,10 +745,28 @@ public class AbstractiveGeneration {
 										break;
 									}
 									
-								}while(graph.isAncestor(stack.peek(), path.peek()) == 1);
+								}while(graph.isAncestor(stack.peek(), path.peek()) != 1 
+										|| flag.equals(stack.peek()));
 								
-								if(stackEmpty == false && !flag.equals(stack.peek()))
-									path.push(stack.peek());	
+								if(stackEmpty == false){
+									if(!candidatePoints.contains(stack.peek())){
+										candidatePoints.add(stack.peek());
+										path.push(stack.peek());	
+									}else{
+										containsCandidate = true;
+										//choose another candidate stack.peek
+										do{
+											stack.pop();
+											if(stack.isEmpty()){
+												stackEmpty = true;
+												break;
+											}
+											
+										}while(graph.isAncestor(stack.peek(), path.peek()) != 1 
+												|| flag.equals(stack.peek()) || candidatePoints.contains(stack.peek()));
+									}
+									
+								}			
 								break;
 								
 							}else
@@ -740,6 +781,9 @@ public class AbstractiveGeneration {
 				continue;
 			
 			if(stackEmpty == true)
+				continue;
+			
+			if(containsCandidate == true)
 				continue;
 			
 			Iterable<SemanticGraphEdge> iter = 
@@ -825,7 +869,7 @@ public class AbstractiveGeneration {
 			}		
 			
 			ArrayList<ArrayList<IndexedWord>> paths = null;
-			if(t.toString().equals("[I]	[hope]	[they stay around here and they will have a lot of friends and a lot of support]")){
+			if(true){
 
 				System.out.println(t);
 				paths = travelAllPaths(graph);
