@@ -593,55 +593,69 @@ public class AbstractiveGeneration {
 					pa.add(iw);
 					sb.append(iw.originalText()+" ");
 				}
-				System.out.println(ret.size()+" "+sb.toString());
+				System.out.println(ret.size()+"  "+sb.toString());
 				ret.add(pa);	
 				//pop end
 				stack.pop();
 				if(stack.isEmpty())
 					break;
+				
 				//Backtracking path, using top element of stack to decide backtracking point.
 				while(!path.isEmpty()){
 					
 					if(!stack.isEmpty()){
 						boolean isSibing = graph.getSiblings(path.peek()).contains(stack.peek());
-						boolean isParent = graph.containsEdge(path.peek(), stack.peek());
+						int isParent = graph.isAncestor(stack.peek(), path.peek());
+						
+						//reach end
 						if(stack.peek().index() == -2){
 							end = true;
 							break;
 						}
-						if(isParent && !path.contains(stack.peek())){
+						
+						//case 1: if stack.peek is the child of path.peek. then insert
+						if(isParent==1 && !path.contains(stack.peek())){
 							path.push(stack.peek());
 							break;
+							
+						//case 2: if stack.peek is the sibling of path.peek. then walk towards sibling.
 						}else if(isSibing && !path.contains(stack.peek())){
 							path.pop();
-							boolean containsEdge = graph.containsEdge(path.peek(), stack.peek());
-							if(containsEdge){
+							int parent = graph.isAncestor(stack.peek(), path.peek());
+							if(parent == 1){
 								path.push(stack.peek());
 								break;
 							}else{
-								path.pop();
+								//find the parent of stack.peek on path
+								do{
+									path.pop();
+								}while(graph.isAncestor(stack.peek(), path.peek()) == 1);
+								
 								path.push(stack.peek());
 								break;
 							}
-								
+							
+						//case 3: stack.peek() equals path.peek()
 						}else if(stack.peek().equals(path.peek())){
 							IndexedWord flag = null;
 							do{
 								flag = path.pop();
+								
 							}while(path.peek().index() != -1);
-							
-							
+						
 							do{
 								stack.pop();
 								if(stack.isEmpty()){
 									stackEmpty = true;
 									break;
 								}
-							}while(graph.containsEdge(path.peek(), stack.peek()) && !flag.equals(stack.peek()));
-
-							if(stackEmpty == false)
+								
+							}while(graph.isAncestor(stack.peek(), path.peek()) == 1);
+							
+							if(stackEmpty == false && !flag.equals(stack.peek()))
 								path.push(stack.peek());	
 							break;
+							
 						}else
 							path.pop();
 					}else
@@ -663,33 +677,44 @@ public class AbstractiveGeneration {
 						
 						if(!stack.isEmpty()){
 							boolean isSibing = graph.getSiblings(path.peek()).contains(stack.peek());
-							boolean isParent = graph.containsEdge(path.peek(), stack.peek());
+							int isParent = graph.isAncestor(stack.peek(), path.peek());
+							
+							//reach end
 							if(stack.peek().index() == -2){
 								end = true;
 								break;
 							}
-							if(isParent && !path.contains(stack.peek())){
+							
+							//case 1: if stack.peek is the child of path.peek. then insert
+							if(isParent==1 && !path.contains(stack.peek())){
 								path.push(stack.peek());
 								break;
+								
+							//case 2: if stack.peek is the sibling of path.peek. then walk towards sibling.
 							}else if(isSibing && !path.contains(stack.peek())){
 								path.pop();
-								boolean containsEdge = graph.containsEdge(path.peek(), stack.peek());
-								if(containsEdge){
+								int parent = graph.isAncestor(stack.peek(), path.peek());
+								if(parent == 1){
 									path.push(stack.peek());
 									break;
 								}else{
-									path.pop();
+									//find the parent of stack.peek on path
+									do{
+										path.pop();
+									}while(graph.isAncestor(stack.peek(), path.peek()) == 1);
+									
 									path.push(stack.peek());
 									break;
 								}
-									
+								
+							//case 3: stack.peek() equals path.peek()
 							}else if(stack.peek().equals(path.peek())){
 								IndexedWord flag = null;
 								do{
 									flag = path.pop();
+									
 								}while(path.peek().index() != -1);
-								
-								
+							
 								do{
 									stack.pop();
 									if(stack.isEmpty()){
@@ -697,9 +722,9 @@ public class AbstractiveGeneration {
 										break;
 									}
 									
-								}while(graph.containsEdge(path.peek(), stack.peek()) && !flag.equals(stack.peek()));
-
-								if(stackEmpty == false)
+								}while(graph.isAncestor(stack.peek(), path.peek()) == 1);
+								
+								if(stackEmpty == false && !flag.equals(stack.peek()))
 									path.push(stack.peek());	
 								break;
 								
@@ -801,6 +826,7 @@ public class AbstractiveGeneration {
 			
 			ArrayList<ArrayList<IndexedWord>> paths = null;
 			if(t.toString().equals("[I]	[hope]	[they stay around here and they will have a lot of friends and a lot of support]")){
+
 				System.out.println(t);
 				paths = travelAllPaths(graph);
 				HashSet<String> set = new HashSet<String>();
