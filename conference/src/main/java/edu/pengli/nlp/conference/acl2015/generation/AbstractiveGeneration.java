@@ -867,44 +867,6 @@ public class AbstractiveGeneration {
 					graph.addEdge(flagLastWord, flagEndRoot, null, 0.0, false);	
 				}
 			}		
-			
-			ArrayList<ArrayList<IndexedWord>> paths = null;
-			if(true){
-
-				System.out.println(t);
-				paths = travelAllPaths(graph);
-				HashSet<String> set = new HashSet<String>();
-				for(ArrayList<IndexedWord> path : paths){
-					StringBuilder sb = new StringBuilder();
-					for(IndexedWord iw : path){
-						if(iw.index()==-2){
-							System.out.println("contains END");
-						}
-						sb.append(iw.originalText()+" ");
-					}
-					if(!set.contains(sb.toString().trim())){
-						System.out.println(sb.toString().trim());
-						set.add(sb.toString().trim());
-					}
-				}
-				
-				boolean contains = false;
-				String mentionT = t.getArg1().originaltext()+" "+
-				t.getRel().originaltext()+" "+t.getArg2().originaltext();
-				for(String s : set){
-					if(s.contains(mentionT))
-						contains = true;
-				}
-				
-				if(contains == false){
-					System.out.println("Wired");
-				}
-			}
-
-
-
-				
-
 //			System.out.println(p.toSpecificForm());
 //			System.out.println(p.toGeneralizedForm());
 			
@@ -912,7 +874,8 @@ public class AbstractiveGeneration {
 //			String summarySent = realization(p, graph);
 		}	
 		
-/*		ArrayList<ArrayList<IndexedWord>> paths = travelAllPaths(graph);
+		ArrayList<ArrayList<IndexedWord>> paths = travelAllPaths(graph);
+		
 		ArrayList<ArrayList<IndexedWord>> filteredPaths = new 
 				ArrayList<ArrayList<IndexedWord>>();
 		HashSet<String> set = new HashSet<String>();
@@ -937,9 +900,7 @@ public class AbstractiveGeneration {
 			xx.add(sb.toString().trim());
 		}
 		
-		return Merger.process(xx);*/
-		
-		return null;
+		return Merger.process(xx);
 	}
 
 	private void generateFinalSummary(String outputSummaryDir,
@@ -969,14 +930,13 @@ public class AbstractiveGeneration {
 			if(bestCluster == null)
 				continue;
 			
-			tupleFusion(bestCluster);
 			
-/*			ArrayList<String> summary = tupleFusion(bestCluster);
+			ArrayList<String> summary = tupleFusion(bestCluster);
 			for(String s : summary){
 				System.out.println(s);
 			}
 			System.out.println();
-			System.out.println();*/
+			System.out.println();
 
 		}
 		out.close();
