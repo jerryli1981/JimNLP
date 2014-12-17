@@ -6,18 +6,38 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.Map.Entry;
 
+import com.jmatio.io.MatFileWriter;
+import com.jmatio.types.MLArray;
+import com.jmatio.types.MLDouble;
+import com.jmatio.types.MLChar;
+import com.jmatio.types.MLCell;
+
 import edu.pengli.nlp.conference.acl2015.types.Pattern;
+import edu.pengli.nlp.platform.types.Alphabet;
 import edu.pengli.nlp.platform.types.FeatureVector;
+import edu.pengli.nlp.platform.types.Instance;
+import edu.pengli.nlp.platform.types.InstanceList;
+import edu.stanford.nlp.ling.CoreLabel;
+import edu.stanford.nlp.ling.IndexedWord;
+import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
+import edu.stanford.nlp.semgraph.SemanticGraph;
+import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.BasicDependenciesAnnotation;
+import edu.stanford.nlp.util.CoreMap;
 
 public class FeatureVectorGenerator {
 	
 	private HashMap<String, float[]> wordMap;
+	
+	private Alphabet dictionary;
 
 	int max_size; // max length of strings
 	int N; // number of closest words that will be shown
@@ -37,6 +57,156 @@ public class FeatureVectorGenerator {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+		
+	private ArrayList<MLDouble> generateMatlabInput
+	(InstanceList instances, String name, int maxPatternSize){	
+		ArrayList<int[]> matrix = new ArrayList<int[]>();
+		ArrayList<int[]> lbl_matrix = new ArrayList<int[]>();
+		for(Instance inst : instances){
+			ArrayList<IndexedWord> toks = (ArrayList<IndexedWord>)inst.getData();
+			int[] idx_arr = new int[maxPatternSize+1];
+			int[] lbl_arr = new int[2];
+			for(int i=0; i<idx_arr.length; i++){
+				if(i < toks.size()){
+					int idx = dictionary.lookupIndex(toks.get(i).originalText());
+					if(idx >= dictionary.size()){
+						System.out.println("Impossible of lookup");
+						System.exit(0);
+					}
+					idx_arr[i] = idx+1;
+				}else{
+					idx_arr[i] = dictionary.size()+1;
+				}
+			}
+			matrix.add(idx_arr);
+			String label = (String)inst.getTarget();
+			lbl_arr[0] = Integer.parseInt(label);
+			lbl_arr[1] = toks.size();
+			lbl_matrix.add(lbl_arr);
+		}
+		double[] arr = new double[(maxPatternSize+1)*instances.size()];
+		int c = 0;
+		for(int i=0; i<maxPatternSize+1; i++){
+			for(int[] ints : matrix)
+				arr[c++] = ints[i];						
+		}
+		
+		double[] lbl_arr = new double[2*instances.size()];
+		c = 0;
+		for(int i=0; i<2; i++){
+			for(int[] ints : lbl_matrix)
+				lbl_arr[c++] = ints[i];						
+		}
+	
+		ArrayList<MLDouble> ret = new ArrayList<MLDouble>();
+		ret.add(new MLDouble(name, arr, instances.size()));
+		ret.add(new MLDouble(name+"_lbl", lbl_arr, instances.size()));
+		return ret;
+	}
+	public FeatureVectorGenerator(HashSet<Pattern> patternSet) throws IOException{
+		dictionary = new Alphabet();
+		int maxPatternSize = 0;
+		InstanceList instances = new InstanceList(null);
+		HashSet<String> set = new HashSet<String>();
+		for(Pattern p : patternSet){
+			CoreMap sentence = p.getAnnotatedSentence();
+			
+			SemanticGraph graph = sentence.get(BasicDependenciesAnnotation.class);
+			List<CoreLabel> labels = sentence.get(TokensAnnotation.class);
+			ArrayList<IndexedWord> list = new ArrayList<IndexedWord>();
+			StringBuilder sb = new StringBuilder();
+			for (int i = 0; i < labels.size() - 1; i++) {
+				CoreLabel nextToken = labels.get(i+1);
+				//token may contain punc, however graph may not contain punc, so word may be null
+				IndexedWord word = graph.getNodeByIndexSafe(nextToken.index());
+				if(p.getArg1().contains(word) || p.getRel().contains(word)
+						|| p.getArg2().contains(word))
+					continue;
+				if(word != null){
+					list.add(word);
+					dictionary.lookupIndex(word.originalText());
+					sb.append(word.originalText()+" ");	
+				}
+								
+			}
+			
+			if(!set.contains(sb.toString().trim())){
+				set.add(sb.toString().trim());
+				Instance inst = new Instance(list, "2", null);
+				instances.add(inst);
+			}
+			ArrayList<IndexedWord> list2 = new ArrayList<IndexedWord>();
+			
+			int size = 0;
+			for(IndexedWord iw : p.getArg1()){
+				size++;
+				dictionary.lookupIndex(iw.originalText());
+				list2.add(iw);
+			}
+			for(IndexedWord iw : p.getRel()){
+				size++;
+				dictionary.lookupIndex(iw.originalText());
+				list2.add(iw);
+			}
+			for(IndexedWord iw : p.getArg2()){
+				size++;
+				dictionary.lookupIndex(iw.originalText());
+				list2.add(iw);
+			}		
+			
+			instances.add(new Instance(list2, "1", null));
+			if(size >= maxPatternSize)
+				maxPatternSize = size;
+		}
+		
+		InstanceList training = new InstanceList(null);
+		InstanceList validating = new InstanceList(null);
+		InstanceList testing  = new InstanceList(null);
+		Random rand = new Random();
+		int size = instances.size();
+		int newSize = size;
+		for(int i=0; i< size*0.7; i++){
+			int ran = rand.nextInt(newSize);
+			training.add(instances.get(ran));
+			instances.remove(ran);
+			newSize--;
+		}
+		for(int i=0; i< size*0.2; i++){
+			int ran = rand.nextInt(newSize);
+			validating.add(instances.get(ran));
+			instances.remove(ran);
+			newSize--;
+		}
+		testing.addAll(instances);
+				
+		String[] idx_arr = new String[dictionary.size()];
+		int[] dims = new int[dictionary.size()];
+		for(int i=0; i<dictionary.size(); i++){
+			idx_arr[i] = (String) dictionary.lookupObject(i);
+			dims[i] = i+1;
+		}
+		MLCell cell = new MLCell("index", dims);
+		for(int i=0; i<dictionary.size(); i++){
+			MLArray val = new MLChar("index", idx_arr[i]);
+			cell.set(val, 1, 1);
+		}
+		
+		double[] vocSize_arr = new double[1];
+		vocSize_arr[0] = dictionary.size()+1;
+		
+		double[] sentLength_arr = new double[1];
+		sentLength_arr[0] = maxPatternSize+1;
+		ArrayList list = new ArrayList();
+		list.add(cell);
+		list.add(new MLDouble("sent_length", sentLength_arr, 1));
+		list.add(new MLDouble("size_vocab", vocSize_arr, 1));
+		list.addAll(generateMatlabInput(testing, "test", maxPatternSize));
+		list.addAll(generateMatlabInput(training, "train", maxPatternSize));
+		list.addAll(generateMatlabInput(validating, "valid", maxPatternSize));
+
+		new MatFileWriter("/home/peng/Develop/Workspace_matlab/DCNN/Data/mat_file.mat", list);
+		System.out.println("done");
 	}
 	
 	public int getDimension(){
