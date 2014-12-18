@@ -52,9 +52,8 @@ public class FreebaseTagger {
 			JSONObject entity = results.getJSONObject(i);
 			if(!entity.toString().contains("\"notable\":"))
 					continue;
-			String notable = entity.getString("notable");
-			JSONObject obj = new JSONObject(notable);
-			String label = obj.getString("name");
+			JSONObject notable = entity.getJSONObject("notable");
+			String label = notable.getString("name");
 			labels.add(label);
 		}
 		
@@ -63,9 +62,9 @@ public class FreebaseTagger {
 	}
 
 	public static void main(String[] args) throws IOException, JSONException {
-		String query = "Helen";
+		String query = "person";
 		FreebaseTagger ft = new FreebaseTagger();
-		ft.search(query);
+		System.out.println(ft.search(query));
 
 	}
 

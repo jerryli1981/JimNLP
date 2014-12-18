@@ -13,7 +13,7 @@ public class Pattern extends Tuple implements Serializable{
 		
 	//for clustering
 	public String toGeneralizedForm(){
-		return arg1.getHead().ner().toUpperCase()+" "+rel.originaltext()+" "
+		return arg1.getHead().ner().toUpperCase()+" "+rel.getHead().originalText()+" "
 		+arg2.getHead().ner().toUpperCase();
 	}
 	
@@ -25,7 +25,7 @@ public class Pattern extends Tuple implements Serializable{
 		IndexedWord headArg1 = arg1.getHead();
 		for(IndexedWord w : arg1){
 			if(w.index() == headArg1.index()){
-				sb.append(w.ner()+" ");
+				sb.append(w.ner().toUpperCase()+" ");
 			}else
 				sb.append(w.originalText()+" ");
 		}
@@ -34,7 +34,7 @@ public class Pattern extends Tuple implements Serializable{
 		IndexedWord headArg2 = arg2.getHead();
 		for(IndexedWord w : arg2){
 			if(w.index() == headArg2.index()){
-				sb.append(w.ner()+" ");
+				sb.append(w.ner().toUpperCase()+" ");
 			}else
 				sb.append(w.originalText()+" ");
 		}
@@ -43,13 +43,15 @@ public class Pattern extends Tuple implements Serializable{
 	}
 	
 	public String toString(){
-		try {
+		try {		
 			throw new NoSuchMethodException();
 		} catch (NoSuchMethodException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			System.out.println("For debug");
+		}finally{
+			
+			return originaltext();
 		}
-		return null;
 	}
 	
 }

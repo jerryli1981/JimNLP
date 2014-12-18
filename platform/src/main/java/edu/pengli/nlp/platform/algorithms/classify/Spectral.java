@@ -1,8 +1,5 @@
 package edu.pengli.nlp.platform.algorithms.classify;
 
-import java.util.Arrays;
-
-
 import edu.pengli.nlp.platform.pipe.Pipe;
 import edu.pengli.nlp.platform.types.FeatureVector;
 import edu.pengli.nlp.platform.types.InstanceList;
@@ -35,6 +32,7 @@ public class Spectral extends Clusterer {
 
 		double[][] similarityMatrix = new double[instances.size()][instances
 				.size()];
+		
 		for (int i = 0; i < instances.size(); i++) {
 			FeatureVector fv_i = (FeatureVector) instances.get(i).getData();
 			for (int j = 0; j < instances.size(); j++) {
@@ -68,12 +66,26 @@ public class Spectral extends Clusterer {
 			proxy.eval("U= U(:, idx(1:" + numClusters + "))");
 			proxy.eval("U=U./repmat(sqrt(sum(U.*U,2)),1," + numClusters + ")");
 			proxy.eval("labels = kmeans(U," + numClusters + ",'Replicates',20)");
+			
+/*			FeatureVector vec = (FeatureVector)instances.get(0).getData();
+			int dimension = vec.getValues().length;
+			double[][] dataMatrix = new double[instances.size()][dimension];
+			for (int i = 0; i < instances.size(); i++) {
+				FeatureVector fv_i = (FeatureVector) instances.get(i).getData();
+				for(int j=0; j<dimension; j++)
+					dataMatrix[i][j] = fv_i.getValues()[j];
+			}
+			
+			processor.setNumericArray("arr", new MatlabNumericArray(
+					dataMatrix, null));
+			proxy.eval("labels = kmeans(arr,"+numClusters+")");*/
 
 			double[][] labels = processor.getNumericArray("labels")
 					.getRealArray2D();
 
 			for (int i = 0; i < instances.size(); i++)
 				clusterLabels[i] = (int) labels[i][0]-1;		
+			
 		} catch (MatlabInvocationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

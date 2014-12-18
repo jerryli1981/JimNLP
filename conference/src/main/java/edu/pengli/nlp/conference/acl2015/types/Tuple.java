@@ -73,13 +73,15 @@ public class Tuple implements Serializable{
 	}
 	
 	public String toString(){
-		try {
+		try {		
 			throw new NoSuchMethodException();
 		} catch (NoSuchMethodException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			System.out.println("For debug");
+		}finally{
+			
+			return originaltext();
 		}
-		return null;
 	}
 	
 	public int hashCode() {

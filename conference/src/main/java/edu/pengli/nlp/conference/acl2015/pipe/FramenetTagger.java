@@ -19,6 +19,7 @@ import edu.knowitall.tool.postag.ClearPostagger;
 import edu.knowitall.tool.postag.Postagger;
 import edu.knowitall.tool.tokenize.ClearTokenizer;
 import edu.pengli.nlp.conference.acl2015.types.Argument;
+import edu.pengli.nlp.conference.acl2015.types.Predicate;
 import edu.pengli.nlp.conference.acl2015.types.Tuple;
 import edu.stanford.nlp.ling.IndexedWord;
 
@@ -104,9 +105,9 @@ public class FramenetTagger {
 	}
 	
 	
-	public void annotate(Argument arg1, Argument arg2, Tuple t) throws Exception{
+	public void annotate(Argument arg1, Predicate pre, Argument arg2) throws Exception{
 		
-		String tupleMention = arg1.originaltext()+" "+t.getRel().originaltext()+
+		String tupleMention = arg1.originaltext()+" "+pre.originaltext()+
 				" "+arg2.originaltext();
 		
 		String conllFormat = generateSemaforInput(tupleMention);
@@ -130,19 +131,13 @@ public class FramenetTagger {
 					for(int l=0; l<spans.length(); l++){
 						JSONObject span = spans.getJSONObject(l);
 						String text = span.getString("text");
-						if(text.equals(arg1.getHead().originalText()) && arg1.getHead().ner().equals("O")){
-							if(arg1.getHead().tag().equals("PRP")){
-								arg1.getHead().setNER("PERSON");
-							}else
+						if(text.equals(arg1.getHead().originalText()) 
+								&& arg1.getHead().ner().equals("O"))
 								arg1.getHead().setNER(labelName);
-						}
 						
-						if(text.equals(arg2.getHead().originalText()) && arg2.getHead().ner().equals("O")){
-							if(arg2.getHead().tag().equals("PRP")){
-								arg2.getHead().setNER("PERSON");
-							}else
-								arg2.getHead().setNER(labelName);
-						}
+						if(text.equals(arg2.getHead().originalText())
+								&& arg2.getHead().ner().equals("O"))
+								arg2.getHead().setNER(labelName);	
 					}
 				}	
 			}

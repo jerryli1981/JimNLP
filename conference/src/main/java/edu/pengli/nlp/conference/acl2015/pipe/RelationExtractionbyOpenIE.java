@@ -294,7 +294,7 @@ public class RelationExtractionbyOpenIE extends Pipe {
 					beginPositionWordMap.put(beginPosition, punc);
 				}
 			}
-								
+			
 			//here need use tokenized sentence to input openIE to keep beginPosition mapping correct.
 			String sentenceMention = sb.toString().trim();
 			Seq<edu.knowitall.openie.Instance> extractions = openIE

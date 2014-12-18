@@ -3,10 +3,10 @@ package edu.pengli.nlp.conference.acl2015.pipe;
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -15,6 +15,10 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.Map.Entry;
 
+import matlabcontrol.MatlabInvocationException;
+import matlabcontrol.MatlabProxy;
+
+import com.jmatio.io.MatFileReader;
 import com.jmatio.io.MatFileWriter;
 import com.jmatio.types.MLArray;
 import com.jmatio.types.MLDouble;
@@ -36,31 +40,218 @@ import edu.stanford.nlp.util.CoreMap;
 public class FeatureVectorGenerator {
 	
 	private HashMap<String, float[]> wordMap;
+	private HashMap<Pattern, FeatureVector> patternVectorMap;
 	
-	private Alphabet dictionary;
+	public FeatureVectorGenerator(HashSet<Pattern> patternSet) throws IOException{
 
-	int max_size; // max length of strings
-	int N; // number of closest words that will be shown
-	int max_w; // max length of vocabulary entries
-	int dimension;
-	
-	public FeatureVectorGenerator(){
 		wordMap = new HashMap<String, float[]>();
-		max_size = 2000; 
-		N = 40; 
-		max_w = 50; 
+		int max_size = 2000; // max length of strings
+		int N = 40; // number of closest words that will be shown
+		int max_w = 50; // max length of vocabulary entries
+        String modelPath = "/home/peng/Develop/Workspace/Mavericks/models"
+        		+ "/word2vec/GoogleNews-vectors-negative300.bin";
+
+		int dimension = loadModel(modelPath, max_w);	
+		patternVectorMap = new HashMap<Pattern, FeatureVector>();
+		for (Pattern p : patternSet) {
+			String sentence = p.toGeneralizedForm();
+			String[] words = sentence.split(" ");
+			double[] vec = new double[dimension];
+			for(String word : words){
+				float[] wordVector = wordMap.get(word);
+				if(wordVector == null)
+					continue;
+				for (int a = 0; a < dimension; a++) {
+					vec[a] += wordVector[a];
+				}
+			}
+			float len = 0;
+			for (int a = 0; a < dimension; a++) {
+				len += vec[a] * vec[a];
+			}
+			len = (float) Math.sqrt(len);
+			for (int a = 0; a < dimension; a++) {
+				vec[a] /= len;
+			}
+			
+			int[] idx = new int[dimension];
+			for(int a = 0; a <dimension; a++){
+				idx[a] = a;
+			}
+			FeatureVector fv = new FeatureVector(idx, vec);
+			patternVectorMap.put(p, fv);
+		}
+	}
+		
+	public FeatureVectorGenerator(String outputSummaryDir,
+			String corpusName, HashSet<Pattern> patternSet, 
+			MatlabProxy proxy) throws IOException, MatlabInvocationException{
+		Alphabet dictionary = new Alphabet();
+		int maxPatternSize = 0;
+		InstanceList instances = new InstanceList(null);
+		HashSet<String> set = new HashSet<String>();
+		for(Pattern p : patternSet){
+			CoreMap sentence = p.getAnnotatedSentence();
+			
+			SemanticGraph graph = sentence.get(BasicDependenciesAnnotation.class);
+			List<CoreLabel> labels = sentence.get(TokensAnnotation.class);
+			ArrayList<IndexedWord> list = new ArrayList<IndexedWord>();
+			StringBuilder sb = new StringBuilder();
+			for (int i = 0; i < labels.size() - 1; i++) {
+				CoreLabel nextToken = labels.get(i+1);
+				//token may contain punc, however graph may not contain punc, so word may be null
+				IndexedWord word = graph.getNodeByIndexSafe(nextToken.index());
+				if(p.getArg1().contains(word) || p.getRel().contains(word)
+						|| p.getArg2().contains(word))
+					continue;
+				if(word != null){
+					list.add(word);
+					dictionary.lookupIndex(word.originalText());
+					sb.append(word.originalText()+" ");	
+				}
+								
+			}
+			
+			if(!set.contains(sb.toString().trim())){
+				set.add(sb.toString().trim());
+				Instance inst = new Instance(list, "2", null, p);
+				instances.add(inst);
+			}
+			ArrayList<IndexedWord> list2 = new ArrayList<IndexedWord>();
+			
+			int size = 0;
+			for(IndexedWord iw : p.getArg1()){
+				size++;
+				dictionary.lookupIndex(iw.originalText());
+				list2.add(iw);
+			}
+			for(IndexedWord iw : p.getRel()){
+				size++;
+				dictionary.lookupIndex(iw.originalText());
+				list2.add(iw);
+			}
+			for(IndexedWord iw : p.getArg2()){
+				size++;
+				dictionary.lookupIndex(iw.originalText());
+				list2.add(iw);
+			}		
+			
+			instances.add(new Instance(list2, "1", null, p));
+			if(size >= maxPatternSize)
+				maxPatternSize = size;
+		}
+		
+		InstanceList training = new InstanceList(null);
+		InstanceList validating = new InstanceList(null);
+		InstanceList testing  = new InstanceList(null);
+		InstanceList allPositives  = new InstanceList(null);
+		for(Instance inst: instances){
+			String label = (String)inst.getTarget();
+			if(label.equals("1"))
+				allPositives.add(inst);
+		}
+		Random rand = new Random();
+		int size = instances.size();
+		int newSize = size;
+		for(int i=0; i< size*0.7; i++){
+			int ran = rand.nextInt(newSize);
+			training.add(instances.get(ran));
+			instances.remove(ran);
+			newSize--;
+		}
+		for(int i=0; i< size*0.2; i++){
+			int ran = rand.nextInt(newSize);
+			validating.add(instances.get(ran));
+			instances.remove(ran);
+			newSize--;
+		}
+		testing.addAll(instances);
+					
+		int[] dims = new int[2];
+		dims[0] = dictionary.size();
+		dims[1] = 1;
+		MLCell cell = new MLCell("index", dims);
+		for(int i=0; i<dictionary.size(); i++){
+			String value = (String)dictionary.lookupObject(i);
+			MLArray val = new MLChar("string", value);
+			cell.set(val, i, 0);
+		}
+		
+		double[] vocSize_arr = new double[1];
+		vocSize_arr[0] = dictionary.size()+1;
+		
+		double[] sentLength_arr = new double[1];
+		sentLength_arr[0] = maxPatternSize+1;
+		ArrayList list = new ArrayList();
+		ArrayList list2 = new ArrayList();
+		list.add(cell);
+		list2.add(cell);
+		list.add(new MLDouble("sent_length", sentLength_arr, 1));
+		list2.add(new MLDouble("sent_length", sentLength_arr, 1));
+		list.add(new MLDouble("size_vocab", vocSize_arr, 1));
+		list2.add(new MLDouble("size_vocab", vocSize_arr, 1));
+		list.addAll(generateMatlabInput(testing, "test", maxPatternSize, dictionary));
+		list2.addAll(generateMatlabInput(testing, "test", maxPatternSize, dictionary));
+		list.addAll(generateMatlabInput(training, "train", maxPatternSize, dictionary));
+		list2.addAll(generateMatlabInput(training, "train", maxPatternSize, dictionary));	
+		list.addAll(generateMatlabInput(validating, "valid", maxPatternSize, dictionary));
+		list2.addAll(generateMatlabInput(allPositives, "valid", maxPatternSize, dictionary));
+		
+		wordMap = new HashMap<String, float[]>();
+		int max_size = 2000; 
+		int N = 40; 
+		int max_w = 50; 
         String modelPath = "/home/peng/Develop/Workspace/Mavericks/models"
         		+ "/word2vec/GoogleNews-vectors-negative300.bin";
 		try {
-			loadModel(modelPath);
+			loadModel(modelPath, max_w);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-	}
 		
+		int dim = 50;
+		double[] vec = new double[dim*dictionary.size()];
+		int c = 0;
+		for(int i=0; i<dictionary.size(); i++){
+			String word = (String)dictionary.lookupObject(i);
+			float[] wordVector = wordMap.get(word);
+			if(wordVector == null){
+				for (int a = 0; a < dim; a++) {
+					vec[c++] = rand.nextDouble();
+				}
+			}else{
+				for (int a = 0; a < dim; a++) {
+					vec[c++] = wordVector[a];
+				}
+			}
+		
+		}
+		list.add(new MLDouble("vocab_emb", vec, dim));
+		list2.add(new MLDouble("vocab_emb", vec, dim));
+		String matInputFile = outputSummaryDir + "/" + corpusName + "_In.mat";
+		String matInputFile2 = outputSummaryDir + "/" + corpusName + "_In2.mat";
+		String modelOutputFile = outputSummaryDir + "/" + corpusName + "_Model.mat";
+		String matOutputFile = outputSummaryDir + "/" + corpusName + "_Out.mat";
+		new MatFileWriter(matInputFile, list);
+		new MatFileWriter(matInputFile2, list2);
+		
+		ArrayList<FeatureVector> fvs = getSentenceVectors(matInputFile, matInputFile2, 
+				modelOutputFile, matOutputFile, proxy);
+		
+		if(fvs.size() != allPositives.size()){
+			System.out.println("fv size is not equal all Positives size");
+			System.exit(0);
+		}
+		
+		patternVectorMap = new HashMap<Pattern, FeatureVector>();
+		for(int i=0; i<allPositives.size(); i++){
+			patternVectorMap.put((Pattern)allPositives.get(i).getSource(), fvs.get(i));
+		}
+	}
+	
 	private ArrayList<MLDouble> generateMatlabInput
-	(InstanceList instances, String name, int maxPatternSize){	
+	(InstanceList instances, String name, int maxPatternSize, Alphabet dictionary){	
 		ArrayList<int[]> matrix = new ArrayList<int[]>();
 		ArrayList<int[]> lbl_matrix = new ArrayList<int[]>();
 		for(Instance inst : instances){
@@ -104,116 +295,44 @@ public class FeatureVectorGenerator {
 		ret.add(new MLDouble(name+"_lbl", lbl_arr, instances.size()));
 		return ret;
 	}
-	public FeatureVectorGenerator(HashSet<Pattern> patternSet) throws IOException{
-		dictionary = new Alphabet();
-		int maxPatternSize = 0;
-		InstanceList instances = new InstanceList(null);
-		HashSet<String> set = new HashSet<String>();
-		for(Pattern p : patternSet){
-			CoreMap sentence = p.getAnnotatedSentence();
-			
-			SemanticGraph graph = sentence.get(BasicDependenciesAnnotation.class);
-			List<CoreLabel> labels = sentence.get(TokensAnnotation.class);
-			ArrayList<IndexedWord> list = new ArrayList<IndexedWord>();
-			StringBuilder sb = new StringBuilder();
-			for (int i = 0; i < labels.size() - 1; i++) {
-				CoreLabel nextToken = labels.get(i+1);
-				//token may contain punc, however graph may not contain punc, so word may be null
-				IndexedWord word = graph.getNodeByIndexSafe(nextToken.index());
-				if(p.getArg1().contains(word) || p.getRel().contains(word)
-						|| p.getArg2().contains(word))
-					continue;
-				if(word != null){
-					list.add(word);
-					dictionary.lookupIndex(word.originalText());
-					sb.append(word.originalText()+" ");	
-				}
-								
-			}
-			
-			if(!set.contains(sb.toString().trim())){
-				set.add(sb.toString().trim());
-				Instance inst = new Instance(list, "2", null);
-				instances.add(inst);
-			}
-			ArrayList<IndexedWord> list2 = new ArrayList<IndexedWord>();
-			
-			int size = 0;
-			for(IndexedWord iw : p.getArg1()){
-				size++;
-				dictionary.lookupIndex(iw.originalText());
-				list2.add(iw);
-			}
-			for(IndexedWord iw : p.getRel()){
-				size++;
-				dictionary.lookupIndex(iw.originalText());
-				list2.add(iw);
-			}
-			for(IndexedWord iw : p.getArg2()){
-				size++;
-				dictionary.lookupIndex(iw.originalText());
-				list2.add(iw);
-			}		
-			
-			instances.add(new Instance(list2, "1", null));
-			if(size >= maxPatternSize)
-				maxPatternSize = size;
-		}
-		
-		InstanceList training = new InstanceList(null);
-		InstanceList validating = new InstanceList(null);
-		InstanceList testing  = new InstanceList(null);
-		Random rand = new Random();
-		int size = instances.size();
-		int newSize = size;
-		for(int i=0; i< size*0.7; i++){
-			int ran = rand.nextInt(newSize);
-			training.add(instances.get(ran));
-			instances.remove(ran);
-			newSize--;
-		}
-		for(int i=0; i< size*0.2; i++){
-			int ran = rand.nextInt(newSize);
-			validating.add(instances.get(ran));
-			instances.remove(ran);
-			newSize--;
-		}
-		testing.addAll(instances);
-				
-		String[] idx_arr = new String[dictionary.size()];
-		int[] dims = new int[dictionary.size()];
-		for(int i=0; i<dictionary.size(); i++){
-			idx_arr[i] = (String) dictionary.lookupObject(i);
-			dims[i] = i+1;
-		}
-		MLCell cell = new MLCell("index", dims);
-		for(int i=0; i<dictionary.size(); i++){
-			MLArray val = new MLChar("index", idx_arr[i]);
-			cell.set(val, 1, 1);
-		}
-		
-		double[] vocSize_arr = new double[1];
-		vocSize_arr[0] = dictionary.size()+1;
-		
-		double[] sentLength_arr = new double[1];
-		sentLength_arr[0] = maxPatternSize+1;
-		ArrayList list = new ArrayList();
-		list.add(cell);
-		list.add(new MLDouble("sent_length", sentLength_arr, 1));
-		list.add(new MLDouble("size_vocab", vocSize_arr, 1));
-		list.addAll(generateMatlabInput(testing, "test", maxPatternSize));
-		list.addAll(generateMatlabInput(training, "train", maxPatternSize));
-		list.addAll(generateMatlabInput(validating, "valid", maxPatternSize));
+	
+	private ArrayList<FeatureVector> getSentenceVectors(String matInputFile, String matInputFile2, String modelOutputFile, 
+			String matOutputFile, MatlabProxy proxy) throws MatlabInvocationException, 
+			FileNotFoundException, IOException{
 
-		new MatFileWriter("/home/peng/Develop/Workspace_matlab/DCNN/Data/mat_file.mat", list);
-		System.out.println("done");
+		proxy.eval("addpath('/home/peng/Develop/Workspace/Mavericks/platform/src/main/java/edu"
+				+ "/pengli/nlp/platform/algorithms/neuralnetwork/DCNN')");
+		proxy.eval("Train('"+matInputFile+"', '"+modelOutputFile+"')");
+		
+		//rebuild matInputFile to include all patterns into validate
+		proxy.eval("MyScript('"+modelOutputFile+"',"+"'"+matInputFile2+"',"+"'"+matOutputFile+"'"+")");
+
+		
+		MatFileReader red = new MatFileReader(matOutputFile);
+		MLDouble data = (MLDouble)red.getMLArray("M_3");
+		double[][] arr = data.getArray();
+		int m = data.getM();
+		int n = data.getN();
+		
+		ArrayList<FeatureVector> ret = new ArrayList<FeatureVector>();
+		for(int i=0; i<m; i++){
+			double[] vec = new double[n];
+			int[] idx = new int[n];
+			int c = 0;
+			for(int j=0; j<n; j++){
+				vec[c++] = arr[i][j];
+				idx[j] = j;
+			}
+			FeatureVector fv = new FeatureVector(idx, vec);
+			ret.add(fv);
+		}
+		return ret;
+			
 	}
 	
-	public int getDimension(){
-		return dimension;
-	}
+
 	
-	private void loadModel(String modelPath) throws IOException{
+	private int loadModel(String modelPath, int max_w) throws IOException{
 		
 		BufferedInputStream bis = new BufferedInputStream(new FileInputStream(
 				modelPath));
@@ -223,11 +342,11 @@ public class FeatureVectorGenerator {
 		String firstLine = dis.readLine();
 		words = Integer.parseInt(firstLine.split(" ")[0]);
 		size = Integer.parseInt(firstLine.split(" ")[1]);
-		dimension = size;
+		int dimension = size;
 		String word;
 		float[] vectors = null;
 		for (int b = 0; b < words; b++) {
-			word = readString(dis);
+			word = readString(dis, max_w);
 			vectors = new float[size];
 			len = 0;
 			for (int a = 0; a < size; a++) {
@@ -245,9 +364,11 @@ public class FeatureVectorGenerator {
 		bis.close();
 		dis.close();
 		
+		return dimension;
+		
 	}
 	
-	public FeatureVector getFeatureVector(String[] keywords){
+	public FeatureVector getFeatureVector(String[] keywords, int dimension){
 		double[] vec = new double[dimension];
 		for(String word : keywords){
 			float[] wordVector = wordMap.get(word);
@@ -275,35 +396,10 @@ public class FeatureVectorGenerator {
 	}
 	
 	public FeatureVector getFeatureVector(Pattern p){
-		String sentence = p.toGeneralizedForm();
-		String[] words = sentence.split(" ");
-		double[] vec = new double[dimension];
-		for(String word : words){
-			float[] wordVector = wordMap.get(word);
-			if(wordVector == null)
-				continue;
-			for (int a = 0; a < dimension; a++) {
-				vec[a] += wordVector[a];
-			}
-		}
-		float len = 0;
-		for (int a = 0; a < dimension; a++) {
-			len += vec[a] * vec[a];
-		}
-		len = (float) Math.sqrt(len);
-		for (int a = 0; a < dimension; a++) {
-			vec[a] /= len;
-		}
-		
-		int[] idx = new int[dimension];
-		for(int a = 0; a <dimension; a++){
-			idx[a] = a;
-		}
-		FeatureVector fv = new FeatureVector(idx, vec);
-		return fv;
+		return patternVectorMap.get(p);
 	}
 	
-	public Set<WordEntry> distance(String sentence) {
+	private Set<WordEntry> distance(String sentence, int N, int dimension) {
 		
 		String[] words = sentence.split(" ");
 		float[] vec = new float[dimension];
@@ -346,14 +442,14 @@ public class FeatureVectorGenerator {
 			for (int i = 0; i < dimension; i++) {
 				dist += vec[i] * tempVector[i];
 			}
-			insertTopN(name, dist, wordEntrys);
+			insertTopN(name, dist, wordEntrys, N);
 		}
 		
 		return new TreeSet<WordEntry>(wordEntrys);
 	}
 	
 	private void insertTopN(String name, double score,
-			List<WordEntry> wordsEntrys) {
+			List<WordEntry> wordsEntrys, int N) {
 
 		if (wordsEntrys.size() < N) {
 			wordsEntrys.add(new WordEntry(name, score));
@@ -373,6 +469,42 @@ public class FeatureVectorGenerator {
 			wordsEntrys.set(minOffe, new WordEntry(name, score));
 		}
 
+	}
+	
+	private static float readFloat(InputStream is) throws IOException {
+		byte[] bytes = new byte[4];
+		is.read(bytes);
+		return getFloat(bytes);
+	}
+	
+	private static float getFloat(byte[] b) {
+		int accum = 0;
+		accum = accum | (b[0] & 0xff) << 0;
+		accum = accum | (b[1] & 0xff) << 8;
+		accum = accum | (b[2] & 0xff) << 16;
+		accum = accum | (b[3] & 0xff) << 24;
+		return Float.intBitsToFloat(accum);
+	}
+	
+	private String readString(DataInputStream dis, int max_w) throws IOException {
+		// TODO Auto-generated method stub
+		//</s> in for that is on
+		byte[] bytes = new byte[max_w];
+		byte b = dis.readByte();
+		int i = -1;
+		StringBuilder sb = new StringBuilder();
+		while (b != 32 && b != 10) { //32 space, 10 newline
+			i++;
+			bytes[i] = b;
+			b = dis.readByte();
+			if (i == 49) {
+				sb.append(new String(bytes));
+				i = -1;
+				bytes = new byte[max_w];
+			}
+		}
+		sb.append(new String(bytes, 0, i+1));
+		return sb.toString();
 	}
 	
 	public class WordEntry implements Comparable<WordEntry> {
@@ -400,41 +532,5 @@ public class FeatureVectorGenerator {
 			}
 		}
 
-	}
-	
-	public static float readFloat(InputStream is) throws IOException {
-		byte[] bytes = new byte[4];
-		is.read(bytes);
-		return getFloat(bytes);
-	}
-	
-	public static float getFloat(byte[] b) {
-		int accum = 0;
-		accum = accum | (b[0] & 0xff) << 0;
-		accum = accum | (b[1] & 0xff) << 8;
-		accum = accum | (b[2] & 0xff) << 16;
-		accum = accum | (b[3] & 0xff) << 24;
-		return Float.intBitsToFloat(accum);
-	}
-	
-	private String readString(DataInputStream dis) throws IOException {
-		// TODO Auto-generated method stub
-		//</s> in for that is on
-		byte[] bytes = new byte[max_w];
-		byte b = dis.readByte();
-		int i = -1;
-		StringBuilder sb = new StringBuilder();
-		while (b != 32 && b != 10) { //32 space, 10 newline
-			i++;
-			bytes[i] = b;
-			b = dis.readByte();
-			if (i == 49) {
-				sb.append(new String(bytes));
-				i = -1;
-				bytes = new byte[max_w];
-			}
-		}
-		sb.append(new String(bytes, 0, i+1));
-		return sb.toString();
 	}
 }

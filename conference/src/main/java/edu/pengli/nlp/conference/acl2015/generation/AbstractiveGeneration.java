@@ -508,17 +508,15 @@ public class AbstractiveGeneration {
 	private InstanceList featureEngineering(HashSet<Pattern> patternSet) {
 
 		InstanceList instances = new InstanceList(new Noop());
-
 		for (Pattern p : patternSet) {
 			FeatureVector fv = fvGenerator.getFeatureVector(p);
 			Instance inst = new Instance(fv, null, null, p);
 			instances.add(inst);
 		}
-
 		return instances;
 	}
 	
-	private InstanceList featureEngineeringOnCategory(String categoryId) {
+	private InstanceList featureEngineeringOnCategory(String categoryId, int dimension) {
 
 		InstanceList seeds = new InstanceList(new Noop());
 		Category[] cats = Category.values();
@@ -528,7 +526,7 @@ public class AbstractiveGeneration {
 				Set<String> keys = aspects.keySet();
 				for (String key : keys) {
 					String[] keywords = aspects.get(key);
-					FeatureVector fv = fvGenerator.getFeatureVector(keywords);
+					FeatureVector fv = fvGenerator.getFeatureVector(keywords, dimension);
 					Instance inst = new Instance(fv, null, null, key);
 					seeds.add(inst);
 				}
@@ -964,15 +962,24 @@ public class AbstractiveGeneration {
 		generatePatterns(outputSummaryDir, corpusName, docs, headAnnotator );*/
 
 		System.out.println("Begin summary generation");
-		if (fvGenerator == null)
-			fvGenerator = new FeatureVectorGenerator();
 		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
 				outputSummaryDir + "/" + corpusName + ".patterns"));
 		HashSet<Pattern> patternSet = (HashSet<Pattern>) in.readObject();
 		in.close();
 		
-		InstanceList instances = featureEngineering(patternSet);	    
-		InstanceList seeds = featureEngineeringOnCategory(categoryId);
+		boolean wordEmbedding = false;
+		boolean CNN =true;
+		if (fvGenerator == null){
+			if(wordEmbedding)
+				fvGenerator = new FeatureVectorGenerator(patternSet);
+			else if(CNN)
+				fvGenerator = new FeatureVectorGenerator(outputSummaryDir,
+						corpusName, patternSet, proxy);	
+		}
+			
+		InstanceList instances = featureEngineering(patternSet);	
+		int dimension = 20;
+		InstanceList seeds = featureEngineeringOnCategory(categoryId, dimension);
 		
 		
 		int numClusters = 5;

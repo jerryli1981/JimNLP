@@ -33,13 +33,13 @@ public class OurMethod {
 		
 	    //Create a proxy, which we will use to control MATLAB
 		String matlabLocation = "/usr/local/MATLAB/R2012a/bin/matlab";
-/*		MatlabProxyFactoryOptions options = new MatlabProxyFactoryOptions.Builder()
+		MatlabProxyFactoryOptions options = new MatlabProxyFactoryOptions.Builder()
         .setProxyTimeout(30000L).setMatlabLocation(matlabLocation)
         .setHidden(true)
         .build();
 		
 	    MatlabProxyFactory factory = new MatlabProxyFactory(options);
-	    MatlabProxy proxy = factory.getProxy();*/
+	    MatlabProxy proxy = factory.getProxy();
 
 
 		SAXBuilder builder = new SAXBuilder();
@@ -69,10 +69,10 @@ public class OurMethod {
 			corpusNameList.add(corpusName);
 			AbstractiveGeneration ag = new AbstractiveGeneration();
 			ag.run(inputCorpusDir + "/" + topic.getAttributeValue("id"),
-					outputSummaryDir, corpusName, pipeLine, categoryId, null);
+					outputSummaryDir, corpusName, pipeLine, categoryId, proxy);
 		}
 		
-//		proxy.disconnect();
+		proxy.disconnect();
 
 /*		// Rouge Evaluation
 		String modelSummaryDir = "../data/ACL2015/ROUGE/models";
