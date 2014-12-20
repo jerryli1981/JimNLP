@@ -19,6 +19,7 @@ import org.json.JSONException;
 
 import edu.pengli.nlp.conference.acl2015.generation.AbstractiveGeneration;
 import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
+import edu.pengli.nlp.conference.acl2015.pipe.FeatureVectorGenerator;
 import edu.pengli.nlp.conference.acl2015.pipe.RelationExtractionbyOpenIE;
 import edu.pengli.nlp.platform.pipe.CharSequenceCoreNLPAnnotation;
 import edu.pengli.nlp.platform.pipe.Input2CharSequence;
@@ -58,6 +59,7 @@ public class OurMethod {
 		pipeLine.addPipe(new CharSequenceCoreNLPAnnotation());
 		pipeLine.addPipe(new RelationExtractionbyOpenIE());*/
 		
+		pipeLine.addPipe(new FeatureVectorGenerator());
 		
 		for (int i = 0; i < 1; i++) {
 			System.out.println("Corpus id is "+i);

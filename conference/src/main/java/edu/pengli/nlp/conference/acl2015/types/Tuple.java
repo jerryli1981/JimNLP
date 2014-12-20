@@ -72,6 +72,15 @@ public class Tuple implements Serializable{
 		return sb.toString();
 	}
 	
+	public String getSentenceRepresentation() {
+		StringBuilder sb = new StringBuilder();
+	
+		sb.append(arg1.originaltext()+" ").
+		append(rel.originaltext()+" ").append(arg2.originaltext());
+
+		return sb.toString();
+	}
+	
 	public String toString(){
 		try {		
 			throw new NoSuchMethodException();

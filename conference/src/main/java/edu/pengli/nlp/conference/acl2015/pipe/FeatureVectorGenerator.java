@@ -26,6 +26,7 @@ import com.jmatio.types.MLChar;
 import com.jmatio.types.MLCell;
 
 import edu.pengli.nlp.conference.acl2015.types.Pattern;
+import edu.pengli.nlp.platform.pipe.Pipe;
 import edu.pengli.nlp.platform.types.Alphabet;
 import edu.pengli.nlp.platform.types.FeatureVector;
 import edu.pengli.nlp.platform.types.Instance;
@@ -37,60 +38,39 @@ import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.BasicDependenciesAnnotation;
 import edu.stanford.nlp.util.CoreMap;
 
-public class FeatureVectorGenerator {
+public class FeatureVectorGenerator extends Pipe{
 	
 	private HashMap<String, float[]> wordMap;
-	private HashMap<Pattern, FeatureVector> patternVectorMap;
 	
-	public FeatureVectorGenerator(HashSet<Pattern> patternSet) throws IOException{
+	private HashMap<Instance, FeatureVector> instanceVectorMap;
 
+	public FeatureVectorGenerator() throws IOException{
 		wordMap = new HashMap<String, float[]>();
-		int max_size = 2000; // max length of strings
-		int N = 40; // number of closest words that will be shown
 		int max_w = 50; // max length of vocabulary entries
         String modelPath = "/home/peng/Develop/Workspace/Mavericks/models"
         		+ "/word2vec/GoogleNews-vectors-negative300.bin";
 
-		int dimension = loadModel(modelPath, max_w);	
-		patternVectorMap = new HashMap<Pattern, FeatureVector>();
-		for (Pattern p : patternSet) {
-			String sentence = p.toGeneralizedForm();
-			String[] words = sentence.split(" ");
-			double[] vec = new double[dimension];
-			for(String word : words){
-				float[] wordVector = wordMap.get(word);
-				if(wordVector == null)
-					continue;
-				for (int a = 0; a < dimension; a++) {
-					vec[a] += wordVector[a];
-				}
-			}
-			float len = 0;
-			for (int a = 0; a < dimension; a++) {
-				len += vec[a] * vec[a];
-			}
-			len = (float) Math.sqrt(len);
-			for (int a = 0; a < dimension; a++) {
-				vec[a] /= len;
-			}
-			
-			int[] idx = new int[dimension];
-			for(int a = 0; a <dimension; a++){
-				idx[a] = a;
-			}
-			FeatureVector fv = new FeatureVector(idx, vec);
-			patternVectorMap.put(p, fv);
-		}
-	}
+		loadModel(modelPath, max_w);	
 		
-	public FeatureVectorGenerator(String outputSummaryDir,
-			String corpusName, HashSet<Pattern> patternSet, 
+	}
+	
+	protected Instance pipe(Instance inst) {
+		
+		FeatureVector fv = instanceVectorMap.get(inst);
+		return new Instance(fv, null, null, (Pattern)inst.getSource());
+	}
+			
+	public void batchGenerateVectors(String outputSummaryDir,
+			String corpusName, InstanceList patternList, 
 			MatlabProxy proxy) throws IOException, MatlabInvocationException{
+		
 		Alphabet dictionary = new Alphabet();
 		int maxPatternSize = 0;
 		InstanceList instances = new InstanceList(null);
 		HashSet<String> set = new HashSet<String>();
-		for(Pattern p : patternSet){
+		HashMap<Instance, Instance> tmpMap = new HashMap<Instance, Instance>();
+		for(Instance instance : patternList){
+			Pattern p = (Pattern)instance.getSource();
 			CoreMap sentence = p.getAnnotatedSentence();
 			
 			SemanticGraph graph = sentence.get(BasicDependenciesAnnotation.class);
@@ -117,6 +97,7 @@ public class FeatureVectorGenerator {
 				Instance inst = new Instance(list, "2", null, p);
 				instances.add(inst);
 			}
+			
 			ArrayList<IndexedWord> list2 = new ArrayList<IndexedWord>();
 			
 			int size = 0;
@@ -136,7 +117,9 @@ public class FeatureVectorGenerator {
 				list2.add(iw);
 			}		
 			
-			instances.add(new Instance(list2, "1", null, p));
+			Instance positiveInst = new Instance(list2, "1", null, p);
+			tmpMap.put(positiveInst, instance);
+			instances.add(positiveInst);
 			if(size >= maxPatternSize)
 				maxPatternSize = size;
 		}
@@ -197,19 +180,7 @@ public class FeatureVectorGenerator {
 		list.addAll(generateMatlabInput(validating, "valid", maxPatternSize, dictionary));
 		list2.addAll(generateMatlabInput(allPositives, "valid", maxPatternSize, dictionary));
 		
-		wordMap = new HashMap<String, float[]>();
-		int max_size = 2000; 
-		int N = 40; 
-		int max_w = 50; 
-        String modelPath = "/home/peng/Develop/Workspace/Mavericks/models"
-        		+ "/word2vec/GoogleNews-vectors-negative300.bin";
-		try {
-			loadModel(modelPath, max_w);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
+
 		int dim = 50;
 		double[] vec = new double[dim*dictionary.size()];
 		int c = 0;
@@ -243,10 +214,14 @@ public class FeatureVectorGenerator {
 			System.out.println("fv size is not equal all Positives size");
 			System.exit(0);
 		}
+		if(allPositives.size() != patternList.size()){
+			System.out.println("match error");
+			System.exit(0);
+		}
 		
-		patternVectorMap = new HashMap<Pattern, FeatureVector>();
+		instanceVectorMap = new HashMap<Instance, FeatureVector>();
 		for(int i=0; i<allPositives.size(); i++){
-			patternVectorMap.put((Pattern)allPositives.get(i).getSource(), fvs.get(i));
+			instanceVectorMap.put(tmpMap.get(allPositives.get(i)), fvs.get(i));
 		}
 	}
 	
@@ -394,11 +369,7 @@ public class FeatureVectorGenerator {
 		FeatureVector fv = new FeatureVector(idx, vec);
 		return fv;
 	}
-	
-	public FeatureVector getFeatureVector(Pattern p){
-		return patternVectorMap.get(p);
-	}
-	
+		
 	private Set<WordEntry> distance(String sentence, int N, int dimension) {
 		
 		String[] words = sentence.split(" ");
@@ -533,4 +504,6 @@ public class FeatureVectorGenerator {
 		}
 
 	}
+
+
 }

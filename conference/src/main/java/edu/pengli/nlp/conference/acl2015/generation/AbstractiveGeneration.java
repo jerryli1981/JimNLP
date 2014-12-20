@@ -3,7 +3,9 @@ package edu.pengli.nlp.conference.acl2015.generation;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -11,8 +13,11 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.Stack;
 
@@ -30,6 +35,7 @@ import edu.pengli.nlp.platform.algorithms.classify.Clustering;
 import edu.pengli.nlp.platform.algorithms.classify.KMeans;
 import edu.pengli.nlp.platform.algorithms.miscellaneous.Merger;
 import edu.pengli.nlp.platform.pipe.Noop;
+import edu.pengli.nlp.platform.pipe.Pipe;
 import edu.pengli.nlp.platform.pipe.PipeLine;
 import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerFileIterator;
 import edu.pengli.nlp.platform.types.FeatureVector;
@@ -39,6 +45,7 @@ import edu.pengli.nlp.platform.types.Metric;
 import edu.pengli.nlp.platform.types.NormalizedDotProductMetric;
 import edu.pengli.nlp.platform.types.SparseVector;
 import edu.pengli.nlp.platform.util.FileOperation;
+import edu.pengli.nlp.platform.util.RankMap;
 import edu.pengli.nlp.platform.util.TimeWait;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.IndexedWord;
@@ -61,10 +68,7 @@ public class AbstractiveGeneration {
 	Realiser realiser;
 
 	static FramenetTagger framenetTagger;
-	
 	static WordnetTagger wordnetTagger;
-
-	static FeatureVectorGenerator fvGenerator;
 
 	public AbstractiveGeneration() {
 		Lexicon lexicon = Lexicon.getDefaultLexicon();
@@ -339,64 +343,7 @@ public class AbstractiveGeneration {
 		return ppp;
 	}
 
-	private HashMap<String, Double> getNbestMap(String outputSummaryDir,
-			String corpusName, InstanceList corpus)
-			throws NumberFormatException, IOException {
 
-		// tuple filtering
-		PrintWriter nbest = FileOperation.getPrintWriter(new File(
-				outputSummaryDir), corpusName + ".nbest");
-		for (Instance doc : corpus) {
-			HashMap<CoreMap, ArrayList<Tuple>> map = (HashMap<CoreMap, ArrayList<Tuple>>) doc
-					.getData();
-			for (CoreMap sent : map.keySet()) {
-
-				ArrayList<Tuple> tuples = map.get(sent);
-				for (Tuple t : tuples) {
-					nbest.println(t.getRel().toString());
-				}
-			}
-
-		}
-
-		nbest.close();
-
-		String[] cmd = { "/home/peng/Develop/Workspace/rnnlm-0.4b/rnnlm",
-				"-rnnlm", "/home/peng/Develop/Workspace/rnnlm-0.4b/model_2",
-				"-test", outputSummaryDir + "/" + corpusName + ".nbest",
-				"-nbest", "-debug", "0" };
-
-		ProcessBuilder builder = new ProcessBuilder(cmd);
-		builder.redirectOutput(new File(outputSummaryDir + "/" + corpusName
-				+ ".scores"));
-		Process proc = builder.start();
-
-		try {
-			while (proc.waitFor() != 0)
-				TimeWait.waiting(100);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-
-		BufferedReader in_score = FileOperation.getBufferedReader(new File(
-				outputSummaryDir), corpusName + ".scores");
-		BufferedReader in_nbest = FileOperation.getBufferedReader(new File(
-				outputSummaryDir), corpusName + ".nbest");
-		String input_nbest, input_score;
-		HashMap<String, Double> nbestmap = new HashMap<String, Double>();
-		while ((input_nbest = in_nbest.readLine()) != null
-				&& (input_score = in_score.readLine()) != null) {
-			if (input_score.equals("-inf")) {
-				nbestmap.put(input_nbest, -100.0);
-			} else
-				nbestmap.put(input_nbest, Double.valueOf(input_score));
-
-		}
-		in_score.close();
-		in_nbest.close();
-		return nbestmap;
-
-	}
 
 	private void generatePatterns(String outputSummaryDir, String corpusName,
 			InstanceList corpus, HeadAnnotation headAnnotator) throws Exception {
@@ -423,7 +370,7 @@ public class AbstractiveGeneration {
 			HashMap<CoreMap, ArrayList<Tuple>> map = (HashMap<CoreMap, ArrayList<Tuple>>) doc
 					.getData();
 			for (CoreMap sent : map.keySet()) {
-				outt.println(sent.toString());					
+//				outt.println(sent.toString());					
 				ArrayList<Tuple> tuples = map.get(sent);
 				for (Tuple t : tuples) {
 											
@@ -443,7 +390,7 @@ public class AbstractiveGeneration {
 					if (score < threshould)
 						continue;*/
 					
-					outt.println(t.originaltext());					
+					outt.println(t.getSentenceRepresentation());					
 					edu.pengli.nlp.conference.acl2015.types.Argument arg1 = headAnnotator
 							.annotateArgHead(t.getArg1(), sent);
 					t.setArg1(arg1);
@@ -503,37 +450,6 @@ public class AbstractiveGeneration {
 		outt.close();
 		out.writeObject(patternSet);
 		out.close();
-	}
-
-	private InstanceList featureEngineering(HashSet<Pattern> patternSet) {
-
-		InstanceList instances = new InstanceList(new Noop());
-		for (Pattern p : patternSet) {
-			FeatureVector fv = fvGenerator.getFeatureVector(p);
-			Instance inst = new Instance(fv, null, null, p);
-			instances.add(inst);
-		}
-		return instances;
-	}
-	
-	private InstanceList featureEngineeringOnCategory(String categoryId, int dimension) {
-
-		InstanceList seeds = new InstanceList(new Noop());
-		Category[] cats = Category.values();
-		for (Category cat : cats) {
-			if (cat.getId() == Integer.parseInt(categoryId)) {
-				Map<String, String[]> aspects = cat.getAspects(cat.getId());
-				Set<String> keys = aspects.keySet();
-				for (String key : keys) {
-					String[] keywords = aspects.get(key);
-					FeatureVector fv = fvGenerator.getFeatureVector(keywords, dimension);
-					Instance inst = new Instance(fv, null, null, key);
-					seeds.add(inst);
-				}
-			}
-		}
-
-		return seeds;
 	}
 	
 	// if not exist similar vertex to merger, then reture null
@@ -784,6 +700,9 @@ public class AbstractiveGeneration {
 			if(containsCandidate == true)
 				continue;
 			
+			if(stack.empty())
+				continue;
+			
 			Iterable<SemanticGraphEdge> iter = 
 					graph.outgoingEdgeIterable(stack.pop());	
 			for (SemanticGraphEdge edge : iter) 
@@ -889,20 +808,71 @@ public class AbstractiveGeneration {
 			}
 		}
 				
-		ArrayList<String> xx = new ArrayList<String>();
+		ArrayList<String> merged = new ArrayList<String>();
 		for(ArrayList<IndexedWord> path : filteredPaths){
 			StringBuilder sb = new StringBuilder();
 			for(IndexedWord iw : path){
 				sb.append(iw.originalText()+" ");
 			}
-			xx.add(sb.toString().trim());
+			merged.add(sb.toString().trim());
 		}
 		
-		return Merger.process(xx);
+		return Merger.process(merged);
+	}
+	
+	private HashMap<String, Double> getNbestMap(String outputSummaryDir,
+			String corpusName, ArrayList<String> candidates)
+			throws NumberFormatException, IOException {
+
+		// tuple filtering
+		PrintWriter nbest = FileOperation.getPrintWriter(new File(
+				outputSummaryDir), corpusName + ".nbest");
+		
+		for(String s : candidates){
+			nbest.println(s);
+		}
+		nbest.close();
+
+		String[] cmd = { "/home/peng/Develop/Workspace/Mavericks/platform/src"
+				+ "/main/java/edu/pengli/nlp/platform/algorithms/neuralnetwork/RNNLM/rnnlm",
+				"-rnnlm", outputSummaryDir + "/" + corpusName + ".rnnlm.model",
+				"-test", outputSummaryDir + "/" + corpusName + ".nbest",
+				"-nbest", "-debug", "0" };
+
+		ProcessBuilder builder = new ProcessBuilder(cmd);
+		builder.redirectOutput(new File(outputSummaryDir + "/" + corpusName
+				+ ".scores"));
+		Process proc = builder.start();
+
+		try {
+			while (proc.waitFor() != 0)
+				TimeWait.waiting(100);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+
+		BufferedReader in_score = FileOperation.getBufferedReader(new File(
+				outputSummaryDir), corpusName + ".scores");
+		BufferedReader in_nbest = FileOperation.getBufferedReader(new File(
+				outputSummaryDir), corpusName + ".nbest");
+		String input_nbest, input_score;
+		HashMap<String, Double> nbestmap = new HashMap<String, Double>();
+		while ((input_nbest = in_nbest.readLine()) != null
+				&& (input_score = in_score.readLine()) != null) {
+			if (input_score.equals("-inf")) {
+				nbestmap.put(input_nbest, -100.0);
+			} else
+				nbestmap.put(input_nbest, Double.valueOf(input_score));
+
+		}
+		in_score.close();
+		in_nbest.close();
+		return nbestmap;
+
 	}
 
 	private void generateFinalSummary(String outputSummaryDir,
-			String corpusName, Clustering predicted, InstanceList seeds) {
+			String corpusName, Clustering predicted, InstanceList seeds) throws NumberFormatException, IOException {
 		PrintWriter out = FileOperation.getPrintWriter(new File(
 				outputSummaryDir), corpusName);
 		HashSet<InstanceList> set = new HashSet<InstanceList>();
@@ -929,19 +899,20 @@ public class AbstractiveGeneration {
 				continue;
 			
 			
-			ArrayList<String> summary = tupleFusion(bestCluster);
-			for(String s : summary){
-				System.out.println(s);
-			}
-			System.out.println();
-			System.out.println();
-
+			ArrayList<String> candidates = tupleFusion(bestCluster);
+			HashMap<String, Double> nbestMap = getNbestMap(outputSummaryDir, corpusName,candidates);
+			LinkedHashMap rankedmap = RankMap.sortHashMapByValues(nbestMap, true);
+			Set<String> keys = rankedmap.keySet();
+			Iterator iter = keys.iterator();
+			if(iter.hasNext())
+				out.println((String)iter.next());
 		}
 		out.close();
 	}
 
 	public void run(String inputCorpusDir, String outputSummaryDir,
-			String corpusName, PipeLine pipeLine, String categoryId,  MatlabProxy proxy)
+			String corpusName, PipeLine pipeLine, String categoryId, 
+			MatlabProxy proxy)
 			throws Exception {
 
 		InstanceList docs = new InstanceList(pipeLine);
@@ -961,32 +932,47 @@ public class AbstractiveGeneration {
 			wordnetTagger = new WordnetTagger();
 		generatePatterns(outputSummaryDir, corpusName, docs, headAnnotator );*/
 
-		System.out.println("Begin summary generation");
+
 		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
 				outputSummaryDir + "/" + corpusName + ".patterns"));
 		HashSet<Pattern> patternSet = (HashSet<Pattern>) in.readObject();
 		in.close();
 		
-		boolean wordEmbedding = false;
-		boolean CNN =true;
-		if (fvGenerator == null){
-			if(wordEmbedding)
-				fvGenerator = new FeatureVectorGenerator(patternSet);
-			else if(CNN)
-				fvGenerator = new FeatureVectorGenerator(outputSummaryDir,
-						corpusName, patternSet, proxy);	
+		System.out.println("Begin pattern clustering");
+		InstanceList patternList = new InstanceList(null);
+		for (Pattern p : patternSet) {
+			Instance inst = new Instance(p, null, null, p);
+			patternList.add(inst);
+		}
+		InstanceList instances = new InstanceList(pipeLine);
+		FeatureVectorGenerator fvGenerator = 
+				(FeatureVectorGenerator) pipeLine.getPipe(0);
+		fvGenerator.batchGenerateVectors(outputSummaryDir, corpusName, patternList, proxy);
+		instances.addThruPipe(patternList.iterator());
+		
+		int dimension = 20;
+		InstanceList seeds = new InstanceList(new Noop());
+		Category[] cats = Category.values();
+		for (Category cat : cats) {
+			if (cat.getId() == Integer.parseInt(categoryId)) {
+				Map<String, String[]> aspects = cat.getAspects(cat.getId());
+				Set<String> keys = aspects.keySet();
+				for (String key : keys) {
+					String[] keywords = aspects.get(key);
+					FeatureVector fv = fvGenerator.getFeatureVector(keywords, dimension);
+					Instance inst = new Instance(fv, null, null, key);
+					seeds.add(inst);
+				}
+			}
 		}
 			
-		InstanceList instances = featureEngineering(patternSet);	
-		int dimension = 20;
-		InstanceList seeds = featureEngineeringOnCategory(categoryId, dimension);
-		
-		
+		System.out.println("Begin clustering");
 		int numClusters = 5;
 		Metric metric = new NormalizedDotProductMetric();
 		
 		KMeans kmeans = new KMeans(new Noop(), numClusters, metric);
 		Clustering predicted = kmeans.cluster(instances);
+		
 		//ROUGE-SU4 is 0.0727 (k = 4)
 		//ROUGE-SU4 is 0.10735 (k = 5)
 		//ROUGE-SU4 is 0.0989 (k = 6)
@@ -1001,6 +987,47 @@ public class AbstractiveGeneration {
 		//ROUGE-SU4 is 0.13102(spectral k=8)
 		//ROUGE-SU4 is 0.10355(spectral k=9)
 		
+		
+		System.out.println("train RNNLM to scoring generated sentences");
+		PrintWriter out_valid = new PrintWriter(new 
+				FileOutputStream(new File(outputSummaryDir + "/" + corpusName + ".tuples.valid")));
+		
+		BufferedReader in_train =new BufferedReader(new FileReader(
+				new File(outputSummaryDir + "/" + corpusName + ".tuples")));
+		ArrayList<String> trainsents = new ArrayList<String>();
+		String input = null;
+		while((input=in_train.readLine()) != null){
+			trainsents.add(input);
+		}
+		in_train.close();
+		Random rand = new Random();
+		int size = trainsents.size();
+		int newSize = size;
+		for(int i=0; i<size*0.2; i++){
+			int ran = rand.nextInt(newSize);
+			out_valid.println(trainsents.get(ran));
+			trainsents.remove(ran);
+			newSize--;
+		}
+		out_valid.close();
+		String[] cmd = {"/home/peng/Develop/Workspace/Mavericks/platform/src"
+				+ "/main/java/edu/pengli/nlp/platform/algorithms/neuralnetwork/RNNLM/rnnlm", 
+				"-train", outputSummaryDir + "/" + corpusName + ".tuples", "-valid", 
+				outputSummaryDir + "/" + corpusName + ".tuples.valid", "-rnnlm", 
+				outputSummaryDir + "/" + corpusName + ".rnnlm.model", "-hidden", "40", "-rand-seed", "1",
+				"-debug", "2", "-bptt", "3", "-class", "200"};
+		
+		Process proc = Runtime.getRuntime().exec(cmd);
+		try {
+			
+			while (proc.waitFor() != 0) {
+				TimeWait.waiting(100);
+			}
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
 		generateFinalSummary(outputSummaryDir, corpusName, predicted, seeds);
 
 	}
