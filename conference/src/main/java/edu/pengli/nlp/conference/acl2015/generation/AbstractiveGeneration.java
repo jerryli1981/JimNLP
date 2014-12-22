@@ -354,8 +354,7 @@ public class AbstractiveGeneration {
 		corpus.readObject(in);
 		in.close();
 
-/*		HashMap<String, Double> nbestmap = getNbestMap(outputSummaryDir,
-				corpusName, corpus);*/
+
 
 		HashSet<Pattern> patternSet = new HashSet<Pattern>();
 
@@ -363,14 +362,12 @@ public class AbstractiveGeneration {
 				outputSummaryDir + "/" + corpusName + ".patterns"));
 		PrintWriter outt = FileOperation.getPrintWriter(new File(
 				outputSummaryDir), corpusName + ".tuples");
-		
-//		double threshould = -20.0;
+
 		int docID = 0;
 		for (Instance doc : corpus) {
 			HashMap<CoreMap, ArrayList<Tuple>> map = (HashMap<CoreMap, ArrayList<Tuple>>) doc
 					.getData();
-			for (CoreMap sent : map.keySet()) {
-//				outt.println(sent.toString());					
+			for (CoreMap sent : map.keySet()) {		
 				ArrayList<Tuple> tuples = map.get(sent);
 				for (Tuple t : tuples) {
 											
@@ -386,9 +383,6 @@ public class AbstractiveGeneration {
 					
 					if (t.getRel().lemmatext().equals("say"))
 						continue;	
-/*					double score = nbestmap.get(t.getRel().toString());
-					if (score < threshould)
-						continue;*/
 					
 					outt.println(t.getSentenceRepresentation());					
 					edu.pengli.nlp.conference.acl2015.types.Argument arg1 = headAnnotator
@@ -552,12 +546,18 @@ public class AbstractiveGeneration {
 							
 						//case 3: stack.peek() equals path.peek()
 						}else if(stack.peek().equals(path.peek())){
-					
+							
+							if(path.size() == 1)
+								break;
+							
 							IndexedWord flag = null;
 							do{
 								flag = path.pop();
 								
-							}while(path.peek().index() != -1);
+							}while(!path.empty()&&path.peek().index() != -1);
+							
+							if(path.empty())
+								break;
 						
 							do{
 								stack.pop();
@@ -646,11 +646,16 @@ public class AbstractiveGeneration {
 								
 							//case 3: stack.peek() equals path.peek()
 							}else if(stack.peek().equals(path.peek())){
+								
+								if(path.size() == 1)
+									break;
+								
 								IndexedWord flag = null;
 								do{
 									flag = path.pop();
 									
-								}while(path.peek().index() != -1);
+								}while(!path.empty() && path.peek().index() != -1);
+								
 							
 								do{
 									stack.pop();
@@ -712,7 +717,7 @@ public class AbstractiveGeneration {
 		
 		return ret;
 	}
-	private ArrayList<String> tupleFusion(InstanceList patternCluster){
+	private ArrayList<String> patternFusion(InstanceList patternCluster){
 				
 		//Node Alignment
 		SemanticGraph graph = new SemanticGraph();
@@ -734,15 +739,27 @@ public class AbstractiveGeneration {
 		endNode.setTag("END");
 		
 		
-		//construct graph to merge tuples
+		//construct graph to merge patterns
 		for (int i = 0; i < patternCluster.size(); i++) {
 			Instance inst = patternCluster.get(i);
 			Pattern p = (Pattern) inst.getSource();
 			Tuple t = (Tuple)p;
 			ArrayList<IndexedWord> wordList = new ArrayList<IndexedWord>();
-			wordList.addAll(t.getArg1());
+			// replaced to pattern representation
+			for(IndexedWord iw : t.getArg1()){
+				if(iw.equals(p.getArg1().getHead())){
+					iw.setOriginalText(p.getArg1().getHead().ner().toUpperCase());
+				}
+				wordList.add(iw);
+			}
 			wordList.addAll(t.getRel());
-			wordList.addAll(t.getArg2());
+			for(IndexedWord iw : t.getArg2()){
+				if(iw.equals(p.getArg2().getHead())){
+					iw.setOriginalText(p.getArg2().getHead().ner().toUpperCase());
+				}
+				wordList.add(iw);
+			}
+
 			IndexedWord firstVertex = wordList.get(0);
 			IndexedWord flag = getSimilarVertex(graph, firstVertex);
 			if(flag == null){
@@ -899,7 +916,7 @@ public class AbstractiveGeneration {
 				continue;
 			
 			
-			ArrayList<String> candidates = tupleFusion(bestCluster);
+			ArrayList<String> candidates = patternFusion(bestCluster);
 			HashMap<String, Double> nbestMap = getNbestMap(outputSummaryDir, corpusName,candidates);
 			LinkedHashMap rankedmap = RankMap.sortHashMapByValues(nbestMap, true);
 			Set<String> keys = rankedmap.keySet();
@@ -939,7 +956,7 @@ public class AbstractiveGeneration {
 		in.close();
 		
 		System.out.println("Begin pattern clustering");
-		InstanceList patternList = new InstanceList(null);
+		InstanceList patternList = new InstanceList(new Noop());
 		for (Pattern p : patternSet) {
 			Instance inst = new Instance(p, null, null, p);
 			patternList.add(inst);
@@ -947,7 +964,14 @@ public class AbstractiveGeneration {
 		InstanceList instances = new InstanceList(pipeLine);
 		FeatureVectorGenerator fvGenerator = 
 				(FeatureVectorGenerator) pipeLine.getPipe(0);
-		fvGenerator.batchGenerateVectors(outputSummaryDir, corpusName, patternList, proxy);
+		//ROUGE-SU4 is 0.03367 by general pattern
+		//ROUGE-SU4 is 0.05414 by specific pattern, release rel, keep arg the same as general pattern
+		//ROUGE-SU4 is 0.09934 by specific pattern, release rel, release arg other parts replace head with type
+		//ROUGE-SU4 is 0.05651 by specific pattern, keep rel head, release arg other parts replace head with type
+		//ROUGE-SU4 is 0.0643  by tuple
+//		fvGenerator.batchGenerateVectorsByGeneralPatterns(outputSummaryDir, corpusName, patternList, proxy);
+		fvGenerator.batchGenerateVectorsBySpecificPatterns(outputSummaryDir, corpusName, patternList, proxy);
+//		fvGenerator.batchGenerateVectorsByTuples(outputSummaryDir, corpusName, patternList, proxy);
 		instances.addThruPipe(patternList.iterator());
 		
 		int dimension = 20;

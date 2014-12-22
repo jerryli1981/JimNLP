@@ -76,7 +76,7 @@ public class OurMethod {
 		
 		proxy.disconnect();
 
-/*		// Rouge Evaluation
+		// Rouge Evaluation
 		String modelSummaryDir = "../data/ACL2015/ROUGE/models";
 		ArrayList<File> files = FileOperation.travelFileList(new File(
 				modelSummaryDir));
@@ -107,7 +107,7 @@ public class OurMethod {
 				confFilePath);
 		String metric = "ROUGE-SU4";
 		HashMap map = RougeEvaluationWrapper.runRough(confFilePath, metric);
-		System.out.println(metric + " is " + (Double) map.get(metric));*/
+		System.out.println(metric + " is " + (Double) map.get(metric));
 
 		System.out.println("Our method is done");
 
