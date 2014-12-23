@@ -4,8 +4,10 @@ import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -49,7 +51,7 @@ public class FeatureVectorGenerator extends Pipe{
 		int max_w = 50; // max length of vocabulary entries
         String modelPath = "/home/peng/Develop/Workspace/Mavericks/models"
         		+ "/word2vec/GoogleNews-vectors-negative300.bin";
-
+        System.out.println("Loading word vectors");
 		loadModel(modelPath, max_w);	
 		
 	}
@@ -261,6 +263,9 @@ public class FeatureVectorGenerator extends Pipe{
 			String corpusName, InstanceList patternList, 
 			MatlabProxy proxy) throws IOException, MatlabInvocationException{
 		
+		ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(
+				outputSummaryDir + "/" +corpusName + ".dict.ser"));
+		
 		Alphabet dictionary = new Alphabet();
 		int maxPatternSize = 0;
 		InstanceList instances = new InstanceList(null);
@@ -278,8 +283,19 @@ public class FeatureVectorGenerator extends Pipe{
 				//token may contain punc, however graph may not contain punc, so word may be null
 				IndexedWord word = graph.getNodeByIndexSafe(token.index());
 				if(p.getArg1().contains(word) || p.getRel().contains(word)
-						|| p.getArg2().contains(word))
+						|| p.getArg2().contains(word)){
+					ArrayList<IndexedWord> toks = new ArrayList<IndexedWord>();
+					toks.addAll(p.getArg1());
+					toks.addAll(p.getRel());
+					toks.addAll(p.getArg2());
+					for(IndexedWord iw : toks){
+						String wordMention = iw.originalText();
+						wordMention = wordMention.replaceAll(" ", "_");
+						dictionary.lookupIndex(wordMention);	
+					}
 					continue;
+				}
+					
 				if(word != null){
 					String wordMention = word.originalText();
 					wordMention = wordMention.replaceAll(" ", "_");
@@ -469,12 +485,16 @@ public class FeatureVectorGenerator extends Pipe{
 		for(int i=0; i<allPositives.size(); i++){
 			instanceVectorMap.put(tmpMap.get(allPositives_L.get(i)), fvs.get(i));
 		}
+		
+		out.writeObject(dictionary);
+		out.writeInt(maxPatternSize);
+		out.close();
 	}
 	
 	public void batchGenerateVectorsByTuples(String outputSummaryDir,
 			String corpusName, InstanceList patternList, 
 			MatlabProxy proxy) throws IOException, MatlabInvocationException{
-		
+			
 		Alphabet dictionary = new Alphabet();
 		int maxPatternSize = 0;
 		InstanceList instances = new InstanceList(null);
@@ -659,9 +679,11 @@ public class FeatureVectorGenerator extends Pipe{
 		for(int i=0; i<allPositives.size(); i++){
 			instanceVectorMap.put(tmpMap.get(allPositives_L.get(i)), fvs.get(i));
 		}
+		
+
 	}
 	
-	private ArrayList<MLDouble> generateMatlabInput
+	public static ArrayList<MLDouble> generateMatlabInput
 	(ArrayList<String[]> instances, String name, int maxPatternSize, Alphabet dictionary){	
 		ArrayList<int[]> matrix = new ArrayList<int[]>();
 		ArrayList<int[]> lbl_matrix = new ArrayList<int[]>();

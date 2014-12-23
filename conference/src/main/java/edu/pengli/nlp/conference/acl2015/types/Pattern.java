@@ -11,11 +11,11 @@ public class Pattern extends Tuple implements Serializable{
 		super(arg1, rel, arg2, sent);
 	}
 		
-	//for clustering is not very good. 
+/*	//for clustering is not very good. 
 	public String toGeneralizedForm(){
 		return arg1.getHead().ner().toUpperCase()+" "+rel.getHead().originalText()+" "
 		+arg2.getHead().ner().toUpperCase();
-	}
+	}*/
 	
 	//for fusion and clustering
 	public String toSpecificForm(){

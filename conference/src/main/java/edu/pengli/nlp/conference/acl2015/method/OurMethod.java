@@ -53,15 +53,18 @@ public class OurMethod {
 		String outputSummaryDir = "../data/ACL2015/Output";
 		
 		PipeLine pipeLine = new PipeLine();
+		//only used in the first phase
 /*		pipeLine.addPipe(new Input2CharSequence("UTF-8"));
 		pipeLine.addPipe(new CharSequenceExtractContent(
 				"<TEXT>[\\p{Graph}\\p{Space}]*</TEXT>"));
 		pipeLine.addPipe(new CharSequenceCoreNLPAnnotation());
 		pipeLine.addPipe(new RelationExtractionbyOpenIE());*/
 		
+		
+		//only used in the third phase
 		pipeLine.addPipe(new FeatureVectorGenerator());
 		
-		for (int i = 0; i < 1; i++) {
+		for (int i = 0; i < corpusList.size(); i++) {
 			System.out.println("Corpus id is "+i);
 			Element topic = corpusList.get(i);
 			String categoryId = topic.getAttributeValue("category");
