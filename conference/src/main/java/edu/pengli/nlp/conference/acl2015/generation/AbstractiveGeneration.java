@@ -28,6 +28,8 @@ import com.jmatio.types.MLDouble;
 
 import matlabcontrol.MatlabInvocationException;
 import matlabcontrol.MatlabProxy;
+import matlabcontrol.extensions.MatlabNumericArray;
+import matlabcontrol.extensions.MatlabTypeConverter;
 import edu.pengli.nlp.conference.acl2015.pipe.FeatureVectorGenerator;
 import edu.pengli.nlp.conference.acl2015.pipe.FramenetTagger;
 import edu.pengli.nlp.conference.acl2015.pipe.HeadAnnotation;
@@ -39,6 +41,8 @@ import edu.pengli.nlp.conference.acl2015.types.Predicate;
 import edu.pengli.nlp.conference.acl2015.types.Tuple;
 import edu.pengli.nlp.platform.algorithms.classify.Clustering;
 import edu.pengli.nlp.platform.algorithms.classify.KMeans;
+import edu.pengli.nlp.platform.algorithms.classify.SemiSupervisedClustering;
+import edu.pengli.nlp.platform.algorithms.classify.Spectral;
 import edu.pengli.nlp.platform.algorithms.miscellaneous.Merger;
 import edu.pengli.nlp.platform.pipe.Noop;
 import edu.pengli.nlp.platform.pipe.Pipe;
@@ -82,7 +86,7 @@ public class AbstractiveGeneration {
 		nlgFactory = new NLGFactory(lexicon);
 		realiser = new Realiser(lexicon);
 	}
-
+	
 	private String realization(Pattern p, SemanticGraph graph) {
 
 		SPhraseSpec newSent = nlgFactory.createClause();
@@ -421,7 +425,7 @@ public class AbstractiveGeneration {
 						if(!arg1.getHead().ner().equals("O") && 
 								!arg2.getHead().ner().equals("O")){
 		
-							Pattern p = new Pattern(arg1, pre, arg2, sent);
+							Pattern p = new Pattern(arg1, pre, arg2, t);
 							patternSet.add(p);
 							
 						}else{
@@ -436,9 +440,9 @@ public class AbstractiveGeneration {
 							
 							if(!arg1.getHead().ner().equals("O") && 
 									!arg2.getHead().ner().equals("O")){
-								Pattern p = new Pattern(arg1, pre, arg2, sent);
+								Pattern p = new Pattern(arg1, pre, arg2, t);
 								patternSet.add(p);
-								outp.println(p.toSpecificForm());
+								outp.println(p.toString());
 							}
 							
 						}
@@ -488,8 +492,8 @@ public class AbstractiveGeneration {
 			}
 		}
 	}
-	
-	private ArrayList<ArrayList<IndexedWord>> travelAllPaths(SemanticGraph graph){
+		
+	private ArrayList<ArrayList<IndexedWord>> travelAllPaths(SemanticGraph graph, IndexedWord endNode){
 		
 		ArrayList<ArrayList<IndexedWord>> ret = new ArrayList<ArrayList<IndexedWord>>();
 		
@@ -499,36 +503,45 @@ public class AbstractiveGeneration {
 		
 		//insert START
 		stack.add(graph.getFirstRoot());
+		boolean stackEmpty = false;		
+		boolean pathArriveEnd = false;
 		
 		while (!stack.isEmpty()) {
 			
-			boolean end = false;
-			boolean stackEmpty = false;		
-			boolean containsCandidate = false;
-			//if path arrive end
+			
 			if(!path.isEmpty() && stack.peek().index() == -2){
+				pathArriveEnd = true;
+			}
+			
+			
+			boolean containsCandidate = false;
+			
+			//if path arrive end
+			if(pathArriveEnd){
 
 				ArrayList<IndexedWord> pa = new ArrayList<IndexedWord>();
 				for(IndexedWord iw : path){
 					pa.add(iw);
 				}
-
 				ret.add(pa);	
+				
 				//pop end
 				stack.pop();
-				if(stack.isEmpty())
+				if(stack.isEmpty()){
+					stackEmpty = true;
 					break;
-				
+				}
+									
 				//Backtracking path, using top element of stack to decide backtracking point.
 				while(!path.isEmpty()){
 					
-					if(!stack.isEmpty()){
+					if(stackEmpty == false){
 						boolean isSibing = graph.getSiblings(path.peek()).contains(stack.peek());
 						int isParent = graph.isAncestor(stack.peek(), path.peek());
 						
 						//reach end
 						if(stack.peek().index() == -2){
-							end = true;
+							pathArriveEnd = true;
 							break;
 						}
 						
@@ -553,7 +566,7 @@ public class AbstractiveGeneration {
 								do{
 									path.pop();
 									
-								}while(!path.empty() && !stack.empty() && graph.isAncestor(stack.peek(), path.peek()) != 1);
+								}while(!path.empty() && graph.isAncestor(stack.peek(), path.peek()) != 1);
 								
 								path.push(stack.peek());
 								break;
@@ -565,11 +578,13 @@ public class AbstractiveGeneration {
 							if(path.size() == 1)
 								break;
 							
+							
 							IndexedWord flag = null;
 							do{
 								flag = path.pop();
 								
 							}while(!path.empty()&&path.peek().index() != -1);
+							
 							
 							if(path.empty())
 								break;
@@ -581,7 +596,7 @@ public class AbstractiveGeneration {
 									break;
 								}
 								
-							}while(!path.empty() && !stack.empty() && graph.isAncestor(stack.peek(), path.peek()) != 1 
+							}while(!path.empty() && graph.isAncestor(stack.peek(), path.peek()) != 1 
 									|| flag.equals(stack.peek()));
 							
 							if(stackEmpty == false){
@@ -598,7 +613,7 @@ public class AbstractiveGeneration {
 											break;
 										}
 										
-									}while(!path.empty() && !stack.empty() && graph.isAncestor(stack.peek(), path.peek()) != 1 
+									}while(!path.empty() && graph.isAncestor(stack.peek(), path.peek()) != 1 
 											|| flag.equals(stack.peek()) || candidatePoints.contains(stack.peek()));
 								}
 									
@@ -620,19 +635,18 @@ public class AbstractiveGeneration {
 				else{
 
 					//choose another way
-
 					stack.pop();
 					
 					//Backtracking path, using top element of stack to decide backtracking point.
 					while(!path.isEmpty()){
 						
-						if(!stack.isEmpty()){
+						if(stackEmpty == false){
 							boolean isSibing = graph.getSiblings(path.peek()).contains(stack.peek());
 							int isParent = graph.isAncestor(stack.peek(), path.peek());
 							
 							//reach end
 							if(stack.peek().index() == -2){
-								end = true;
+								pathArriveEnd = true;
 								break;
 							}
 							
@@ -667,14 +681,25 @@ public class AbstractiveGeneration {
 								
 								if(path.size() == 1)
 									break;
+
 								
+								// flag is the next token of start, clear path
 								IndexedWord flag = null;
+								boolean jump = false;
 								do{
+									if(graph.isAncestor(endNode, path.peek()) == 1){
+										jump = true;
+										break;
+									}
 									flag = path.pop();
 									
-								}while(!path.empty() && path.peek().index() != -1);
+								}while(path.peek().index() != -1);
 								
-							
+								if(jump == true){
+									pathArriveEnd = true;
+									break;
+								}	
+								
 								do{
 									stack.pop();
 									if(stack.isEmpty()){
@@ -682,7 +707,7 @@ public class AbstractiveGeneration {
 										break;
 									}
 									
-								}while(!path.empty() && !stack.empty() && graph.isAncestor(stack.peek(), path.peek()) != 1 
+								}while(graph.isAncestor(stack.peek(), path.peek()) != 1 
 										|| flag.equals(stack.peek()));
 								
 								if(stackEmpty == false){
@@ -699,13 +724,16 @@ public class AbstractiveGeneration {
 												break;
 											}
 											
-										}while(!path.empty() && !stack.empty() && graph.isAncestor(stack.peek(), path.peek()) != 1 
+										}while(graph.isAncestor(stack.peek(), path.peek()) != 1 
 												|| flag.equals(stack.peek()) || candidatePoints.contains(stack.peek()));
 									}
 									
 								}			
 								break;
 								
+							}else if(graph.isAncestor(endNode, path.peek()) == 1){
+								pathArriveEnd = true;
+								break;
 							}else
 								path.pop();
 						}else
@@ -714,23 +742,19 @@ public class AbstractiveGeneration {
 				}
 			}
 			
-			if(end == true)
+			if(pathArriveEnd == true)
 				continue;
-			
-			if(stackEmpty == true)
-				continue;
-			
+					
 			if(containsCandidate == true)
 				continue;
 			
-			if(stack.empty())
-				continue;
-			
+			if(stackEmpty == true)
+				break;
+					
 			Iterable<SemanticGraphEdge> iter = 
 					graph.outgoingEdgeIterable(stack.pop());	
 			for (SemanticGraphEdge edge : iter) 
-				stack.push(edge.getDependent());
-					
+				stack.push(edge.getDependent());		
 		}	
 		
 		return ret;
@@ -761,20 +785,18 @@ public class AbstractiveGeneration {
 		for (int i = 0; i < patternCluster.size(); i++) {
 			Instance inst = patternCluster.get(i);
 			Pattern p = (Pattern) inst.getSource();
-			Tuple t = (Tuple)p;
 			ArrayList<IndexedWord> wordList = new ArrayList<IndexedWord>();
 			// replaced to pattern representation
-			for(IndexedWord iw : t.getArg1()){
+			for(IndexedWord iw : p.getArg1()){
 				if(iw.equals(p.getArg1().getHead())){ 
-					//here should be lowerCase to consistant with dictionary. 
-					iw.setOriginalText(p.getArg1().getHead().ner().toLowerCase());
+					iw.setOriginalText(p.getArg1().getHead().ner().toUpperCase().replaceAll(" ", "_"));
 				}
 				wordList.add(iw);
-			}
-			wordList.addAll(t.getRel());
-			for(IndexedWord iw : t.getArg2()){
+			}			
+			wordList.addAll(p.getRel());		
+			for(IndexedWord iw : p.getArg2()){			
 				if(iw.equals(p.getArg2().getHead())){
-					iw.setOriginalText(p.getArg2().getHead().ner().toLowerCase());
+					iw.setOriginalText(p.getArg2().getHead().ner().toUpperCase().replaceAll(" ", "_"));
 				}
 				wordList.add(iw);
 			}
@@ -823,7 +845,8 @@ public class AbstractiveGeneration {
 
 		}	
 		
-		ArrayList<ArrayList<IndexedWord>> paths = travelAllPaths(graph);
+		System.out.println("Begin travel the graph to generate new patterns");
+		ArrayList<ArrayList<IndexedWord>> paths = travelAllPaths(graph, endNode);
 		
 		ArrayList<ArrayList<IndexedWord>> filteredPaths = new 
 				ArrayList<ArrayList<IndexedWord>>();
@@ -832,7 +855,8 @@ public class AbstractiveGeneration {
 			ArrayList<IndexedWord> path = paths.get(i);
 			StringBuilder sb = new StringBuilder();
 			for(IndexedWord iw : path){
-				sb.append(iw.originalText()+" ");
+				//keep consistent with dictionary
+				sb.append(iw.originalText().replaceAll(" ", "_")+" ");
 			}
 			if(!set.contains(sb.toString().trim())){
 				filteredPaths.add(path);
@@ -844,15 +868,20 @@ public class AbstractiveGeneration {
 		for(ArrayList<IndexedWord> path : filteredPaths){
 			StringBuilder sb = new StringBuilder();
 			for(IndexedWord iw : path){
-				sb.append(iw.originalText()+" ");
+				//keep consistent with dictionary
+				sb.append(iw.originalText().replaceAll(" ", "_")+" ");
 			}
+			
+			//prevent impossible lookup in dictionary
+			if(sb.toString().trim().equals("") || sb.toString().trim().equals(" "))
+				continue;
 			merged.add(sb.toString().trim());
 		}
 		
 		return Merger.process(merged);
 	}
 	
-	private ArrayList<String> tupleFusion(InstanceList patternCluster){
+	private ArrayList<String> tupleFusion(InstanceList tupleCluster){
 		
 		//Node Alignment
 		SemanticGraph graph = new SemanticGraph();
@@ -875,10 +904,10 @@ public class AbstractiveGeneration {
 		
 		
 		//construct graph to merge tuples
-		for (int i = 0; i < patternCluster.size(); i++) {
-			Instance inst = patternCluster.get(i);
+		for (int i = 0; i < tupleCluster.size(); i++) {
+			Instance inst = tupleCluster.get(i);
 			Pattern p = (Pattern) inst.getSource();
-			Tuple t = (Tuple)p;
+			Tuple t = p.getTuple();
 			ArrayList<IndexedWord> wordList = new ArrayList<IndexedWord>();
 			wordList.addAll(t.getArg1());
 			wordList.addAll(t.getRel());
@@ -926,7 +955,8 @@ public class AbstractiveGeneration {
 			}		
 		}	
 		
-		ArrayList<ArrayList<IndexedWord>> paths = travelAllPaths(graph);
+		System.out.println("Begin travel the graph to generate new tuples");
+		ArrayList<ArrayList<IndexedWord>> paths = travelAllPaths(graph, endNode);
 		
 		ArrayList<ArrayList<IndexedWord>> filteredPaths = new 
 				ArrayList<ArrayList<IndexedWord>>();
@@ -935,7 +965,8 @@ public class AbstractiveGeneration {
 			ArrayList<IndexedWord> path = paths.get(i);
 			StringBuilder sb = new StringBuilder();
 			for(IndexedWord iw : path){
-				sb.append(iw.originalText()+" ");
+				//keep consistent with dictionary
+				sb.append(iw.originalText().replaceAll(" ", "_")+" ");
 			}
 			if(!set.contains(sb.toString().trim())){
 				filteredPaths.add(path);
@@ -947,8 +978,12 @@ public class AbstractiveGeneration {
 		for(ArrayList<IndexedWord> path : filteredPaths){
 			StringBuilder sb = new StringBuilder();
 			for(IndexedWord iw : path){
-				sb.append(iw.originalText()+" ");
+				//keep consistent with dictionary
+				sb.append(iw.originalText().replaceAll(" ", "_")+" ");
 			}
+			//prevent impossible lookup in dictionary
+			if(sb.toString().trim().equals("") || sb.toString().trim().equals(" "))
+				continue;
 			merged.add(sb.toString().trim());
 		}
 		
@@ -1006,6 +1041,126 @@ public class AbstractiveGeneration {
 		return nbestmap;
 
 	}
+	
+	private String realization(String outputSummaryDir,
+			String corpusName, InstanceList patternCluster, MatlabProxy proxy)
+					throws FileNotFoundException, 
+					IOException, MatlabInvocationException, ClassNotFoundException{
+		
+		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + "ALL" + ".dict.ser"));
+		Alphabet dictionary = (Alphabet)in.readObject();
+		int maxPatternSize = in.readInt();
+		in.close();
+
+		ArrayList<String> tupleCandidates = tupleFusion(patternCluster);
+		ArrayList<String> patternCandidates = patternFusion(patternCluster);
+		if(tupleCandidates.size() == 0 || patternCandidates.size() == 0){
+			System.out.println(" tuple or pattern set is empty");
+			System.exit(0);
+		}	
+		ArrayList<String> candidates  =new ArrayList<String>();
+		candidates.addAll(patternCandidates);
+		candidates.addAll(tupleCandidates);
+		
+		ArrayList<String[]> instances  = new ArrayList<String[]>();
+		for(String str : candidates){
+			String[] inst = new String[2];
+			inst[0] = str;
+			inst[1] = "1";
+			instances.add(inst);
+		}
+
+		String matInputFile = outputSummaryDir + "/" + corpusName + "_In_AllPosi.mat";
+		MatFileReader red = new MatFileReader(matInputFile);
+		ArrayList list = new ArrayList();
+		MLCell cell = (MLCell)red.getMLArray("index");
+		list.add(cell);
+		MLDouble sent_length = (MLDouble)red.getMLArray("sent_length");
+		list.add(sent_length);
+		MLDouble size_vocab = (MLDouble)red.getMLArray("size_vocab");
+		list.add(size_vocab);
+		MLDouble test = (MLDouble)red.getMLArray("test");
+		list.add(test);
+		MLDouble test_lbl = (MLDouble)red.getMLArray("test_lbl");
+		list.add(test_lbl);
+		MLDouble train = (MLDouble)red.getMLArray("train");
+		list.add(train);
+		MLDouble train_lbl = (MLDouble)red.getMLArray("train_lbl");
+		list.add(train_lbl);
+		
+		list.addAll(FeatureVectorGenerator.generateMatlabInput(instances, "valid", maxPatternSize, dictionary));
+		
+		MLDouble vocab_emb = (MLDouble)red.getMLArray("vocab_emb");
+		list.add(vocab_emb);
+		
+		String matInputFile_Final = outputSummaryDir + "/" + corpusName + "_In_Final.mat";
+		new MatFileWriter(matInputFile_Final, list);
+		
+		String modelOutputFile = outputSummaryDir + "/" + "ALL" + "_Model.mat";
+		String matOutputFile = outputSummaryDir + "/" + corpusName + "_Out_final.mat";
+				
+		ArrayList<FeatureVector> patternTupleVectors = FeatureVectorGenerator.getVectors(modelOutputFile, matInputFile_Final,
+				matOutputFile, proxy);
+		
+		ArrayList<FeatureVector> patternVectors = new ArrayList<FeatureVector>();
+		ArrayList<FeatureVector> tupleVectors = new ArrayList<FeatureVector>();
+		int k=0;
+		for(int i=0; i<patternCandidates.size(); i++){
+			patternVectors.add(patternTupleVectors.get(k++));
+		}
+		for(int j=0; j<tupleCandidates.size(); j++){
+			tupleVectors.add(patternTupleVectors.get(k++));
+		}
+		
+		HashMap<Instance, Double> nbestMap = getNbestMap(outputSummaryDir, corpusName, 
+				patternCandidates, patternVectors);
+		LinkedHashMap rankedmap = RankMap.sortHashMapByValues(nbestMap, true);
+		Set<Instance> keys = rankedmap.keySet();
+		Iterator iter = keys.iterator();
+		FeatureVector bestPatternVector = null;
+		if(iter.hasNext()){
+			Instance bestPatternInst = (Instance)iter.next();
+			bestPatternVector = (FeatureVector)bestPatternInst.getData();
+		}
+		int idx=0;
+		double min = Double.MAX_VALUE;
+		
+		double[] vec_p = new double[bestPatternVector.getValues().length];
+		double len_p = 0;
+		for (int a = 0; a < bestPatternVector.getValues().length; a++) {
+			len_p += bestPatternVector.getValues()[a] * 
+					bestPatternVector.getValues()[a];
+		}
+		len_p = (double) Math.sqrt(len_p);
+		for (int a = 0; a < bestPatternVector.getValues().length; a++) {
+			vec_p[a] /= len_p;
+		}
+		
+		for(int i=0; i<tupleVectors.size(); i++){
+			FeatureVector tfv = tupleVectors.get(i);
+			double[] vec_t = new double[tfv.getValues().length];
+			double len = 0;
+			for (int a = 0; a < tfv.getValues().length; a++) {
+				len += tfv.getValues()[a] * tfv.getValues()[a];
+			}
+			len = (double) Math.sqrt(len);
+			for (int a = 0; a < tfv.getValues().length; a++) {
+				vec_t[a] /= len;
+			}
+			
+			double dist = 0.0;
+			for (int j = 0; j < tfv.getValues().length; j++) {
+				dist += vec_t[j] * vec_p[j];
+			}
+			if(dist < min){
+				min = dist;
+				idx = i;
+			}	
+		}
+		
+		return tupleCandidates.get(idx);
+	}
 
 	private void generateFinalSummary(String outputSummaryDir,
 			String corpusName, Clustering predicted, InstanceList seeds, MatlabProxy proxy) 
@@ -1022,6 +1177,7 @@ public class AbstractiveGeneration {
 		int maxPatternSize = in.readInt();
 		in.close();
 
+		int seedIdx = 0;
 		for (Instance seed : seeds) {
 			FeatureVector seedFv = (FeatureVector) seed.getData();
 			InstanceList[] clusters = predicted.getClusters();
@@ -1043,9 +1199,11 @@ public class AbstractiveGeneration {
 			if(bestCluster == null)
 				continue;
 			
-			// here tupleFusion should be preceed patternFusion due to patternFusion will
-			// change tuple mention. 
+
+			System.out.println("Tuple fusion in seed "+seedIdx);
 			ArrayList<String> tupleCandidates = tupleFusion(bestCluster);
+			System.out.println("Pattern fusion in seed "+seedIdx);
+			seedIdx++;
 			ArrayList<String> patternCandidates = patternFusion(bestCluster);
 			
 			ArrayList<String> candidates  =new ArrayList<String>();
@@ -1089,8 +1247,8 @@ public class AbstractiveGeneration {
 			String matInputFile_Final = outputSummaryDir + "/" + corpusName + "_In_Final.mat";
 			new MatFileWriter(matInputFile_Final, list);
 					
-			ArrayList<FeatureVector> patternTupleVectors = getVectors(modelOutputFile, matInputFile_Final,
-					matOutputFile, patternCandidates, proxy);
+			ArrayList<FeatureVector> patternTupleVectors = FeatureVectorGenerator.getVectors(modelOutputFile, matInputFile_Final,
+					matOutputFile,  proxy);
 			
 			ArrayList<FeatureVector> patternVectors = new ArrayList<FeatureVector>();
 			ArrayList<FeatureVector> tupleVectors = new ArrayList<FeatureVector>();
@@ -1153,34 +1311,136 @@ public class AbstractiveGeneration {
 		out.close();
 	}
 	
-	private ArrayList<FeatureVector> getVectors(String modelOutputFile, String matInputFile, 
-			String matOutputFile,
-			ArrayList<String> candidates, MatlabProxy proxy) throws MatlabInvocationException, FileNotFoundException, IOException{
-		
-		proxy.eval("MyScript('"+modelOutputFile+"',"+"'"+matInputFile+"',"+"'"+matOutputFile+"'"+")");
-
-		
-		MatFileReader red = new MatFileReader(matOutputFile);
-		MLDouble data = (MLDouble)red.getMLArray("M_3");
-		double[][] arr = data.getArray();
-		int m = data.getM();
-		int n = data.getN();
-		
-		ArrayList<FeatureVector> ret = new ArrayList<FeatureVector>();
-		for(int i=0; i<m; i++){
-			double[] vec = new double[n];
-			int[] idx = new int[n];
-			int c = 0;
-			for(int j=0; j<n; j++){
-				vec[c++] = arr[i][j];
-				idx[j] = j;
-			}
-			FeatureVector fv = new FeatureVector(idx, vec);
-			ret.add(fv);
-		}
-		return ret;
+	private InstanceList[] kmeans(InstanceList instances, int numClusters){
+		Metric metric = new NormalizedDotProductMetric();
+		KMeans kmeans = new KMeans(new Noop(), numClusters, metric);
+		Clustering predicted = kmeans.cluster(instances);
+		return predicted.getClusters();
 	}
+	
+	private InstanceList[] spectral(InstanceList instances, int numClusters, MatlabProxy proxy){
+		Metric metric = new NormalizedDotProductMetric();
+		Spectral spectral = new Spectral(new Noop(), numClusters, metric, proxy);
+		Clustering predicted = spectral.cluster(instances); 
+		return predicted.getClusters();
+	}
+	
+	private InstanceList[] seedBasedClustering(InstanceList 
+			instances, String categoryId, MatlabProxy proxy){
+		
+		int dimension = 20;
+		InstanceList seeds = new InstanceList(new Noop());
+		Category[] cats = Category.values();
+		for (Category cat : cats) {
+			if (cat.getId() == Integer.parseInt(categoryId)) {
+				Map<String, String[]> aspects = cat.getAspects(cat.getId());
+				Set<String> keys = aspects.keySet();
+				for (String key : keys) {
+					String[] keywords = aspects.get(key);
+					FeatureVector fv = FeatureVectorGenerator.getFeatureVector(keywords, dimension);
+					Instance inst = new Instance(fv, null, null, key);
+					seeds.add(inst);
+				}
+			}
+		}
+		
+		Metric metric = new NormalizedDotProductMetric();
+		SemiSupervisedClustering semiClustering = new 
+				SemiSupervisedClustering(new Noop(), seeds,  metric, proxy);
+		Clustering predicted = semiClustering.cluster(instances); 
+		return predicted.getClusters();	
+	}
+	
+	private void generateFinalSummary_X(String outputSummaryDir,
+			String corpusName, InstanceList instances, String categoryId, MatlabProxy proxy) 
+					throws NumberFormatException, IOException, 
+					MatlabInvocationException, ClassNotFoundException {
+		
+		System.out.println("Begin pattern clustering");
+		PrintWriter out = FileOperation.getPrintWriter(new File(
+				outputSummaryDir), corpusName);
+			
+		int numClusters  = 4;
 
+		//method 1: kmeans unsupervised clustering
+		//ROUGE-SU4 is 0.06278 (k = 4)
+		//ROUGE-SU4 is 0.0706 (k = 5)
+		//ROUGE-SU4 is 0.08875 (k = 6)
+		//ROUGE-SU4 is 0.09603 (k = 7)
+		InstanceList[] groups_k = kmeans(instances, numClusters);
+		for(InstanceList cluster :groups_k){
+			out.println(realization(outputSummaryDir,
+					corpusName, cluster,  proxy));
+		}
+		
+		//method 2: spectral unsupervised clustering
+		//ROUGE-SU4 is 0.03736 (spectral k=4)
+		//ROUGE-SU4 is 0.05479 (spectral k=5)
+		//ROUGE-SU4 is 0.05715 (spectral k=6)
+		//ROUGE-SU4 is 0.08172 (spectral k=7)
+/*		InstanceList[] groups_s = spectral(instances, numClusters, proxy);
+		for(InstanceList cluster :groups_s){
+			out.println(realization(outputSummaryDir,
+					corpusName, cluster,  proxy));
+		}*/
+		
+		//method 3: seed based semi-supervised clusterting
+ 		//ROUGE-SU4 is ? (k=4)
+		//ROUGE-SU4 is ? (k=5)
+		//ROUGE-SU4 is ? (k=6)
+		//ROUGE-SU4 is ? (k=7)
+/*		InstanceList[] groups_seed = seedBasedClustering(instances, categoryId,  proxy);
+		for(InstanceList cluster :groups_seed){
+			out.println(realization(outputSummaryDir,
+					corpusName, cluster,  proxy));
+		}*/
+		
+		out.close();
+	}
+	
+	private void trainRNN(String outputSummaryDir,
+			String corpusName) throws IOException{
+		System.out.println("train RNNLM to scoring generated patterns");
+		PrintWriter out_valid = new PrintWriter(new 
+				FileOutputStream(new File(outputSummaryDir + "/" + corpusName + ".patterns.valid")));
+		
+		BufferedReader in_train =new BufferedReader(new FileReader(
+				new File(outputSummaryDir + "/" + corpusName + ".patterns")));
+		ArrayList<String> trainsents = new ArrayList<String>();
+		String input = null;
+		while((input=in_train.readLine()) != null){
+			trainsents.add(input);
+		}
+		in_train.close();
+		Random rand = new Random();
+		int size = trainsents.size();
+		int newSize = size;
+		for(int i=0; i<size*0.2; i++){
+			int ran = rand.nextInt(newSize);
+			out_valid.println(trainsents.get(ran));
+			trainsents.remove(ran);
+			newSize--;
+		}
+		out_valid.close();
+		String[] cmd = {"/home/peng/Develop/Workspace/Mavericks/platform/src"
+				+ "/main/java/edu/pengli/nlp/platform/algorithms/neuralnetwork/RNNLM/rnnlm", 
+				"-train", outputSummaryDir + "/" + corpusName + ".patterns", "-valid", 
+				outputSummaryDir + "/" + corpusName + ".patterns.valid", "-rnnlm", 
+				outputSummaryDir + "/" + corpusName + ".rnnlm.model", "-hidden", "40", "-rand-seed", "1",
+				"-debug", "2", "-bptt", "3", "-class", "200"};
+		
+		Process proc = Runtime.getRuntime().exec(cmd);
+		try {
+			
+			while (proc.waitFor() != 0) {
+				TimeWait.waiting(100);
+			}
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
 	public void run(String inputCorpusDir, String outputSummaryDir,
 			String corpusName, PipeLine pipeLine, String categoryId, 
 			MatlabProxy proxy)
@@ -1224,89 +1484,18 @@ public class AbstractiveGeneration {
 		//ROUGE-SU4 is 0.05651 by specific pattern, keep rel head, release arg other parts replace head with type
 		//ROUGE-SU4 is 0.0643  by tuple
 //		fvGenerator.batchGenerateVectorsByGeneralPatterns(outputSummaryDir, corpusName, patternList, proxy);
-		fvGenerator.batchGenerateVectorsBySpecificPatterns(outputSummaryDir, corpusName, patternList, proxy);
+		
+		//if choose this, then choose generateFinalSummary
+//		fvGenerator.batchGenerateVectorsBySpecificPatterns(outputSummaryDir, corpusName, patternList, proxy);
+		
+		//if choose this, then choose generateFinalSummary_X
+        fvGenerator.batchGetVectors(outputSummaryDir, corpusName, patternList, proxy);
 //		fvGenerator.batchGenerateVectorsByTuples(outputSummaryDir, corpusName, patternList, proxy);
 		instances.addThruPipe(patternList.iterator());
 		
-		int dimension = 20;
-		InstanceList seeds = new InstanceList(new Noop());
-		Category[] cats = Category.values();
-		for (Category cat : cats) {
-			if (cat.getId() == Integer.parseInt(categoryId)) {
-				Map<String, String[]> aspects = cat.getAspects(cat.getId());
-				Set<String> keys = aspects.keySet();
-				for (String key : keys) {
-					String[] keywords = aspects.get(key);
-					FeatureVector fv = fvGenerator.getFeatureVector(keywords, dimension);
-					Instance inst = new Instance(fv, null, null, key);
-					seeds.add(inst);
-				}
-			}
-		}
-			
-		System.out.println("Begin pattern clustering");
-		int numClusters = 5;
-		Metric metric = new NormalizedDotProductMetric();
-		
-		KMeans kmeans = new KMeans(new Noop(), numClusters, metric);
-		Clustering predicted = kmeans.cluster(instances);
-		
-		//ROUGE-SU4 is 0.0727 (k = 4)
-		//ROUGE-SU4 is 0.10735 (k = 5)
-		//ROUGE-SU4 is 0.0989 (k = 6)
-		//ROUGE-SU4 is 0.09172 (k = 7)
-		
-//		Spectral spectral = new Spectral(new Noop(), numClusters, metric, proxy);
-//		Clustering predicted = spectral.cluster(instances); 
-		//ROUGE-SU4 is 0.10228(kmean matlab k=5)  
-		//ROUGE-SU4 is 0.10947(spectral k=5)
-		//ROUGE-SU4 is 0.13271(spectral k=6)
-		//ROUGE-SU4 is 0.13652(spectral k=7)
-		//ROUGE-SU4 is 0.13102(spectral k=8)
-		//ROUGE-SU4 is 0.10355(spectral k=9)
-		
-		
-		System.out.println("train RNNLM to scoring generated patterns");
-		PrintWriter out_valid = new PrintWriter(new 
-				FileOutputStream(new File(outputSummaryDir + "/" + corpusName + ".patterns.valid")));
-		
-		BufferedReader in_train =new BufferedReader(new FileReader(
-				new File(outputSummaryDir + "/" + corpusName + ".patterns")));
-		ArrayList<String> trainsents = new ArrayList<String>();
-		String input = null;
-		while((input=in_train.readLine()) != null){
-			trainsents.add(input);
-		}
-		in_train.close();
-		Random rand = new Random();
-		int size = trainsents.size();
-		int newSize = size;
-		for(int i=0; i<size*0.2; i++){
-			int ran = rand.nextInt(newSize);
-			out_valid.println(trainsents.get(ran));
-			trainsents.remove(ran);
-			newSize--;
-		}
-		out_valid.close();
-		String[] cmd = {"/home/peng/Develop/Workspace/Mavericks/platform/src"
-				+ "/main/java/edu/pengli/nlp/platform/algorithms/neuralnetwork/RNNLM/rnnlm", 
-				"-train", outputSummaryDir + "/" + corpusName + ".patterns", "-valid", 
-				outputSummaryDir + "/" + corpusName + ".patterns.valid", "-rnnlm", 
-				outputSummaryDir + "/" + corpusName + ".rnnlm.model", "-hidden", "40", "-rand-seed", "1",
-				"-debug", "2", "-bptt", "3", "-class", "200"};
-		
-		Process proc = Runtime.getRuntime().exec(cmd);
-		try {
-			
-			while (proc.waitFor() != 0) {
-				TimeWait.waiting(100);
-			}
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
-		generateFinalSummary(outputSummaryDir, corpusName, predicted, seeds, proxy);
+		System.out.println("Begin generate final summary");
+//		generateFinalSummary(outputSummaryDir, corpusName, predicted, seeds, proxy);
+		generateFinalSummary_X(outputSummaryDir, corpusName, instances, categoryId, proxy);
 
 	}
 }

@@ -44,7 +44,7 @@ public class Spectral extends Clusterer {
 		int clusterLabels[] = new int[instances.size()];
 		
 		try {
-			processor.setNumericArray("D", new MatlabNumericArray(
+			processor.setNumericArray("A", new MatlabNumericArray(
 					similarityMatrix, null));
 
 			double[][] diagonalMatrix = new double[instances.size()][instances
@@ -56,7 +56,7 @@ public class Spectral extends Clusterer {
 				}
 				diagonalMatrix[i][i] = sum;
 			}
-			processor.setNumericArray("A", new MatlabNumericArray(
+			processor.setNumericArray("D", new MatlabNumericArray(
 					diagonalMatrix, null));
 
 			proxy.eval("L=D-A");

@@ -1,11 +1,16 @@
 package edu.pengli.nlp.conference.acl2015.method;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 
+import matlabcontrol.MatlabInvocationException;
 import matlabcontrol.MatlabProxy;
 import matlabcontrol.MatlabProxyFactory;
 import matlabcontrol.MatlabProxyFactoryOptions;
@@ -21,14 +26,47 @@ import edu.pengli.nlp.conference.acl2015.generation.AbstractiveGeneration;
 import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
 import edu.pengli.nlp.conference.acl2015.pipe.FeatureVectorGenerator;
 import edu.pengli.nlp.conference.acl2015.pipe.RelationExtractionbyOpenIE;
+import edu.pengli.nlp.conference.acl2015.types.Pattern;
 import edu.pengli.nlp.platform.pipe.CharSequenceCoreNLPAnnotation;
 import edu.pengli.nlp.platform.pipe.Input2CharSequence;
+import edu.pengli.nlp.platform.pipe.Noop;
 import edu.pengli.nlp.platform.pipe.PipeLine;
+import edu.pengli.nlp.platform.types.Instance;
+import edu.pengli.nlp.platform.types.InstanceList;
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.RougeEvaluationWrapper;
 
-
 public class OurMethod {
+	
+	private static void trainingDCNN(String inputCorpusDir, 
+			String outputSummaryDir, List<Element> corpusList, 
+			PipeLine pipeLine, MatlabProxy proxy, int iterTime) throws 
+			FileNotFoundException, IOException, 
+			ClassNotFoundException, MatlabInvocationException{
+		
+		InstanceList patternList = new InstanceList(new Noop());
+		
+		for (int i = 0; i < iterTime; i++) {
+			Element topic = corpusList.get(i);
+			List<Element> docSets = topic.getChildren();
+			Element docSetA = docSets.get(1);
+			String corpusName = docSetA.getAttributeValue("id");
+			
+			ObjectInputStream in = new ObjectInputStream(new FileInputStream(
+					outputSummaryDir + "/" + corpusName + ".patterns.ser"));
+			HashSet<Pattern> patternSet = (HashSet<Pattern>) in.readObject();
+			for (Pattern p : patternSet) {
+				Instance inst = new Instance(p, null, null, p);
+				patternList.add(inst);
+			}
+			in.close();
+		}
+				
+		FeatureVectorGenerator fvGenerator = 
+				(FeatureVectorGenerator) pipeLine.getPipe(0);	
+		
+		fvGenerator.trainingDCNN(outputSummaryDir, patternList, proxy);
+	}
 
 	public static void main(String[] args) throws Exception {
 		
@@ -64,7 +102,16 @@ public class OurMethod {
 		//only used in the third phase
 		pipeLine.addPipe(new FeatureVectorGenerator());
 		
-		for (int i = 0; i < corpusList.size(); i++) {
+		int iterTime = 10;
+		
+		//training DCNN for pattern representation
+		System.out.println("Begin to train DCNN pattern model");
+		
+/*		trainingDCNN(inputCorpusDir, 
+				outputSummaryDir, corpusList, 
+				pipeLine, proxy, iterTime);*/
+		
+		for (int i = 0; i < iterTime; i++) {
 			System.out.println("Corpus id is "+i);
 			Element topic = corpusList.get(i);
 			String categoryId = topic.getAttributeValue("category");

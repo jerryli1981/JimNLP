@@ -7,6 +7,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import com.jmatio.types.MLChar;
 import com.jmatio.types.MLCell;
 
 import edu.pengli.nlp.conference.acl2015.types.Pattern;
+import edu.pengli.nlp.conference.acl2015.types.Tuple;
 import edu.pengli.nlp.platform.pipe.Pipe;
 import edu.pengli.nlp.platform.types.Alphabet;
 import edu.pengli.nlp.platform.types.FeatureVector;
@@ -42,7 +44,7 @@ import edu.stanford.nlp.util.CoreMap;
 
 public class FeatureVectorGenerator extends Pipe{
 	
-	private HashMap<String, float[]> wordMap;
+	private static HashMap<String, float[]> wordMap;
 	
 	private HashMap<Instance, FeatureVector> instanceVectorMap;
 
@@ -62,7 +64,7 @@ public class FeatureVectorGenerator extends Pipe{
 		return new Instance(fv, null, null, (Pattern)inst.getSource());
 	}
 			
-	public void batchGenerateVectorsByGeneralPatterns(String outputSummaryDir,
+/*	public void batchGenerateVectorsByGeneralPatterns(String outputSummaryDir,
 			String corpusName, InstanceList patternList, 
 			MatlabProxy proxy) throws IOException, MatlabInvocationException{
 		
@@ -258,23 +260,44 @@ public class FeatureVectorGenerator extends Pipe{
 		for(int i=0; i<allPositives.size(); i++){
 			instanceVectorMap.put(tmpMap.get(allPositives_L.get(i)), fvs.get(i));
 		}
-	}
-	public void batchGenerateVectorsBySpecificPatterns(String outputSummaryDir,
-			String corpusName, InstanceList patternList, 
+	}*/
+	
+	public void trainingDCNN(String outputSummaryDir, InstanceList patternList, 
 			MatlabProxy proxy) throws IOException, MatlabInvocationException{
 		
 		ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(
-				outputSummaryDir + "/" +corpusName + ".dict.ser"));
+				outputSummaryDir + "/" +"ALL" + ".dict.ser"));
 		
 		Alphabet dictionary = new Alphabet();
+		// put all pattern and tuple mentions into dictionary
+		for(Instance instance : patternList){
+			Pattern p = (Pattern)instance.getSource();
+			ArrayList<IndexedWord> wordList = new ArrayList<IndexedWord>();
+			wordList.addAll(p.getArg1());
+			wordList.addAll(p.getRel());
+			wordList.addAll(p.getArg2());
+			for(IndexedWord iw : wordList){
+				String wordMention = iw.originalText();
+				wordMention = wordMention.replaceAll(" ", "_");
+				dictionary.lookupIndex(wordMention);	
+			}
+			String arg1Type = p.getArg1().getHead().ner().toUpperCase();
+			arg1Type = arg1Type.replaceAll(" ", "_");
+			dictionary.lookupIndex(arg1Type);
+			
+			String arg2Type = p.getArg2().getHead().ner().toUpperCase();
+			arg2Type = arg2Type.replaceAll(" ", "_");
+			dictionary.lookupIndex(arg2Type);
+			
+		}
+		
 		int maxPatternSize = 0;
 		InstanceList instances = new InstanceList(null);
 		HashSet<String> set = new HashSet<String>();
-		HashMap<Instance, Instance> tmpMap = new HashMap<Instance, Instance>();
+		//also need put all other tuples into dictionary
 		for(Instance instance : patternList){
 			Pattern p = (Pattern)instance.getSource();
-			CoreMap sentence = p.getAnnotatedSentence();
-			
+			CoreMap sentence = p.getTuple().getAnnotatedSentence();
 			SemanticGraph graph = sentence.get(BasicDependenciesAnnotation.class);
 			List<CoreLabel> labels = sentence.get(TokensAnnotation.class);
 			StringBuilder negativePattern = new StringBuilder();
@@ -283,29 +306,19 @@ public class FeatureVectorGenerator extends Pipe{
 				//token may contain punc, however graph may not contain punc, so word may be null
 				IndexedWord word = graph.getNodeByIndexSafe(token.index());
 				if(p.getArg1().contains(word) || p.getRel().contains(word)
-						|| p.getArg2().contains(word)){
-					ArrayList<IndexedWord> toks = new ArrayList<IndexedWord>();
-					toks.addAll(p.getArg1());
-					toks.addAll(p.getRel());
-					toks.addAll(p.getArg2());
-					for(IndexedWord iw : toks){
-						String wordMention = iw.originalText();
-						wordMention = wordMention.replaceAll(" ", "_");
-						dictionary.lookupIndex(wordMention);	
-					}
+						|| p.getArg2().contains(word))
 					continue;
-				}
-					
+								
 				if(word != null){
 					String wordMention = word.originalText();
 					wordMention = wordMention.replaceAll(" ", "_");
 					negativePattern.append(wordMention+" ");
-					dictionary.lookupIndex(wordMention);	
+					dictionary.lookupIndex(wordMention);
 				}else{
 					String tokenMention = token.originalText();
 					tokenMention = tokenMention.replaceAll(" ", "_");
 					negativePattern.append(tokenMention+" ");
-					dictionary.lookupIndex(tokenMention);	
+					dictionary.lookupIndex(tokenMention);
 				}
 			}
 
@@ -321,15 +334,11 @@ public class FeatureVectorGenerator extends Pipe{
 			
 			StringBuilder positivePattern = new StringBuilder();
 
-		
 			int size = 0;
-			String arg1Type = p.getArg1().getHead().ner().toLowerCase();
+			String arg1Type = p.getArg1().getHead().ner().toUpperCase();
 			arg1Type = arg1Type.replaceAll(" ", "_");
-			dictionary.lookupIndex(arg1Type);
 			for(IndexedWord iw : p.getArg1()){
 				size++;
-				dictionary.lookupIndex(iw.originalText().replaceAll(" ", "_"));	
-				
 				if(iw.index() == p.getArg1().getHead().index()){
 					positivePattern.append(arg1Type+" ");
 				}else
@@ -340,17 +349,309 @@ public class FeatureVectorGenerator extends Pipe{
 				size++;
 				String mention = iw.originalText();
 				mention = mention.replaceAll(" ", "_");
-				dictionary.lookupIndex(mention);
 				positivePattern.append(mention+" ");
 			}
 
-			String arg2Type = p.getArg2().getHead().ner().toLowerCase();
+			String arg2Type = p.getArg2().getHead().ner().toUpperCase();
 			arg2Type = arg2Type.replaceAll(" ", "_");
-			positivePattern.append(arg2Type+" ");
-			dictionary.lookupIndex(arg2Type);
 			for(IndexedWord iw : p.getArg2()){
+				size++;	
+				if(iw.index() == p.getArg2().getHead().index()){
+					positivePattern.append(arg2Type+" ");
+				}else
+					positivePattern.append(iw.originalText().replaceAll(" ", "_")+" ");
+			}		
+				
+			Instance positiveInst = new Instance(positivePattern.toString().trim(), 
+					"1", "positivePattern", sentence);
+
+			instances.add(positiveInst);
+			if(size >= maxPatternSize)
+				maxPatternSize = size;
+		}
+		
+		ArrayList<String[]> training = new ArrayList<String[]>();
+		ArrayList<String[]> validating = new ArrayList<String[]>();
+		ArrayList<String[]> testing  = new ArrayList<String[]>();
+	
+		Random rand = new Random();
+		int size = instances.size();
+		int newSize = size;
+		for(int i=0; i< size*0.7; i++){
+			int ran = rand.nextInt(newSize);
+			String instLabel = (String)instances.get(ran).getTarget();
+			String[] map = new String[2];
+			map[0] = (String)instances.get(ran).getData();
+			map[1] = instLabel;
+			training.add(map);
+			instances.remove(ran);
+			newSize--;
+		}
+		for(int i=0; i< size*0.2; i++){
+			int ran = rand.nextInt(newSize);
+			String instLabel = (String)instances.get(ran).getTarget();
+			String[] map = new String[2];
+			map[0] = (String)instances.get(ran).getData();
+			map[1] = instLabel;
+			validating.add(map);
+			instances.remove(ran);
+			newSize--;
+		}
+		for(Instance inst : instances){
+			String instLabel = (String)inst.getTarget();
+			String[] map = new String[2];
+			map[0] = (String)inst.getData();
+			map[1] = instLabel;
+			testing.add(map);
+		}					
+		int[] dims = new int[2];
+		dims[0] = dictionary.size();
+		dims[1] = 1;
+		MLCell cell = new MLCell("index", dims);
+		for(int i=0; i<dictionary.size(); i++){
+			String value = (String)dictionary.lookupObject(i);
+			MLArray val = new MLChar("string", value);
+			cell.set(val, i, 0);
+		}
+		
+		double[] vocSize_arr = new double[1];
+		vocSize_arr[0] = dictionary.size()+1;
+		
+		double[] sentLength_arr = new double[1];
+		sentLength_arr[0] = maxPatternSize+1;
+		ArrayList list = new ArrayList();
+		list.add(cell);
+
+		list.add(new MLDouble("sent_length", sentLength_arr, 1));
+		list.add(new MLDouble("size_vocab", vocSize_arr, 1));
+		list.addAll(generateMatlabInput(testing, "test", maxPatternSize, dictionary));
+		list.addAll(generateMatlabInput(training, "train", maxPatternSize, dictionary));
+		list.addAll(generateMatlabInput(validating, "valid", maxPatternSize, dictionary));
+
+		int dim = 50;
+		double[] vec = new double[dim*dictionary.size()];
+		int c = 0;
+		for(int i=0; i<dictionary.size(); i++){
+			String word = (String)dictionary.lookupObject(i);
+			float[] wordVector = wordMap.get(word);
+			if(wordVector == null){
+				for (int a = 0; a < dim; a++) {
+					vec[c++] = rand.nextDouble();
+				}
+			}else{
+				for (int a = 0; a < dim; a++) {
+					vec[c++] = wordVector[a];
+				}
+			}
+		
+		}
+		list.add(new MLDouble("vocab_emb", vec, dim));
+		String matInputFile = outputSummaryDir + "/" + "ALL" + "_In.mat";
+		String modelOutputFile = outputSummaryDir + "/" + "ALL" + "_Model.mat";
+
+		new MatFileWriter(matInputFile, list);
+		
+		proxy.eval("addpath('/home/peng/Develop/Workspace/Mavericks/platform/src/main/java/edu"
+				+ "/pengli/nlp/platform/algorithms/neuralnetwork/DCNN')");
+		proxy.eval("Train('"+matInputFile+"', '"+modelOutputFile+"')");
+				
+		out.writeObject(dictionary);
+		out.writeInt(maxPatternSize);
+		out.close();
+		
+		
+	}
+	
+	public void batchGetVectors(String outputSummaryDir, String corpusName, InstanceList patternList
+			, MatlabProxy proxy) throws 
+	FileNotFoundException, IOException, ClassNotFoundException, MatlabInvocationException{
+		
+		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + "ALL" + ".dict.ser"));
+		Alphabet dictionary = (Alphabet)in.readObject();
+
+		int maxPatternSize = in.readInt();
+		in.close();
+		
+		ArrayList<String> candidates  =new ArrayList<String>();
+		// consistent with dictionary construction
+		for(Instance inst : patternList){
+			StringBuilder positivePattern = new StringBuilder();
+			Pattern p = (Pattern)inst.getData();
+			String arg1Type = p.getArg1().getHead().ner().toUpperCase();
+			arg1Type = arg1Type.replaceAll(" ", "_");
+			for(IndexedWord iw : p.getArg1()){
+				if(iw.index() == p.getArg1().getHead().index()){
+					positivePattern.append(arg1Type+" ");
+				}else
+					positivePattern.append(iw.originalText().replaceAll(" ", "_")+" ");
+			}
+				
+			for(IndexedWord iw : p.getRel()){
+				String mention = iw.originalText();
+				mention = mention.replaceAll(" ", "_");
+				positivePattern.append(mention+" ");
+			}
+
+			String arg2Type = p.getArg2().getHead().ner().toUpperCase();
+			arg2Type = arg2Type.replaceAll(" ", "_");
+			for(IndexedWord iw : p.getArg2()){
+				if(iw.index() == p.getArg2().getHead().index()){
+					positivePattern.append(arg2Type+" ");
+				}else
+					positivePattern.append(iw.originalText().replaceAll(" ", "_")+" ");
+			}	
+			candidates.add(positivePattern.toString().trim());
+		}
+
+		
+		ArrayList<String[]> instances  = new ArrayList<String[]>();
+		for(String str : candidates){
+			String[] inst = new String[2];
+			inst[0] = str;
+			inst[1] = "1";
+			instances.add(inst);
+		}
+		
+
+		
+		String matInputFile = outputSummaryDir + "/" + "ALL" + "_In.mat";
+		MatFileReader red = new MatFileReader(matInputFile);
+		ArrayList list = new ArrayList();
+		MLCell cell = (MLCell)red.getMLArray("index");
+		list.add(cell);
+		MLDouble sent_length = (MLDouble)red.getMLArray("sent_length");
+		list.add(sent_length);
+		MLDouble size_vocab = (MLDouble)red.getMLArray("size_vocab");
+		list.add(size_vocab);
+		MLDouble test = (MLDouble)red.getMLArray("test");
+		list.add(test);
+		MLDouble test_lbl = (MLDouble)red.getMLArray("test_lbl");
+		list.add(test_lbl);
+		MLDouble train = (MLDouble)red.getMLArray("train");
+		list.add(train);
+		MLDouble train_lbl = (MLDouble)red.getMLArray("train_lbl");
+		list.add(train_lbl);
+		
+		list.addAll(FeatureVectorGenerator.generateMatlabInput(instances, "valid", maxPatternSize, dictionary));
+		
+		MLDouble vocab_emb = (MLDouble)red.getMLArray("vocab_emb");
+		list.add(vocab_emb);
+		
+		String matInputFile_AllPosi = outputSummaryDir + "/" + corpusName + "_In_AllPosi.mat";
+		new MatFileWriter(matInputFile_AllPosi, list);
+		
+		String modelOutputFile = outputSummaryDir + "/" + "ALL" + "_Model.mat";
+		String matOutputFile = outputSummaryDir + "/" + corpusName + "_Out_AllPosi.mat";
+		
+		
+		ArrayList<FeatureVector> fvs = FeatureVectorGenerator.getVectors(modelOutputFile, matInputFile_AllPosi,
+				matOutputFile, proxy);
+	
+		instanceVectorMap = new HashMap<Instance, FeatureVector>();
+		for(int i=0; i<patternList.size(); i++){
+			instanceVectorMap.put(patternList.get(i), fvs.get(i));
+		}
+		
+	}
+	
+	public void batchGenerateVectorsBySpecificPatterns(String outputSummaryDir,
+			String corpusName, InstanceList patternList, 
+			MatlabProxy proxy) throws IOException, MatlabInvocationException{
+		
+		ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(
+				outputSummaryDir + "/" +corpusName + ".dict.ser"));
+		
+		Alphabet dictionary = new Alphabet();
+		int maxPatternSize = 0;
+		InstanceList instances = new InstanceList(null);
+		HashSet<String> set = new HashSet<String>();
+		HashMap<Instance, Instance> tmpMap = new HashMap<Instance, Instance>();
+		
+		// put all pattern and tuple mentions into dictionary
+		for(Instance instance : patternList){
+			Pattern p = (Pattern)instance.getSource();
+			ArrayList<IndexedWord> wordList = new ArrayList<IndexedWord>();
+			wordList.addAll(p.getArg1());
+			wordList.addAll(p.getRel());
+			wordList.addAll(p.getArg2());
+			for(IndexedWord iw : wordList){
+				String wordMention = iw.originalText();
+				wordMention = wordMention.replaceAll(" ", "_");
+				dictionary.lookupIndex(wordMention);	
+			}
+			String arg1Type = p.getArg1().getHead().ner().toUpperCase();
+			arg1Type = arg1Type.replaceAll(" ", "_");
+			dictionary.lookupIndex(arg1Type);
+			
+			String arg2Type = p.getArg2().getHead().ner().toUpperCase();
+			arg2Type = arg2Type.replaceAll(" ", "_");
+			dictionary.lookupIndex(arg2Type);
+			
+		}
+		
+		//also need put all other tuples into dictionary
+		for(Instance instance : patternList){
+			Pattern p = (Pattern)instance.getSource();
+			CoreMap sentence = p.getTuple().getAnnotatedSentence();
+			SemanticGraph graph = sentence.get(BasicDependenciesAnnotation.class);
+			List<CoreLabel> labels = sentence.get(TokensAnnotation.class);
+			StringBuilder negativePattern = new StringBuilder();
+			for (int i = 0; i < labels.size(); i++) {
+				CoreLabel token = labels.get(i);
+				//token may contain punc, however graph may not contain punc, so word may be null
+				IndexedWord word = graph.getNodeByIndexSafe(token.index());
+				if(p.getArg1().contains(word) || p.getRel().contains(word)
+						|| p.getArg2().contains(word))
+					continue;
+								
+				if(word != null){
+					String wordMention = word.originalText();
+					wordMention = wordMention.replaceAll(" ", "_");
+					negativePattern.append(wordMention+" ");
+					dictionary.lookupIndex(wordMention);
+				}else{
+					String tokenMention = token.originalText();
+					tokenMention = tokenMention.replaceAll(" ", "_");
+					negativePattern.append(tokenMention+" ");
+					dictionary.lookupIndex(tokenMention);
+				}
+			}
+
+		
+			//pattern cover original sentence, so there is no negative pattern					
+			if(!negativePattern.toString().trim().equals("") && 
+					!set.contains(negativePattern.toString().trim())){
+				set.add(negativePattern.toString().trim());
+				Instance negativeInst = new Instance(negativePattern.toString().trim(), 
+						"2", "negativePattern", sentence);
+				instances.add(negativeInst);
+			}
+			
+			StringBuilder positivePattern = new StringBuilder();
+
+			int size = 0;
+			String arg1Type = p.getArg1().getHead().ner().toUpperCase();
+			arg1Type = arg1Type.replaceAll(" ", "_");
+			for(IndexedWord iw : p.getArg1()){
 				size++;
-				dictionary.lookupIndex(iw.originalText().replaceAll(" ", "_"));			
+				if(iw.index() == p.getArg1().getHead().index()){
+					positivePattern.append(arg1Type+" ");
+				}else
+					positivePattern.append(iw.originalText().replaceAll(" ", "_")+" ");
+			}
+				
+			for(IndexedWord iw : p.getRel()){
+				size++;
+				String mention = iw.originalText();
+				mention = mention.replaceAll(" ", "_");
+				positivePattern.append(mention+" ");
+			}
+
+			String arg2Type = p.getArg2().getHead().ner().toUpperCase();
+			arg2Type = arg2Type.replaceAll(" ", "_");
+			for(IndexedWord iw : p.getArg2()){
+				size++;	
 				if(iw.index() == p.getArg2().getHead().index()){
 					positivePattern.append(arg2Type+" ");
 				}else
@@ -473,8 +774,12 @@ public class FeatureVectorGenerator extends Pipe{
 		new MatFileWriter(matInputFile, list);
 		new MatFileWriter(matInputFile2, list2);
 		
-		ArrayList<FeatureVector> fvs = getSentenceVectors(matInputFile, matInputFile2, 
-				modelOutputFile, matOutputFile, proxy);
+		proxy.eval("addpath('/home/peng/Develop/Workspace/Mavericks/platform/src/main/java/edu"
+				+ "/pengli/nlp/platform/algorithms/neuralnetwork/DCNN')");
+		proxy.eval("Train('"+matInputFile+"', '"+modelOutputFile+"')");
+		
+		ArrayList<FeatureVector> fvs = getVectors( 
+				modelOutputFile, matInputFile2, matOutputFile, proxy);
 		
 		if(fvs.size() != allPositives.size()){
 			System.out.println("fv size is not equal all Positives size");
@@ -491,7 +796,7 @@ public class FeatureVectorGenerator extends Pipe{
 		out.close();
 	}
 	
-	public void batchGenerateVectorsByTuples(String outputSummaryDir,
+/*	public void batchGenerateVectorsByTuples(String outputSummaryDir,
 			String corpusName, InstanceList patternList, 
 			MatlabProxy proxy) throws IOException, MatlabInvocationException{
 			
@@ -681,7 +986,7 @@ public class FeatureVectorGenerator extends Pipe{
 		}
 		
 
-	}
+	}*/
 	
 	public static ArrayList<MLDouble> generateMatlabInput
 	(ArrayList<String[]> instances, String name, int maxPatternSize, Alphabet dictionary){	
@@ -730,17 +1035,13 @@ public class FeatureVectorGenerator extends Pipe{
 		ret.add(new MLDouble(name+"_lbl", lbl_arr, instances.size()));
 		return ret;
 	}
-	
-	private ArrayList<FeatureVector> getSentenceVectors(String matInputFile, String matInputFile2, String modelOutputFile, 
-			String matOutputFile, MatlabProxy proxy) throws MatlabInvocationException, 
-			FileNotFoundException, IOException{
-
+		
+	public static ArrayList<FeatureVector> getVectors(String modelOutputFile, String matInputFile, 
+			String matOutputFile, MatlabProxy proxy) throws MatlabInvocationException, FileNotFoundException, IOException{
+		
 		proxy.eval("addpath('/home/peng/Develop/Workspace/Mavericks/platform/src/main/java/edu"
 				+ "/pengli/nlp/platform/algorithms/neuralnetwork/DCNN')");
-		proxy.eval("Train('"+matInputFile+"', '"+modelOutputFile+"')");
-		
-		//rebuild matInputFile to include all patterns into validate
-		proxy.eval("MyScript('"+modelOutputFile+"',"+"'"+matInputFile2+"',"+"'"+matOutputFile+"'"+")");
+		proxy.eval("MyScript('"+modelOutputFile+"',"+"'"+matInputFile+"',"+"'"+matOutputFile+"'"+")");
 
 		
 		MatFileReader red = new MatFileReader(matOutputFile);
@@ -762,7 +1063,6 @@ public class FeatureVectorGenerator extends Pipe{
 			ret.add(fv);
 		}
 		return ret;
-			
 	}
 	
 
@@ -803,7 +1103,7 @@ public class FeatureVectorGenerator extends Pipe{
 		
 	}
 	
-	public FeatureVector getFeatureVector(String[] keywords, int dimension){
+	public static FeatureVector getFeatureVector(String[] keywords, int dimension){
 		double[] vec = new double[dimension];
 		for(String word : keywords){
 			float[] wordVector = wordMap.get(word);
