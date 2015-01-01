@@ -100,16 +100,17 @@ public class OurMethod {
 		
 		
 		//only used in the third phase
-		pipeLine.addPipe(new FeatureVectorGenerator());
+		FeatureVectorGenerator fvg = new FeatureVectorGenerator();
+		pipeLine.addPipe(fvg);
 		
-		int iterTime = 10;
+		int iterTime = 20;
 		
-		//training DCNN for pattern representation
-		System.out.println("Begin to train DCNN pattern model");
-		
-/*		trainingDCNN(inputCorpusDir, 
+		//training DCNN for pattern representation, only used in the third phase
+/*		System.out.println("Begin to train DCNN pattern model");
+		trainingDCNN(inputCorpusDir, 
 				outputSummaryDir, corpusList, 
 				pipeLine, proxy, iterTime);*/
+		
 		
 		for (int i = 0; i < iterTime; i++) {
 			System.out.println("Corpus id is "+i);

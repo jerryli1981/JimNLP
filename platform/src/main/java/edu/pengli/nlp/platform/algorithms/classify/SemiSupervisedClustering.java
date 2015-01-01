@@ -43,18 +43,28 @@ public class SemiSupervisedClustering extends Clusterer {
 		for(Instance inst : instances)
 			allInsts.add(inst);
 		
+
+		
+		//Semi-Supervised Learning Using Gaussian Fields and Harmonic Functions
 		for (int i = 0; i < allInsts.size(); i++) {
 			FeatureVector fv_i = (FeatureVector) allInsts.get(i).getData();
+			for(int l=0; l<fv_i.getValues().length; l++)
 			for (int j = 0; j < allInsts.size(); j++) {
 				FeatureVector fv_j = (FeatureVector) allInsts.get(j).getData();
-				weightMatrix[i][j] = metric.distance(fv_i, fv_j);
+				double sum = 0.0;
+				for(int k=0; k<fv_i.getValues().length; k++){
+					sum += Math.pow((fv_i.getValues()[k]-fv_j.getValues()[k]), 2)/10;
+				}
+				weightMatrix[i][j] = Math.exp(-sum);
 			}
 		}
 		int clusterLabels[] = new int[instances.size()];
 		try {
 			
+			
 			processor.setNumericArray("W", new MatlabNumericArray(
 					weightMatrix, null));
+
 
 			double[][] diagonalMatrix = new double[instances.size()+seeds.size()][instances
 			                                                      				.size()+seeds.size()];
@@ -87,16 +97,16 @@ public class SemiSupervisedClustering extends Clusterer {
 			proxy.eval("l = size(fl, 1)");
 			proxy.eval("n = size(L, 1)");
 			proxy.eval("fu = -inv(L(l+1:n, l+1:n)) * L(l+1:n, 1:l) * fl");
-//			proxy.eval("q = sum(fl)+1");
-//			proxy.eval("fu_CMN = fu.*repmat(q./sum(fu), n-l, 1)");
+			proxy.eval("q = sum(fl)+1");
+			proxy.eval("fu_CMN = fu.*repmat(q./sum(fu), n-l, 1)");
 			
-			double[][] fu = processor.getNumericArray("fu").getRealArray2D();
+			double[][] fu_CMN = processor.getNumericArray("fu_CMN").getRealArray2D();
 			for(int i=0; i<instances.size(); i++){
 				double max = Double.MIN_VALUE;
 				int idx = -1;
 				for(int j=0; j<seeds.size(); j++){
-					if(max <= fu[i][j]){
-						max = fu[i][j];
+					if(max <= fu_CMN[i][j]){
+						max = fu_CMN[i][j];
 						idx = j;
 					}
 				}

@@ -37,7 +37,7 @@ public class Spectral extends Clusterer {
 			FeatureVector fv_i = (FeatureVector) instances.get(i).getData();
 			for (int j = 0; j < instances.size(); j++) {
 				FeatureVector fv_j = (FeatureVector) instances.get(j).getData();
-				similarityMatrix[i][j] = metric.distance(fv_i, fv_j);
+				similarityMatrix[i][j] = 1-metric.distance(fv_i, fv_j);
 			}
 		}
 

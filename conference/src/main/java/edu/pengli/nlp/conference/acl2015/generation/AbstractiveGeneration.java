@@ -1042,7 +1042,7 @@ public class AbstractiveGeneration {
 
 	}
 	
-	private String realization(String outputSummaryDir,
+	private ArrayList<String> realization(String outputSummaryDir,
 			String corpusName, InstanceList patternCluster, MatlabProxy proxy)
 					throws FileNotFoundException, 
 					IOException, MatlabInvocationException, ClassNotFoundException{
@@ -1100,7 +1100,8 @@ public class AbstractiveGeneration {
 		String modelOutputFile = outputSummaryDir + "/" + "ALL" + "_Model.mat";
 		String matOutputFile = outputSummaryDir + "/" + corpusName + "_Out_final.mat";
 				
-		ArrayList<FeatureVector> patternTupleVectors = FeatureVectorGenerator.getVectors(modelOutputFile, matInputFile_Final,
+		ArrayList<FeatureVector> patternTupleVectors = FeatureVectorGenerator
+				.getInstancesVectors(modelOutputFile, matInputFile_Final,
 				matOutputFile, proxy);
 		
 		ArrayList<FeatureVector> patternVectors = new ArrayList<FeatureVector>();
@@ -1124,7 +1125,7 @@ public class AbstractiveGeneration {
 			bestPatternVector = (FeatureVector)bestPatternInst.getData();
 		}
 		int idx=0;
-		double min = Double.MAX_VALUE;
+		double max = Double.MIN_VALUE;
 		
 		double[] vec_p = new double[bestPatternVector.getValues().length];
 		double len_p = 0;
@@ -1136,7 +1137,9 @@ public class AbstractiveGeneration {
 		for (int a = 0; a < bestPatternVector.getValues().length; a++) {
 			vec_p[a] /= len_p;
 		}
+		ArrayList<String> ret = new ArrayList<String>();
 		
+		HashMap<Integer, Double> scores = new HashMap<Integer, Double>();
 		for(int i=0; i<tupleVectors.size(); i++){
 			FeatureVector tfv = tupleVectors.get(i);
 			double[] vec_t = new double[tfv.getValues().length];
@@ -1153,13 +1156,29 @@ public class AbstractiveGeneration {
 			for (int j = 0; j < tfv.getValues().length; j++) {
 				dist += vec_t[j] * vec_p[j];
 			}
-			if(dist < min){
-				min = dist;
+			scores.put(i, dist);
+			if(dist >= max){
+				max = dist;
 				idx = i;
 			}	
 		}
 		
-		return tupleCandidates.get(idx);
+//		ret.add(tupleCandidates.get(idx));
+		HashMap sortedScores = RankMap.sortHashMapByValues(scores, false);
+		Set<Integer> ids = sortedScores.keySet();
+		ArrayList<Integer> IDS = new ArrayList<Integer>();
+		Iterator it = ids.iterator();
+		int number = 0;
+		while(it.hasNext() && number < 2){
+			IDS.add((Integer)it.next());
+			number++;
+		}
+		
+		
+		for(Integer i : IDS)
+			ret.add(tupleCandidates.get(i));
+		
+		return ret;
 	}
 
 	private void generateFinalSummary(String outputSummaryDir,
@@ -1247,7 +1266,8 @@ public class AbstractiveGeneration {
 			String matInputFile_Final = outputSummaryDir + "/" + corpusName + "_In_Final.mat";
 			new MatFileWriter(matInputFile_Final, list);
 					
-			ArrayList<FeatureVector> patternTupleVectors = FeatureVectorGenerator.getVectors(modelOutputFile, matInputFile_Final,
+			ArrayList<FeatureVector> patternTupleVectors = FeatureVectorGenerator.
+					getInstancesVectors(modelOutputFile, matInputFile_Final,
 					matOutputFile,  proxy);
 			
 			ArrayList<FeatureVector> patternVectors = new ArrayList<FeatureVector>();
@@ -1325,24 +1345,58 @@ public class AbstractiveGeneration {
 		return predicted.getClusters();
 	}
 	
-	private InstanceList[] seedBasedClustering(InstanceList 
-			instances, String categoryId, MatlabProxy proxy){
+	private InstanceList[] seedBasedClustering(String outputSummaryDir, InstanceList 
+			instances, String categoryId, MatlabProxy proxy) throws ClassNotFoundException, IOException, MatlabInvocationException{
 		
-		int dimension = 20;
+		int sizeofWordVector = 20;
 		InstanceList seeds = new InstanceList(new Noop());
 		Category[] cats = Category.values();
 		for (Category cat : cats) {
 			if (cat.getId() == Integer.parseInt(categoryId)) {
 				Map<String, String[]> aspects = cat.getAspects(cat.getId());
-				Set<String> keys = aspects.keySet();
-				for (String key : keys) {
-					String[] keywords = aspects.get(key);
-					FeatureVector fv = FeatureVectorGenerator.getFeatureVector(keywords, dimension);
-					Instance inst = new Instance(fv, null, null, key);
-					seeds.add(inst);
+				ArrayList<FeatureVector> fvs = FeatureVectorGenerator.
+						batchGetSeedVectorsForClustering(
+						outputSummaryDir, aspects, proxy);
+				for(FeatureVector fv : fvs){
+					Instance seed = new Instance(fv, null, null, null);
+					seeds.add(seed);
 				}
 			}
 		}
+		
+/*		//below code for plot for debug
+		InstanceList allInsts = new InstanceList(null);
+		for(Instance seed : seeds)
+			allInsts.add(seed);
+		for(Instance inst : instances)
+			allInsts.add(inst);
+		
+		double[][] points = new double[instances.size()+seeds.size()][20];
+		
+		double[] arr = new double[(instances.size()+seeds.size())*20];
+		
+		int dim = sizeofWordVector;
+		for (int i = 0; i < allInsts.size(); i++) {
+			FeatureVector fv_i = (FeatureVector) allInsts.get(i).getData();
+			for(int l=0; l<dim; l++)
+				points[i][l] = fv_i.getValues()[l];
+		}
+		
+		int c = 0;
+		for(int l=0; l<dim; l++){
+			for (int i = 0; i < allInsts.size(); i++) {
+				arr[c++] = points[i][l];
+			}
+		}
+		ArrayList list = new ArrayList();
+		list.add(new MLDouble("D", arr, allInsts.size()));
+		String matInputFile_AllPosi = "/home/peng/Downloads/visual/D.mat";
+		try {
+			new MatFileWriter(matInputFile_AllPosi, list);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}*/
 		
 		Metric metric = new NormalizedDotProductMetric();
 		SemiSupervisedClustering semiClustering = new 
@@ -1350,7 +1404,7 @@ public class AbstractiveGeneration {
 		Clustering predicted = semiClustering.cluster(instances); 
 		return predicted.getClusters();	
 	}
-	
+		
 	private void generateFinalSummary_X(String outputSummaryDir,
 			String corpusName, InstanceList instances, String categoryId, MatlabProxy proxy) 
 					throws NumberFormatException, IOException, 
@@ -1360,39 +1414,129 @@ public class AbstractiveGeneration {
 		PrintWriter out = FileOperation.getPrintWriter(new File(
 				outputSummaryDir), corpusName);
 			
-		int numClusters  = 4;
-
+		int numClusters  = 25;
+		int length = 0;
+		boolean flag = false;
 		//method 1: kmeans unsupervised clustering
-		//ROUGE-SU4 is 0.06278 (k = 4)
-		//ROUGE-SU4 is 0.0706 (k = 5)
-		//ROUGE-SU4 is 0.08875 (k = 6)
-		//ROUGE-SU4 is 0.09603 (k = 7)
+		//ROUGE-SU4 is 0.09051 (k = 5), 0.08618, 0.0834
+		//ROUGE-SU4 is 0.10102 (k = 10),0.10499, 0.09232
+		//ROUGE-SU4 is 0.09713(k = 15),0.09561, 0.09172
+		//ROUGE-SU4 is 0.09903 (k = 20),0.10165, 0.08731
+		//ROUGE-SU4 is 0.09818(k = 25),0.10134, 0.08475
+		//ROUGE-SU4 is 0.09922 (k = 30),0.09821, 0.08981
 		InstanceList[] groups_k = kmeans(instances, numClusters);
-		for(InstanceList cluster :groups_k){
-			out.println(realization(outputSummaryDir,
-					corpusName, cluster,  proxy));
+		HashMap<InstanceList, Integer> tmp = new HashMap<InstanceList, Integer>();
+		for(InstanceList il : groups_k)
+			tmp.put(il, il.size());
+		HashMap rankedMap = RankMap.sortHashMapByValues(tmp, false);
+		Set keys = rankedMap.keySet();
+		Iterator iter = keys.iterator();
+	
+		while(iter.hasNext()){
+			InstanceList il = (InstanceList)iter.next();
+			ArrayList<String> lines = realization(outputSummaryDir,
+					corpusName, il,  proxy);
+			for(String line : lines){
+				String[] toks = line.split(" ");
+				length += toks.length;
+				if(length <= 100)
+					out.println(line);
+				else{
+					length -= toks.length;
+					boolean stop = false;
+					for(int i=0; i<toks.length; i++){
+						out.print(toks[i]+" ");
+						length++;
+						if(length > 100){
+							stop = true;
+							break;
+						}	
+					}
+					if(stop == true){
+						flag = true;
+						break;
+					}
+				}
+			}
+			
+			if(flag == true)
+				break;
 		}
-		
+						
 		//method 2: spectral unsupervised clustering
-		//ROUGE-SU4 is 0.03736 (spectral k=4)
-		//ROUGE-SU4 is 0.05479 (spectral k=5)
-		//ROUGE-SU4 is 0.05715 (spectral k=6)
-		//ROUGE-SU4 is 0.08172 (spectral k=7)
+		//ROUGE-SU4 is 0.05952(s) (spectral k=5), 0.06928, 0.07414
+		//ROUGE-SU4 is 0.09729(s) (spectral k=10),0.10292, 0.08499
+		//ROUGE-SU4 is 0.10181(s) (spectral k=15),0.0994, 0.07983
+		//ROUGE-SU4 is 0.10121(s) (spectral k=20),0.09283, 0.08105
+		//ROUGE-SU4 is 0.10036(s) (spectral k=25),0.08921, 0.08951
+		//ROUGE-SU4 is 0.09361(s) (spectral k=30),0.09891, 0.0865
 /*		InstanceList[] groups_s = spectral(instances, numClusters, proxy);
-		for(InstanceList cluster :groups_s){
-			out.println(realization(outputSummaryDir,
-					corpusName, cluster,  proxy));
-		}*/
-		
+		HashMap<InstanceList, Integer> tmp = new HashMap<InstanceList, Integer>();
+		for(InstanceList il : groups_s)
+			tmp.put(il, il.size());
+		HashMap rankedMap = RankMap.sortHashMapByValues(tmp, false);
+		Set keys = rankedMap.keySet();
+		Iterator iter = keys.iterator();	
+		while(iter.hasNext()){
+			InstanceList il = (InstanceList)iter.next();
+			ArrayList<String> lines = realization(outputSummaryDir,
+					corpusName, il,  proxy);
+			for(String line : lines){
+				String[] toks = line.split(" ");
+				length += toks.length;
+				if(length <= 100)
+					out.println(line);
+				else{
+					length -= toks.length;
+					boolean stop = false;
+					for(int i=0; i<toks.length; i++){
+						out.print(toks[i]+" ");
+						length++;
+						if(length > 100){
+							stop = true;
+							break;
+						}	
+					}
+					if(stop == true){
+						flag = true;
+						break;
+					}
+				}
+			}
+			
+			if(flag == true)
+				break;
+		}	*/
 		//method 3: seed based semi-supervised clusterting
- 		//ROUGE-SU4 is ? (k=4)
-		//ROUGE-SU4 is ? (k=5)
-		//ROUGE-SU4 is ? (k=6)
-		//ROUGE-SU4 is ? (k=7)
-/*		InstanceList[] groups_seed = seedBasedClustering(instances, categoryId,  proxy);
+ 		//ROUGE-SU4 is 0.06363 
+		//ROUGE-SU4 is 0.06572
+/*		InstanceList[] groups_seed = seedBasedClustering(outputSummaryDir, instances, categoryId,  proxy);
 		for(InstanceList cluster :groups_seed){
-			out.println(realization(outputSummaryDir,
-					corpusName, cluster,  proxy));
+			if(cluster.size() == 0){
+				System.out.println("cluster is empty");
+				//System.exit(0);
+				continue;
+			}
+			String line = realization(outputSummaryDir,
+					corpusName, cluster,  proxy);
+			String[] toks = line.split(" ");
+			length += toks.length;
+			if(length <= 100)
+				out.println(line);
+			else{
+				length -= toks.length;
+				boolean stop = false;
+				for(int i=0; i<toks.length; i++){
+					out.print(toks[i]+" ");
+					length++;
+					if(length > 100){
+						stop = true;
+						break;
+					}	
+				}
+				if(stop == true)
+					break;
+			}
 		}*/
 		
 		out.close();
@@ -1469,7 +1613,7 @@ public class AbstractiveGeneration {
 		HashSet<Pattern> patternSet = (HashSet<Pattern>) in.readObject();
 		in.close();
 		
-		System.out.println("Begin pattern representation learning");
+
 		InstanceList patternList = new InstanceList(new Noop());
 		for (Pattern p : patternSet) {
 			Instance inst = new Instance(p, null, null, p);
@@ -1489,7 +1633,7 @@ public class AbstractiveGeneration {
 //		fvGenerator.batchGenerateVectorsBySpecificPatterns(outputSummaryDir, corpusName, patternList, proxy);
 		
 		//if choose this, then choose generateFinalSummary_X
-        fvGenerator.batchGetVectors(outputSummaryDir, corpusName, patternList, proxy);
+        fvGenerator.batchGetVectorsForClustering(outputSummaryDir, corpusName, patternList, proxy);
 //		fvGenerator.batchGenerateVectorsByTuples(outputSummaryDir, corpusName, patternList, proxy);
 		instances.addThruPipe(patternList.iterator());
 		

@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
@@ -20,6 +21,7 @@ import java.util.Map.Entry;
 
 import matlabcontrol.MatlabInvocationException;
 import matlabcontrol.MatlabProxy;
+import matlabcontrol.extensions.MatlabTypeConverter;
 
 import com.jmatio.io.MatFileReader;
 import com.jmatio.io.MatFileWriter;
@@ -28,8 +30,10 @@ import com.jmatio.types.MLDouble;
 import com.jmatio.types.MLChar;
 import com.jmatio.types.MLCell;
 
+import edu.pengli.nlp.conference.acl2015.types.Category;
 import edu.pengli.nlp.conference.acl2015.types.Pattern;
 import edu.pengli.nlp.conference.acl2015.types.Tuple;
+import edu.pengli.nlp.platform.pipe.Noop;
 import edu.pengli.nlp.platform.pipe.Pipe;
 import edu.pengli.nlp.platform.types.Alphabet;
 import edu.pengli.nlp.platform.types.FeatureVector;
@@ -44,19 +48,13 @@ import edu.stanford.nlp.util.CoreMap;
 
 public class FeatureVectorGenerator extends Pipe{
 	
-	private static HashMap<String, float[]> wordMap;
 	
 	private HashMap<Instance, FeatureVector> instanceVectorMap;
-
+	
 	public FeatureVectorGenerator() throws IOException{
-		wordMap = new HashMap<String, float[]>();
-		int max_w = 50; // max length of vocabulary entries
-        String modelPath = "/home/peng/Develop/Workspace/Mavericks/models"
-        		+ "/word2vec/GoogleNews-vectors-negative300.bin";
-        System.out.println("Loading word vectors");
-		loadModel(modelPath, max_w);	
-		
+		instanceVectorMap = new HashMap<Instance, FeatureVector>();
 	}
+	
 	
 	protected Instance pipe(Instance inst) {
 		
@@ -269,6 +267,19 @@ public class FeatureVectorGenerator extends Pipe{
 				outputSummaryDir + "/" +"ALL" + ".dict.ser"));
 		
 		Alphabet dictionary = new Alphabet();
+		// put all seed keywords into dictionary
+		for(int i=1; i<= 5; i++){
+			Map<String, String[]> aspects = Category.getAspects(i);
+			Set<String> keys = aspects.keySet();
+			for (String key : keys) {
+				String[] keywords = aspects.get(key);
+				for(String w : keywords){
+					w = w.replaceAll(" ", "_");
+					dictionary.lookupIndex(w);	
+				}
+			}
+		}
+		
 		// put all pattern and tuple mentions into dictionary
 		for(Instance instance : patternList){
 			Pattern p = (Pattern)instance.getSource();
@@ -428,41 +439,127 @@ public class FeatureVectorGenerator extends Pipe{
 		list.addAll(generateMatlabInput(training, "train", maxPatternSize, dictionary));
 		list.addAll(generateMatlabInput(validating, "valid", maxPatternSize, dictionary));
 
-		int dim = 50;
-		double[] vec = new double[dim*dictionary.size()];
+		int sizeOfWordVector = 50;
+		double[] vec = new double[sizeOfWordVector*dictionary.size()];
 		int c = 0;
+		
+		HashMap<String, float[]> wordMap = initializeWordVectorMap();
 		for(int i=0; i<dictionary.size(); i++){
 			String word = (String)dictionary.lookupObject(i);
 			float[] wordVector = wordMap.get(word);
 			if(wordVector == null){
-				for (int a = 0; a < dim; a++) {
+				for (int a = 0; a < sizeOfWordVector; a++) {
 					vec[c++] = rand.nextDouble();
 				}
 			}else{
-				for (int a = 0; a < dim; a++) {
+				for (int a = 0; a < sizeOfWordVector; a++) {
 					vec[c++] = wordVector[a];
 				}
 			}
 		
 		}
-		list.add(new MLDouble("vocab_emb", vec, dim));
+		list.add(new MLDouble("vocab_emb", vec, sizeOfWordVector));
 		String matInputFile = outputSummaryDir + "/" + "ALL" + "_In.mat";
 		String modelOutputFile = outputSummaryDir + "/" + "ALL" + "_Model.mat";
 
 		new MatFileWriter(matInputFile, list);
 		
-		proxy.eval("addpath('/home/peng/Develop/Workspace/Mavericks/platform/src/main/java/edu"
-				+ "/pengli/nlp/platform/algorithms/neuralnetwork/DCNN')");
-		proxy.eval("Train('"+matInputFile+"', '"+modelOutputFile+"')");
-				
 		out.writeObject(dictionary);
 		out.writeInt(maxPatternSize);
 		out.close();
 		
+		proxy.eval("addpath('/home/peng/Develop/Workspace/Mavericks/platform/src/main/java/edu"
+				+ "/pengli/nlp/platform/algorithms/neuralnetwork/DCNN')");
+		proxy.eval("Train('"+matInputFile+"', '"+modelOutputFile+"')");
+				
+		
+		
 		
 	}
 	
-	public void batchGetVectors(String outputSummaryDir, String corpusName, InstanceList patternList
+	public static ArrayList<FeatureVector> 
+	batchGetSeedVectorsForClustering(String outputSummaryDir,  
+			Map<String, String[]> aspects
+			, MatlabProxy proxy) throws IOException, ClassNotFoundException, MatlabInvocationException{
+		
+		ObjectInputStream in;
+
+		in = new ObjectInputStream(new FileInputStream(
+					outputSummaryDir + "/" + "ALL" + ".dict.ser"));
+		Alphabet dictionary = (Alphabet)in.readObject();
+
+		int maxPatternSize = in.readInt();
+		in.close();
+
+
+		Set<String> keys = aspects.keySet();
+		ArrayList<String> candidates  =new ArrayList<String>();
+		for (String key : keys) {
+			String[] keywords = aspects.get(key);
+			Set<String> removedDup = new HashSet<String>();
+			for(String s: keywords){	
+				removedDup.add(s);
+			}
+			StringBuilder positivePattern = new StringBuilder();
+			int c = 0;
+			for(String s: removedDup){
+				if(c++ > 6)break;
+				s = s.replaceAll(" ", "_");
+				positivePattern.append(s+" ");
+			}
+			candidates.add(positivePattern.toString().trim());
+		}
+			
+		ArrayList<String[]> instances  = new ArrayList<String[]>();
+		for(String str : candidates){
+			String[] inst = new String[2];
+			inst[0] = str;
+			inst[1] = "1";
+			instances.add(inst);
+		}
+		
+		String matInputFile = outputSummaryDir + "/" + "ALL" + "_In.mat";
+		MatFileReader red = new MatFileReader(matInputFile);
+
+		ArrayList list = new ArrayList();
+		MLCell cell = (MLCell)red.getMLArray("index");
+		list.add(cell);
+		MLDouble sent_length = (MLDouble)red.getMLArray("sent_length");
+		list.add(sent_length);
+		MLDouble size_vocab = (MLDouble)red.getMLArray("size_vocab");
+		list.add(size_vocab);
+		MLDouble test = (MLDouble)red.getMLArray("test");
+		list.add(test);
+		MLDouble test_lbl = (MLDouble)red.getMLArray("test_lbl");
+		list.add(test_lbl);
+		MLDouble train = (MLDouble)red.getMLArray("train");
+		list.add(train);
+		MLDouble train_lbl = (MLDouble)red.getMLArray("train_lbl");
+		list.add(train_lbl);
+		
+		list.addAll(FeatureVectorGenerator.generateMatlabInput(instances, "valid", maxPatternSize, dictionary));
+		
+		MLDouble vocab_emb = (MLDouble)red.getMLArray("vocab_emb");
+		list.add(vocab_emb);
+		
+		String matInputFile_AllPosi = outputSummaryDir + "/" + "_In_Seed.mat";
+	
+		String modelOutputFile = outputSummaryDir + "/" + "ALL" + "_Model.mat";
+		String matOutputFile = outputSummaryDir + "/" + "_Out_Seed.mat";
+		
+		
+		new MatFileWriter(matInputFile_AllPosi, list);
+			
+		ArrayList<FeatureVector> fvs = FeatureVectorGenerator.
+					getInstancesVectors(modelOutputFile, matInputFile_AllPosi,
+					matOutputFile, proxy);
+
+	
+        return fvs;
+		
+	}
+	
+	public void batchGetVectorsForClustering(String outputSummaryDir, String corpusName, InstanceList patternList
 			, MatlabProxy proxy) throws 
 	FileNotFoundException, IOException, ClassNotFoundException, MatlabInvocationException{
 		
@@ -513,8 +610,6 @@ public class FeatureVectorGenerator extends Pipe{
 			instances.add(inst);
 		}
 		
-
-		
 		String matInputFile = outputSummaryDir + "/" + "ALL" + "_In.mat";
 		MatFileReader red = new MatFileReader(matInputFile);
 		ArrayList list = new ArrayList();
@@ -545,10 +640,10 @@ public class FeatureVectorGenerator extends Pipe{
 		String matOutputFile = outputSummaryDir + "/" + corpusName + "_Out_AllPosi.mat";
 		
 		
-		ArrayList<FeatureVector> fvs = FeatureVectorGenerator.getVectors(modelOutputFile, matInputFile_AllPosi,
+		ArrayList<FeatureVector> fvs = FeatureVectorGenerator.
+				getInstancesVectors(modelOutputFile, matInputFile_AllPosi,
 				matOutputFile, proxy);
 	
-		instanceVectorMap = new HashMap<Instance, FeatureVector>();
 		for(int i=0; i<patternList.size(); i++){
 			instanceVectorMap.put(patternList.get(i), fvs.get(i));
 		}
@@ -751,6 +846,7 @@ public class FeatureVectorGenerator extends Pipe{
 		int dim = 50;
 		double[] vec = new double[dim*dictionary.size()];
 		int c = 0;
+		HashMap<String, float[]> wordMap = initializeWordVectorMap();
 		for(int i=0; i<dictionary.size(); i++){
 			String word = (String)dictionary.lookupObject(i);
 			float[] wordVector = wordMap.get(word);
@@ -778,7 +874,7 @@ public class FeatureVectorGenerator extends Pipe{
 				+ "/pengli/nlp/platform/algorithms/neuralnetwork/DCNN')");
 		proxy.eval("Train('"+matInputFile+"', '"+modelOutputFile+"')");
 		
-		ArrayList<FeatureVector> fvs = getVectors( 
+		ArrayList<FeatureVector> fvs = getInstancesVectors( 
 				modelOutputFile, matInputFile2, matOutputFile, proxy);
 		
 		if(fvs.size() != allPositives.size()){
@@ -786,7 +882,6 @@ public class FeatureVectorGenerator extends Pipe{
 			System.exit(0);
 		}
 
-		instanceVectorMap = new HashMap<Instance, FeatureVector>();
 		for(int i=0; i<allPositives.size(); i++){
 			instanceVectorMap.put(tmpMap.get(allPositives_L.get(i)), fvs.get(i));
 		}
@@ -1036,8 +1131,9 @@ public class FeatureVectorGenerator extends Pipe{
 		return ret;
 	}
 		
-	public static ArrayList<FeatureVector> getVectors(String modelOutputFile, String matInputFile, 
-			String matOutputFile, MatlabProxy proxy) throws MatlabInvocationException, FileNotFoundException, IOException{
+	public static ArrayList<FeatureVector> getInstancesVectors(String modelOutputFile, String matInputFile, 
+			String matOutputFile, MatlabProxy proxy) 
+					throws MatlabInvocationException, FileNotFoundException, IOException{
 		
 		proxy.eval("addpath('/home/peng/Develop/Workspace/Mavericks/platform/src/main/java/edu"
 				+ "/pengli/nlp/platform/algorithms/neuralnetwork/DCNN')");
@@ -1065,10 +1161,81 @@ public class FeatureVectorGenerator extends Pipe{
 		return ret;
 	}
 	
-
-	
-	private int loadModel(String modelPath, int max_w) throws IOException{
+	public static FeatureVector getKeywordsVector(String outputSummaryDir, 
+			String[] keywords, int sizeofWordVector, MatlabProxy proxy){
 		
+		MatlabTypeConverter processor = new MatlabTypeConverter(proxy);
+		String modelOutputFile = outputSummaryDir + "/" + "ALL" + "_Model.mat";
+		FeatureVector fv = null;
+		
+		try {
+			
+			ObjectInputStream in= new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + "ALL" + ".dict.ser"));
+			
+			Alphabet dictionary = (Alphabet)in.readObject();
+		
+			double[][] arr = new double[sizeofWordVector][dictionary.size()];
+	
+			proxy.eval("addpath('/home/peng/Develop/Workspace/Mavericks/platform/src/main/java/edu"
+					+ "/pengli/nlp/platform/algorithms/neuralnetwork/DCNN')");
+			proxy.eval("load('"+modelOutputFile+"')");
+			proxy.eval("[CR_E, CR_1, CR_1_b, CR_2, CR_2_b, CR_3, CR_3_b, CR_Z, ~, ~] "
+					+ "= stack2param(X, decodeInfo);");
+			
+			arr = processor.getNumericArray("CR_E")
+					.getRealArray2D();
+	
+			int rowNumber = sizeofWordVector;
+			int columnNumber = dictionary.size();
+			double[] vec = new double[rowNumber];
+			for(String word : keywords){
+				word = word.replaceAll(" ", "_");
+				int wordIdx = dictionary.lookupIndex(word, false);
+				for(int j=0; j< columnNumber; j++){
+					if(j == wordIdx){
+						for(int i=0; i<rowNumber; i++)
+							vec[i] += arr[i][j];
+					}	
+				}
+			}
+			
+/*			for (int a = 0; a < rowNumber; a++) {
+				vec[a] /= rowNumber;
+			}*/
+			
+			int[] idx = new int[rowNumber];
+			for(int a = 0; a < rowNumber; a++){
+				idx[a] = a;
+			}
+			
+			fv = new FeatureVector(idx, vec);
+			
+		} catch (FileNotFoundException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (MatlabInvocationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return fv;
+	}
+
+
+	private HashMap<String, float[]> initializeWordVectorMap() throws IOException{
+		System.out.println("Begin to load word vectors");
+		
+		int max_w = 50; // max length of vocabulary entries
+        String modelPath = "/home/peng/Develop/Workspace/Mavericks/models"
+        		+ "/word2vec/GoogleNews-vectors-negative300.bin";	
+		HashMap<String, float[]> wordMap = new HashMap<String, float[]>();
 		BufferedInputStream bis = new BufferedInputStream(new FileInputStream(
 				modelPath));
 		DataInputStream dis = new DataInputStream(bis);
@@ -1099,107 +1266,8 @@ public class FeatureVectorGenerator extends Pipe{
 		bis.close();
 		dis.close();
 		
-		return dimension;
+		return wordMap;
 		
-	}
-	
-	public static FeatureVector getFeatureVector(String[] keywords, int dimension){
-		double[] vec = new double[dimension];
-		for(String word : keywords){
-			float[] wordVector = wordMap.get(word);
-			if(wordVector == null)
-				continue;
-			for (int a = 0; a < dimension; a++) {
-				vec[a] += wordVector[a];
-			}
-		}
-		float len = 0;
-		for (int a = 0; a < dimension; a++) {
-			len += vec[a] * vec[a];
-		}
-		len = (float) Math.sqrt(len);
-		for (int a = 0; a < dimension; a++) {
-			vec[a] /= len;
-		}
-		
-		int[] idx = new int[dimension];
-		for(int a = 0; a <dimension; a++){
-			idx[a] = a;
-		}
-		FeatureVector fv = new FeatureVector(idx, vec);
-		return fv;
-	}
-		
-	private Set<WordEntry> distance(String sentence, int N, int dimension) {
-		
-		String[] words = sentence.split(" ");
-		float[] vec = new float[dimension];
-		for(String word : words){
-			float[] wordVector = wordMap.get(word);
-			if(wordVector == null)
-				return null;
-			for (int a = 0; a < dimension; a++) {
-				vec[a] += wordVector [a];
-			}
-		}
-		
-		float len = 0;
-		for (int a = 0; a < dimension; a++) {
-			len += vec[a] * vec[a];
-		}
-		len = (float) Math.sqrt(len);
-		for (int a = 0; a < dimension; a++) {
-			vec[a] /= len;
-		}
-	
-		Set<Entry<String, float[]>> entrySet = wordMap.entrySet();
-		float[] tempVector = null;
-		List<WordEntry> wordEntrys = new ArrayList<WordEntry>(N);
-		String name = null;
-		for (Entry<String, float[]> entry : entrySet) {
-			name = entry.getKey();
-			boolean flag = false;
-			for(String word : words){
-				if (name.equals(word)) {
-					flag = true;
-				}
-			}
-			if(flag == true)
-				continue;
-
-			float dist = 0;
-			tempVector = entry.getValue();
-		
-			for (int i = 0; i < dimension; i++) {
-				dist += vec[i] * tempVector[i];
-			}
-			insertTopN(name, dist, wordEntrys, N);
-		}
-		
-		return new TreeSet<WordEntry>(wordEntrys);
-	}
-	
-	private void insertTopN(String name, double score,
-			List<WordEntry> wordsEntrys, int N) {
-
-		if (wordsEntrys.size() < N) {
-			wordsEntrys.add(new WordEntry(name, score));
-			return;
-		}
-		double min = Float.MAX_VALUE;
-		int minOffe = 0;
-		for (int i = 0; i < N; i++) {
-			WordEntry wordEntry = wordsEntrys.get(i);
-			if (min > wordEntry.score) {
-				min = wordEntry.score;
-				minOffe = i;
-			}
-		}
-
-		if (score > min) {
-			wordsEntrys.set(minOffe, new WordEntry(name, score));
-		}
-
 	}
 	
 	private static float readFloat(InputStream is) throws IOException {
@@ -1238,32 +1306,4 @@ public class FeatureVectorGenerator extends Pipe{
 		return sb.toString();
 	}
 	
-	public class WordEntry implements Comparable<WordEntry> {
-		public String name;
-		public double score;
-
-		public WordEntry(String name, double score) {
-			this.name = name;
-			this.score = score;
-		}
-
-		@Override
-		public String toString() {
-			// TODO Auto-generated method stub
-			return this.name + "\t" + score;
-		}
-
-		@Override
-		public int compareTo(WordEntry o) {
-			// TODO Auto-generated method stub
-			if (this.score > o.score) {
-				return -1;
-			} else {
-				return 1;
-			}
-		}
-
-	}
-
-
 }

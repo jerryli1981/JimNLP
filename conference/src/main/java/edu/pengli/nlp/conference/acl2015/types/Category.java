@@ -35,6 +35,7 @@ public enum Category {
 			return generateAspectsFor4();
 		case 5:
 			return generateAspectsFor5();
+			
 		default: return null;
 		}
 	}

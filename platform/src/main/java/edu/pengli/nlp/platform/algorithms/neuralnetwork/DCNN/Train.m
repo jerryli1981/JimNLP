@@ -6,7 +6,7 @@ load(data_f,'train','train_lbl', 'valid', 'valid_lbl',  'test', 'test_lbl', 'siz
 
 
 %% ASSIGN P AND indices
-p(1) = 5;          disp(strcat('Size word vectors:',num2str(p(1))));
+p(1) = 20;          disp(strcat('Size word vectors:',num2str(p(1))));
 p(2) = sent_length; disp(strcat('Max sent length:',num2str(p(2))));
 p(3) = 3;           disp(strcat('Number feat maps in first layer:',num2str(p(3))));
 p(5) = 4;           disp(strcat('Number feat maps in second layer:', num2str(p(5))));
