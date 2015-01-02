@@ -71,14 +71,14 @@ public class OurMethod {
 	public static void main(String[] args) throws Exception {
 		
 	    //Create a proxy, which we will use to control MATLAB
-		String matlabLocation = "/usr/local/MATLAB/R2012a/bin/matlab";
+/*		String matlabLocation = "/usr/local/MATLAB/R2012a/bin/matlab";
 		MatlabProxyFactoryOptions options = new MatlabProxyFactoryOptions.Builder()
         .setProxyTimeout(30000L).setMatlabLocation(matlabLocation)
         .setHidden(true)
         .build();
 		
 	    MatlabProxyFactory factory = new MatlabProxyFactory(options);
-	    MatlabProxy proxy = factory.getProxy();
+	    MatlabProxy proxy = factory.getProxy();*/
 
 
 		SAXBuilder builder = new SAXBuilder();
@@ -103,7 +103,7 @@ public class OurMethod {
 		FeatureVectorGenerator fvg = new FeatureVectorGenerator();
 		pipeLine.addPipe(fvg);
 		
-		int iterTime = 20;
+		int iterTime = corpusList.size();
 		
 		//training DCNN for pattern representation, only used in the third phase
 /*		System.out.println("Begin to train DCNN pattern model");
@@ -122,10 +122,10 @@ public class OurMethod {
 			corpusNameList.add(corpusName);
 			AbstractiveGeneration ag = new AbstractiveGeneration();
 			ag.run(inputCorpusDir + "/" + topic.getAttributeValue("id"),
-					outputSummaryDir, corpusName, pipeLine, categoryId, proxy);
+					outputSummaryDir, corpusName, pipeLine, categoryId, null);
 		}
 		
-		proxy.disconnect();
+//		proxy.disconnect();
 
 		// Rouge Evaluation
 		String modelSummaryDir = "../data/ACL2015/ROUGE/models";

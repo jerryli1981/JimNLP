@@ -50,9 +50,16 @@ public class FeatureVectorGenerator extends Pipe{
 	
 	
 	private HashMap<Instance, FeatureVector> instanceVectorMap;
+	private HashMap<String, float[]> wordMap;
 	
 	public FeatureVectorGenerator() throws IOException{
 		instanceVectorMap = new HashMap<Instance, FeatureVector>();
+		wordMap = new HashMap<String, float[]>();
+		initializeWordVectorMap();
+	}
+	
+	public HashMap<String, float[]> getWordMap(){
+		return wordMap;
 	}
 	
 	
@@ -62,203 +69,6 @@ public class FeatureVectorGenerator extends Pipe{
 		return new Instance(fv, null, null, (Pattern)inst.getSource());
 	}
 			
-/*	public void batchGenerateVectorsByGeneralPatterns(String outputSummaryDir,
-			String corpusName, InstanceList patternList, 
-			MatlabProxy proxy) throws IOException, MatlabInvocationException{
-		
-		Alphabet dictionary = new Alphabet();
-		int maxPatternSize = 0;
-		InstanceList instances = new InstanceList(null);
-		HashSet<String> set = new HashSet<String>();
-		HashMap<Instance, Instance> tmpMap = new HashMap<Instance, Instance>();
-		for(Instance instance : patternList){
-			Pattern p = (Pattern)instance.getSource();
-			CoreMap sentence = p.getAnnotatedSentence();
-			
-			SemanticGraph graph = sentence.get(BasicDependenciesAnnotation.class);
-			List<CoreLabel> labels = sentence.get(TokensAnnotation.class);
-			StringBuilder negativePattern = new StringBuilder();
-			for (int i = 0; i < labels.size() - 1; i++) {
-				CoreLabel nextToken = labels.get(i+1);
-				//token may contain punc, however graph may not contain punc, so word may be null
-				IndexedWord word = graph.getNodeByIndexSafe(nextToken.index());
-				if(p.getArg1().contains(word) || p.getRel().contains(word)
-						|| p.getArg2().contains(word))
-					continue;
-				if(word != null){
-					negativePattern.append(word.originalText()+" ");
-					dictionary.lookupIndex(word.originalText());	
-				}		
-			}
-
-			
-			//pattern cover original sentence, so there is no negative pattern					
-			if(!negativePattern.toString().trim().equals("") && 
-					!set.contains(negativePattern.toString().trim())){
-				set.add(negativePattern.toString().trim());
-				Instance negativeInst = new Instance(negativePattern.toString().trim(), 
-						"2", "negativePattern", sentence);
-				instances.add(negativeInst);
-			}
-			
-			StringBuilder positivePattern = new StringBuilder();
-		
-			int size = 0;
-			for(IndexedWord iw : p.getArg1()){
-				size++;
-				dictionary.lookupIndex(iw.originalText());	
-			}
-			String arg1Type = p.getArg1().getHead().ner().toUpperCase();
-			arg1Type = arg1Type.replaceAll(" ", "_");
-			positivePattern.append(arg1Type+" ");
-			dictionary.lookupIndex(arg1Type);
-			
-			for(IndexedWord iw : p.getRel()){
-				size++;
-				dictionary.lookupIndex(iw.originalText());
-			}
-			positivePattern.append(p.getRel().getHead().originalText()+" ");
-			dictionary.lookupIndex(p.getRel().getHead().originalText());
-
-			for(IndexedWord iw : p.getArg2()){
-				size++;
-				dictionary.lookupIndex(iw.originalText());
-			}		
-
-			String arg2Type = p.getArg2().getHead().ner().toUpperCase();
-			arg2Type = arg2Type.replaceAll(" ", "_");
-			positivePattern.append(arg2Type+" ");
-			dictionary.lookupIndex(arg2Type);
-			
-			Instance positiveInst = new Instance(positivePattern.toString().trim(), 
-					"1", "positivePattern", sentence);
-			tmpMap.put(positiveInst, instance);
-			instances.add(positiveInst);
-			if(size >= maxPatternSize)
-				maxPatternSize = size;
-		}
-		
-		ArrayList<String[]> training = new ArrayList<String[]>();
-		ArrayList<String[]> validating = new ArrayList<String[]>();
-		ArrayList<String[]> testing  = new ArrayList<String[]>();
-		ArrayList<String[]> allPositives  = new ArrayList<String[]>();
-		ArrayList<Instance> allPositives_L  = new ArrayList<Instance>();
-		for(Instance inst: instances){
-			String label = (String)inst.getTarget();
-			if(label.equals("1")){
-				String[] map = new String[2];
-				map[0] = (String)inst.getData();
-				map[1] = "1";
-				allPositives.add(map);
-				allPositives_L.add(inst);
-			}	
-		}
-		
-		if(allPositives.size() != patternList.size()){
-			System.out.println("match error");
-			System.exit(0);
-		}
-		
-		Random rand = new Random();
-		int size = instances.size();
-		int newSize = size;
-		for(int i=0; i< size*0.7; i++){
-			int ran = rand.nextInt(newSize);
-			String instLabel = (String)instances.get(ran).getTarget();
-			String[] map = new String[2];
-			map[0] = (String)instances.get(ran).getData();
-			map[1] = instLabel;
-			training.add(map);
-			instances.remove(ran);
-			newSize--;
-		}
-		for(int i=0; i< size*0.2; i++){
-			int ran = rand.nextInt(newSize);
-			String instLabel = (String)instances.get(ran).getTarget();
-			String[] map = new String[2];
-			map[0] = (String)instances.get(ran).getData();
-			map[1] = instLabel;
-			validating.add(map);
-			instances.remove(ran);
-			newSize--;
-		}
-		for(Instance inst : instances){
-			String instLabel = (String)inst.getTarget();
-			String[] map = new String[2];
-			map[0] = (String)inst.getData();
-			map[1] = instLabel;
-			testing.add(map);
-		}					
-		int[] dims = new int[2];
-		dims[0] = dictionary.size();
-		dims[1] = 1;
-		MLCell cell = new MLCell("index", dims);
-		for(int i=0; i<dictionary.size(); i++){
-			String value = (String)dictionary.lookupObject(i);
-			MLArray val = new MLChar("string", value);
-			cell.set(val, i, 0);
-		}
-		
-		double[] vocSize_arr = new double[1];
-		vocSize_arr[0] = dictionary.size()+1;
-		
-		double[] sentLength_arr = new double[1];
-		sentLength_arr[0] = maxPatternSize+1;
-		ArrayList list = new ArrayList();
-		ArrayList list2 = new ArrayList();
-		list.add(cell);
-		list2.add(cell);
-		list.add(new MLDouble("sent_length", sentLength_arr, 1));
-		list2.add(new MLDouble("sent_length", sentLength_arr, 1));
-		list.add(new MLDouble("size_vocab", vocSize_arr, 1));
-		list2.add(new MLDouble("size_vocab", vocSize_arr, 1));
-		list.addAll(generateMatlabInput(testing, "test", maxPatternSize, dictionary));
-		list2.addAll(generateMatlabInput(testing, "test", maxPatternSize, dictionary));
-		list.addAll(generateMatlabInput(training, "train", maxPatternSize, dictionary));
-		list2.addAll(generateMatlabInput(training, "train", maxPatternSize, dictionary));	
-		list.addAll(generateMatlabInput(validating, "valid", maxPatternSize, dictionary));
-		list2.addAll(generateMatlabInput(allPositives, "valid", maxPatternSize, dictionary));
-		
-
-		int dim = 50;
-		double[] vec = new double[dim*dictionary.size()];
-		int c = 0;
-		for(int i=0; i<dictionary.size(); i++){
-			String word = (String)dictionary.lookupObject(i);
-			float[] wordVector = wordMap.get(word);
-			if(wordVector == null){
-				for (int a = 0; a < dim; a++) {
-					vec[c++] = rand.nextDouble();
-				}
-			}else{
-				for (int a = 0; a < dim; a++) {
-					vec[c++] = wordVector[a];
-				}
-			}
-		
-		}
-		list.add(new MLDouble("vocab_emb", vec, dim));
-		list2.add(new MLDouble("vocab_emb", vec, dim));
-		String matInputFile = outputSummaryDir + "/" + corpusName + "_In.mat";
-		String matInputFile2 = outputSummaryDir + "/" + corpusName + "_In2.mat";
-		String modelOutputFile = outputSummaryDir + "/" + corpusName + "_Model.mat";
-		String matOutputFile = outputSummaryDir + "/" + corpusName + "_Out.mat";
-		new MatFileWriter(matInputFile, list);
-		new MatFileWriter(matInputFile2, list2);
-		
-		ArrayList<FeatureVector> fvs = getSentenceVectors(matInputFile, matInputFile2, 
-				modelOutputFile, matOutputFile, proxy);
-		
-		if(fvs.size() != allPositives.size()){
-			System.out.println("fv size is not equal all Positives size");
-			System.exit(0);
-		}
-
-		instanceVectorMap = new HashMap<Instance, FeatureVector>();
-		for(int i=0; i<allPositives.size(); i++){
-			instanceVectorMap.put(tmpMap.get(allPositives_L.get(i)), fvs.get(i));
-		}
-	}*/
 	
 	public void trainingDCNN(String outputSummaryDir, InstanceList patternList, 
 			MatlabProxy proxy) throws IOException, MatlabInvocationException{
@@ -443,7 +253,6 @@ public class FeatureVectorGenerator extends Pipe{
 		double[] vec = new double[sizeOfWordVector*dictionary.size()];
 		int c = 0;
 		
-		HashMap<String, float[]> wordMap = initializeWordVectorMap();
 		for(int i=0; i<dictionary.size(); i++){
 			String word = (String)dictionary.lookupObject(i);
 			float[] wordVector = wordMap.get(word);
@@ -477,89 +286,135 @@ public class FeatureVectorGenerator extends Pipe{
 		
 	}
 	
-	public static ArrayList<FeatureVector> 
-	batchGetSeedVectorsForClustering(String outputSummaryDir,  
-			Map<String, String[]> aspects
-			, MatlabProxy proxy) throws IOException, ClassNotFoundException, MatlabInvocationException{
+	public String cleaning(String mention){
+		if(mention.equals("'s"))
+			return "is";
+		else if(mention.equals("cognizer"))
+			return "cognize";
+		else if(mention.equals("evaluee"))
+			return "assess";
+		else if(mention.equals("organising") || mention.equals("organised")||mention.equals("organise"))
+			return "organize";
+		else if(mention.equals("recognise"))
+			return "recognize";
+		else if(mention.equals("undergoer"))
+			return "undergo";
+		else if(mention.equals("ingestibles"))
+			return "ingest";
+		else if(mention.equals("travelled"))
+			return "travel";
+		else if(mention.equals("abbas-led"))
+			return "led";
+		else if(mention.equals("ploughed"))
+			return "plow";
+		else if(mention.equals("internet-based"))
+			return "internet";
+		else if(mention.equals("criticised"))
+			return "criticize";
+		else if(mention.equals("uncommunicativeness"))
+			return "communicate";
+		else if(mention.equals("analysed"))
+			return "analyze";
+		else if(mention.equals("submittor"))
+			return "submit";
+		else if(mention.equals("u.s.-led"))
+			return "led";
+		else if(mention.equals("favours"))
+			return "favor";
+		else if(mention.equals("stabilise"))
+			return "stabilize";
+		else if(mention.equals("aggregateproperty"))
+			return "aggregate";
+		else if(mention.equals("re-establish"))
+			return "establish";
+		else if(mention.equals("democratic-controlled"))
+			return "democratic";
+		else if(mention.equals("ill-being"))
+			return "illness";
+		else if(mention.equals("mobilised"))
+			return "mobilize";
+		else if(mention.equals("impactee"))
+			return "impact";
+		else if(mention.equals("genitor"))
+			return "father";
+		else
+		    return mention;
+	}
+	public void setFvsViaTrainedRNN(String outputSummaryDir, 
+			String corpusName, InstanceList patternList){
+		ArrayList<FeatureVector> fvs = new ArrayList<FeatureVector>();
 		
-		ObjectInputStream in;
+		//wordEmbeding dimension is 300
+		int dimension = 300;
+		
+		for(Instance inst : patternList){
+			Pattern p = (Pattern)inst.getData();
+			String Arg1 = p.getArg1().getHead().ner().toLowerCase();
+			String Pre = p.getRel().getHead().originalText().toLowerCase();
+			String Arg2 = p.getArg2().getHead().ner().toLowerCase();
+			float[] wordVectorArg1 = wordMap.get(cleaning(Arg1));
+			float[] wordVectorPre = wordMap.get(cleaning(Pre));
+			float[] wordVectorArg2 = wordMap.get(cleaning(Arg2));
+			if(wordVectorArg1 == null){
+				if(Arg1.contains("_")){ 
+					String[] toks = Arg1.split("_");
+					for(int i=0; i<toks.length; i++){
+						wordVectorArg1 = wordMap.get(toks[i]);
+					}
+				}else if(Arg1.contains(" ")){
+					String[] toks = Arg1.split(" ");
+					for(int i=0; i<toks.length; i++){
+						wordVectorArg1 = wordMap.get(toks[i]);
+					}
+				}
 
-		in = new ObjectInputStream(new FileInputStream(
-					outputSummaryDir + "/" + "ALL" + ".dict.ser"));
-		Alphabet dictionary = (Alphabet)in.readObject();
-
-		int maxPatternSize = in.readInt();
-		in.close();
-
-
-		Set<String> keys = aspects.keySet();
-		ArrayList<String> candidates  =new ArrayList<String>();
-		for (String key : keys) {
-			String[] keywords = aspects.get(key);
-			Set<String> removedDup = new HashSet<String>();
-			for(String s: keywords){	
-				removedDup.add(s);
 			}
-			StringBuilder positivePattern = new StringBuilder();
+						
+			if(wordVectorArg2 == null){
+				if(Arg2.contains("_")){ 
+					String[] toks = Arg2.split("_");
+					for(int i=0; i<toks.length; i++){
+						wordVectorArg2 = wordMap.get(toks[i]);
+					}
+				}else if(Arg2.contains(" ")){
+					String[] toks = Arg2.split(" ");
+					for(int i=0; i<toks.length; i++){
+						wordVectorArg2 = wordMap.get(toks[i]);
+					}
+				}
+				
+			}
+						
+			double[] vec = new double[dimension*3];
+			int[] idx = new int[dimension*3];
 			int c = 0;
-			for(String s: removedDup){
-				if(c++ > 6)break;
-				s = s.replaceAll(" ", "_");
-				positivePattern.append(s+" ");
+			int d = 0;
+			for(int i=0; i<wordVectorArg1.length; i++){
+				vec[c++] = wordVectorArg1[i];
+				idx[d] = d++;
+	
 			}
-			candidates.add(positivePattern.toString().trim());
-		}
+			for(int i=0; i<wordVectorPre.length; i++){
+				vec[c++] = wordVectorPre[i];
+				idx[d] = d++;
+			}
+			for(int i=0; i<wordVectorArg2.length; i++){
+				vec[c++] = wordVectorArg2[i];
+				idx[d] = d++;
+			}
 			
-		ArrayList<String[]> instances  = new ArrayList<String[]>();
-		for(String str : candidates){
-			String[] inst = new String[2];
-			inst[0] = str;
-			inst[1] = "1";
-			instances.add(inst);
+			FeatureVector fv = new FeatureVector(idx, vec);
+			fvs.add(fv);	
 		}
 		
-		String matInputFile = outputSummaryDir + "/" + "ALL" + "_In.mat";
-		MatFileReader red = new MatFileReader(matInputFile);
-
-		ArrayList list = new ArrayList();
-		MLCell cell = (MLCell)red.getMLArray("index");
-		list.add(cell);
-		MLDouble sent_length = (MLDouble)red.getMLArray("sent_length");
-		list.add(sent_length);
-		MLDouble size_vocab = (MLDouble)red.getMLArray("size_vocab");
-		list.add(size_vocab);
-		MLDouble test = (MLDouble)red.getMLArray("test");
-		list.add(test);
-		MLDouble test_lbl = (MLDouble)red.getMLArray("test_lbl");
-		list.add(test_lbl);
-		MLDouble train = (MLDouble)red.getMLArray("train");
-		list.add(train);
-		MLDouble train_lbl = (MLDouble)red.getMLArray("train_lbl");
-		list.add(train_lbl);
-		
-		list.addAll(FeatureVectorGenerator.generateMatlabInput(instances, "valid", maxPatternSize, dictionary));
-		
-		MLDouble vocab_emb = (MLDouble)red.getMLArray("vocab_emb");
-		list.add(vocab_emb);
-		
-		String matInputFile_AllPosi = outputSummaryDir + "/" + "_In_Seed.mat";
-	
-		String modelOutputFile = outputSummaryDir + "/" + "ALL" + "_Model.mat";
-		String matOutputFile = outputSummaryDir + "/" + "_Out_Seed.mat";
-		
-		
-		new MatFileWriter(matInputFile_AllPosi, list);
-			
-		ArrayList<FeatureVector> fvs = FeatureVectorGenerator.
-					getInstancesVectors(modelOutputFile, matInputFile_AllPosi,
-					matOutputFile, proxy);
-
-	
-        return fvs;
+		for(int i=0; i<patternList.size(); i++){
+			instanceVectorMap.put(patternList.get(i), fvs.get(i));
+		}
 		
 	}
 	
-	public void batchGetVectorsForClustering(String outputSummaryDir, String corpusName, InstanceList patternList
+	//if use this method, you should train a DCNN pattern model first. 
+	public void setFvsViaTrainedDCNN(String outputSummaryDir, String corpusName, InstanceList patternList
 			, MatlabProxy proxy) throws 
 	FileNotFoundException, IOException, ClassNotFoundException, MatlabInvocationException{
 		
@@ -640,450 +495,37 @@ public class FeatureVectorGenerator extends Pipe{
 		String matOutputFile = outputSummaryDir + "/" + corpusName + "_Out_AllPosi.mat";
 		
 		
-		ArrayList<FeatureVector> fvs = FeatureVectorGenerator.
-				getInstancesVectors(modelOutputFile, matInputFile_AllPosi,
-				matOutputFile, proxy);
+		ArrayList<FeatureVector> fvs = new ArrayList<FeatureVector>();
+		proxy.eval("addpath('/home/peng/Develop/Workspace/Mavericks/platform/src/main/java/edu"
+				+ "/pengli/nlp/platform/algorithms/neuralnetwork/DCNN')");
+		proxy.eval("MyScript('"+modelOutputFile+"',"+"'"+matInputFile+"',"+"'"+matOutputFile+"'"+")");
+
+		MatFileReader mr = new MatFileReader(matOutputFile);
+		MLDouble data = (MLDouble)mr.getMLArray("M_3");
+		double[][] arr = data.getArray();
+		int m = data.getM();
+		int n = data.getN();
+		
+		for(int i=0; i<m; i++){
+			double[] vec = new double[n];
+			int[] idx = new int[n];
+			int c = 0;
+			for(int j=0; j<n; j++){
+				vec[c++] = arr[i][j];
+				idx[j] = j;
+			}
+			FeatureVector fv = new FeatureVector(idx, vec);
+			fvs.add(fv);
+		}
+
 	
 		for(int i=0; i<patternList.size(); i++){
 			instanceVectorMap.put(patternList.get(i), fvs.get(i));
 		}
 		
 	}
-	
-	public void batchGenerateVectorsBySpecificPatterns(String outputSummaryDir,
-			String corpusName, InstanceList patternList, 
-			MatlabProxy proxy) throws IOException, MatlabInvocationException{
 		
-		ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(
-				outputSummaryDir + "/" +corpusName + ".dict.ser"));
-		
-		Alphabet dictionary = new Alphabet();
-		int maxPatternSize = 0;
-		InstanceList instances = new InstanceList(null);
-		HashSet<String> set = new HashSet<String>();
-		HashMap<Instance, Instance> tmpMap = new HashMap<Instance, Instance>();
-		
-		// put all pattern and tuple mentions into dictionary
-		for(Instance instance : patternList){
-			Pattern p = (Pattern)instance.getSource();
-			ArrayList<IndexedWord> wordList = new ArrayList<IndexedWord>();
-			wordList.addAll(p.getArg1());
-			wordList.addAll(p.getRel());
-			wordList.addAll(p.getArg2());
-			for(IndexedWord iw : wordList){
-				String wordMention = iw.originalText();
-				wordMention = wordMention.replaceAll(" ", "_");
-				dictionary.lookupIndex(wordMention);	
-			}
-			String arg1Type = p.getArg1().getHead().ner().toUpperCase();
-			arg1Type = arg1Type.replaceAll(" ", "_");
-			dictionary.lookupIndex(arg1Type);
-			
-			String arg2Type = p.getArg2().getHead().ner().toUpperCase();
-			arg2Type = arg2Type.replaceAll(" ", "_");
-			dictionary.lookupIndex(arg2Type);
-			
-		}
-		
-		//also need put all other tuples into dictionary
-		for(Instance instance : patternList){
-			Pattern p = (Pattern)instance.getSource();
-			CoreMap sentence = p.getTuple().getAnnotatedSentence();
-			SemanticGraph graph = sentence.get(BasicDependenciesAnnotation.class);
-			List<CoreLabel> labels = sentence.get(TokensAnnotation.class);
-			StringBuilder negativePattern = new StringBuilder();
-			for (int i = 0; i < labels.size(); i++) {
-				CoreLabel token = labels.get(i);
-				//token may contain punc, however graph may not contain punc, so word may be null
-				IndexedWord word = graph.getNodeByIndexSafe(token.index());
-				if(p.getArg1().contains(word) || p.getRel().contains(word)
-						|| p.getArg2().contains(word))
-					continue;
-								
-				if(word != null){
-					String wordMention = word.originalText();
-					wordMention = wordMention.replaceAll(" ", "_");
-					negativePattern.append(wordMention+" ");
-					dictionary.lookupIndex(wordMention);
-				}else{
-					String tokenMention = token.originalText();
-					tokenMention = tokenMention.replaceAll(" ", "_");
-					negativePattern.append(tokenMention+" ");
-					dictionary.lookupIndex(tokenMention);
-				}
-			}
-
-		
-			//pattern cover original sentence, so there is no negative pattern					
-			if(!negativePattern.toString().trim().equals("") && 
-					!set.contains(negativePattern.toString().trim())){
-				set.add(negativePattern.toString().trim());
-				Instance negativeInst = new Instance(negativePattern.toString().trim(), 
-						"2", "negativePattern", sentence);
-				instances.add(negativeInst);
-			}
-			
-			StringBuilder positivePattern = new StringBuilder();
-
-			int size = 0;
-			String arg1Type = p.getArg1().getHead().ner().toUpperCase();
-			arg1Type = arg1Type.replaceAll(" ", "_");
-			for(IndexedWord iw : p.getArg1()){
-				size++;
-				if(iw.index() == p.getArg1().getHead().index()){
-					positivePattern.append(arg1Type+" ");
-				}else
-					positivePattern.append(iw.originalText().replaceAll(" ", "_")+" ");
-			}
-				
-			for(IndexedWord iw : p.getRel()){
-				size++;
-				String mention = iw.originalText();
-				mention = mention.replaceAll(" ", "_");
-				positivePattern.append(mention+" ");
-			}
-
-			String arg2Type = p.getArg2().getHead().ner().toUpperCase();
-			arg2Type = arg2Type.replaceAll(" ", "_");
-			for(IndexedWord iw : p.getArg2()){
-				size++;	
-				if(iw.index() == p.getArg2().getHead().index()){
-					positivePattern.append(arg2Type+" ");
-				}else
-					positivePattern.append(iw.originalText().replaceAll(" ", "_")+" ");
-			}		
-				
-			Instance positiveInst = new Instance(positivePattern.toString().trim(), 
-					"1", "positivePattern", sentence);
-			tmpMap.put(positiveInst, instance);
-			instances.add(positiveInst);
-			if(size >= maxPatternSize)
-				maxPatternSize = size;
-		}
-		
-		ArrayList<String[]> training = new ArrayList<String[]>();
-		ArrayList<String[]> validating = new ArrayList<String[]>();
-		ArrayList<String[]> testing  = new ArrayList<String[]>();
-		ArrayList<String[]> allPositives  = new ArrayList<String[]>();
-		ArrayList<Instance> allPositives_L  = new ArrayList<Instance>();
-		for(Instance inst: instances){
-			String label = (String)inst.getTarget();
-			if(label.equals("1")){
-				String[] map = new String[2];
-				map[0] = (String)inst.getData();
-				map[1] = "1";
-				allPositives.add(map);
-				allPositives_L.add(inst);
-			}	
-		}
-		
-		if(allPositives.size() != patternList.size()){
-			System.out.println("match error");
-			System.exit(0);
-		}
-		
-		Random rand = new Random();
-		int size = instances.size();
-		int newSize = size;
-		for(int i=0; i< size*0.7; i++){
-			int ran = rand.nextInt(newSize);
-			String instLabel = (String)instances.get(ran).getTarget();
-			String[] map = new String[2];
-			map[0] = (String)instances.get(ran).getData();
-			map[1] = instLabel;
-			training.add(map);
-			instances.remove(ran);
-			newSize--;
-		}
-		for(int i=0; i< size*0.2; i++){
-			int ran = rand.nextInt(newSize);
-			String instLabel = (String)instances.get(ran).getTarget();
-			String[] map = new String[2];
-			map[0] = (String)instances.get(ran).getData();
-			map[1] = instLabel;
-			validating.add(map);
-			instances.remove(ran);
-			newSize--;
-		}
-		for(Instance inst : instances){
-			String instLabel = (String)inst.getTarget();
-			String[] map = new String[2];
-			map[0] = (String)inst.getData();
-			map[1] = instLabel;
-			testing.add(map);
-		}					
-		int[] dims = new int[2];
-		dims[0] = dictionary.size();
-		dims[1] = 1;
-		MLCell cell = new MLCell("index", dims);
-		for(int i=0; i<dictionary.size(); i++){
-			String value = (String)dictionary.lookupObject(i);
-			MLArray val = new MLChar("string", value);
-			cell.set(val, i, 0);
-		}
-		
-		double[] vocSize_arr = new double[1];
-		vocSize_arr[0] = dictionary.size()+1;
-		
-		double[] sentLength_arr = new double[1];
-		sentLength_arr[0] = maxPatternSize+1;
-		ArrayList list = new ArrayList();
-		ArrayList list2 = new ArrayList();
-		list.add(cell);
-		list2.add(cell);
-		list.add(new MLDouble("sent_length", sentLength_arr, 1));
-		list2.add(new MLDouble("sent_length", sentLength_arr, 1));
-		list.add(new MLDouble("size_vocab", vocSize_arr, 1));
-		list2.add(new MLDouble("size_vocab", vocSize_arr, 1));
-		list.addAll(generateMatlabInput(testing, "test", maxPatternSize, dictionary));
-		list2.addAll(generateMatlabInput(testing, "test", maxPatternSize, dictionary));
-		list.addAll(generateMatlabInput(training, "train", maxPatternSize, dictionary));
-		list2.addAll(generateMatlabInput(training, "train", maxPatternSize, dictionary));	
-		list.addAll(generateMatlabInput(validating, "valid", maxPatternSize, dictionary));
-		list2.addAll(generateMatlabInput(allPositives, "valid", maxPatternSize, dictionary));
-		
-
-		int dim = 50;
-		double[] vec = new double[dim*dictionary.size()];
-		int c = 0;
-		HashMap<String, float[]> wordMap = initializeWordVectorMap();
-		for(int i=0; i<dictionary.size(); i++){
-			String word = (String)dictionary.lookupObject(i);
-			float[] wordVector = wordMap.get(word);
-			if(wordVector == null){
-				for (int a = 0; a < dim; a++) {
-					vec[c++] = rand.nextDouble();
-				}
-			}else{
-				for (int a = 0; a < dim; a++) {
-					vec[c++] = wordVector[a];
-				}
-			}
-		
-		}
-		list.add(new MLDouble("vocab_emb", vec, dim));
-		list2.add(new MLDouble("vocab_emb", vec, dim));
-		String matInputFile = outputSummaryDir + "/" + corpusName + "_In.mat";
-		String matInputFile2 = outputSummaryDir + "/" + corpusName + "_In2.mat";
-		String modelOutputFile = outputSummaryDir + "/" + corpusName + "_Model.mat";
-		String matOutputFile = outputSummaryDir + "/" + corpusName + "_Out.mat";
-		new MatFileWriter(matInputFile, list);
-		new MatFileWriter(matInputFile2, list2);
-		
-		proxy.eval("addpath('/home/peng/Develop/Workspace/Mavericks/platform/src/main/java/edu"
-				+ "/pengli/nlp/platform/algorithms/neuralnetwork/DCNN')");
-		proxy.eval("Train('"+matInputFile+"', '"+modelOutputFile+"')");
-		
-		ArrayList<FeatureVector> fvs = getInstancesVectors( 
-				modelOutputFile, matInputFile2, matOutputFile, proxy);
-		
-		if(fvs.size() != allPositives.size()){
-			System.out.println("fv size is not equal all Positives size");
-			System.exit(0);
-		}
-
-		for(int i=0; i<allPositives.size(); i++){
-			instanceVectorMap.put(tmpMap.get(allPositives_L.get(i)), fvs.get(i));
-		}
-		
-		out.writeObject(dictionary);
-		out.writeInt(maxPatternSize);
-		out.close();
-	}
-	
-/*	public void batchGenerateVectorsByTuples(String outputSummaryDir,
-			String corpusName, InstanceList patternList, 
-			MatlabProxy proxy) throws IOException, MatlabInvocationException{
-			
-		Alphabet dictionary = new Alphabet();
-		int maxPatternSize = 0;
-		InstanceList instances = new InstanceList(null);
-		HashSet<String> set = new HashSet<String>();
-		HashMap<Instance, Instance> tmpMap = new HashMap<Instance, Instance>();
-		for(Instance instance : patternList){
-			Pattern p = (Pattern)instance.getSource();
-			CoreMap sentence = p.getAnnotatedSentence();
-			
-			SemanticGraph graph = sentence.get(BasicDependenciesAnnotation.class);
-			List<CoreLabel> labels = sentence.get(TokensAnnotation.class);
-			StringBuilder negativeTuple = new StringBuilder();
-			for (int i = 0; i < labels.size() - 1; i++) {
-				CoreLabel nextToken = labels.get(i+1);
-				//token may contain punc, however graph may not contain punc, so word may be null
-				IndexedWord word = graph.getNodeByIndexSafe(nextToken.index());
-				if(p.getArg1().contains(word) || p.getRel().contains(word)
-						|| p.getArg2().contains(word))
-					continue;
-				if(word != null){
-					negativeTuple.append(word.originalText()+" ");
-					dictionary.lookupIndex(word.originalText());	
-				}		
-			}
-
-			
-			//pattern cover original sentence, so there is no negative pattern					
-			if(!negativeTuple.toString().trim().equals("") && 
-					!set.contains(negativeTuple.toString().trim())){
-				set.add(negativeTuple.toString().trim());
-				Instance negativeInst = new Instance(negativeTuple.toString().trim(), 
-						"2", "negativeTuple", sentence);
-				instances.add(negativeInst);
-			}
-			
-			StringBuilder positiveTuple = new StringBuilder();
-		
-			int size = 0;
-			for(IndexedWord iw : p.getArg1()){
-				size++;
-				dictionary.lookupIndex(iw.originalText());	
-				positiveTuple.append(iw.originalText()+" ");
-			}
-			
-			for(IndexedWord iw : p.getRel()){
-				size++;
-				dictionary.lookupIndex(iw.originalText());
-				positiveTuple.append(iw.originalText()+" ");
-			}
-
-			for(IndexedWord iw : p.getArg2()){
-				size++;
-				dictionary.lookupIndex(iw.originalText());
-				positiveTuple.append(iw.originalText()+" ");
-			}		
-			
-			Instance positiveInst = new Instance(positiveTuple.toString().trim(), 
-					"1", "positiveTuple", sentence);
-			tmpMap.put(positiveInst, instance);
-			instances.add(positiveInst);
-			if(size >= maxPatternSize)
-				maxPatternSize = size;
-		}
-		
-		ArrayList<String[]> training = new ArrayList<String[]>();
-		ArrayList<String[]> validating = new ArrayList<String[]>();
-		ArrayList<String[]> testing  = new ArrayList<String[]>();
-		ArrayList<String[]> allPositives  = new ArrayList<String[]>();
-		ArrayList<Instance> allPositives_L  = new ArrayList<Instance>();
-		for(Instance inst: instances){
-			String label = (String)inst.getTarget();
-			if(label.equals("1")){
-				String[] map = new String[2];
-				map[0] = (String)inst.getData();
-				map[1] = "1";
-				allPositives.add(map);
-				allPositives_L.add(inst);
-			}	
-		}
-		
-		if(allPositives.size() != patternList.size()){
-			System.out.println("match error");
-			System.exit(0);
-		}
-		
-		Random rand = new Random();
-		int size = instances.size();
-		int newSize = size;
-		for(int i=0; i< size*0.7; i++){
-			int ran = rand.nextInt(newSize);
-			String instLabel = (String)instances.get(ran).getTarget();
-			String[] map = new String[2];
-			map[0] = (String)instances.get(ran).getData();
-			map[1] = instLabel;
-			training.add(map);
-			instances.remove(ran);
-			newSize--;
-		}
-		for(int i=0; i< size*0.2; i++){
-			int ran = rand.nextInt(newSize);
-			String instLabel = (String)instances.get(ran).getTarget();
-			String[] map = new String[2];
-			map[0] = (String)instances.get(ran).getData();
-			map[1] = instLabel;
-			validating.add(map);
-			instances.remove(ran);
-			newSize--;
-		}
-		for(Instance inst : instances){
-			String instLabel = (String)inst.getTarget();
-			String[] map = new String[2];
-			map[0] = (String)inst.getData();
-			map[1] = instLabel;
-			testing.add(map);
-		}					
-		int[] dims = new int[2];
-		dims[0] = dictionary.size();
-		dims[1] = 1;
-		MLCell cell = new MLCell("index", dims);
-		for(int i=0; i<dictionary.size(); i++){
-			String value = (String)dictionary.lookupObject(i);
-			MLArray val = new MLChar("string", value);
-			cell.set(val, i, 0);
-		}
-		
-		double[] vocSize_arr = new double[1];
-		vocSize_arr[0] = dictionary.size()+1;
-		
-		double[] sentLength_arr = new double[1];
-		sentLength_arr[0] = maxPatternSize+1;
-		ArrayList list = new ArrayList();
-		ArrayList list2 = new ArrayList();
-		list.add(cell);
-		list2.add(cell);
-		list.add(new MLDouble("sent_length", sentLength_arr, 1));
-		list2.add(new MLDouble("sent_length", sentLength_arr, 1));
-		list.add(new MLDouble("size_vocab", vocSize_arr, 1));
-		list2.add(new MLDouble("size_vocab", vocSize_arr, 1));
-		list.addAll(generateMatlabInput(testing, "test", maxPatternSize, dictionary));
-		list2.addAll(generateMatlabInput(testing, "test", maxPatternSize, dictionary));
-		list.addAll(generateMatlabInput(training, "train", maxPatternSize, dictionary));
-		list2.addAll(generateMatlabInput(training, "train", maxPatternSize, dictionary));	
-		list.addAll(generateMatlabInput(validating, "valid", maxPatternSize, dictionary));
-		list2.addAll(generateMatlabInput(allPositives, "valid", maxPatternSize, dictionary));
-		
-
-		int dim = 50;
-		double[] vec = new double[dim*dictionary.size()];
-		int c = 0;
-		for(int i=0; i<dictionary.size(); i++){
-			String word = (String)dictionary.lookupObject(i);
-			float[] wordVector = wordMap.get(word);
-			if(wordVector == null){
-				for (int a = 0; a < dim; a++) {
-					vec[c++] = rand.nextDouble();
-				}
-			}else{
-				for (int a = 0; a < dim; a++) {
-					vec[c++] = wordVector[a];
-				}
-			}
-		
-		}
-		list.add(new MLDouble("vocab_emb", vec, dim));
-		list2.add(new MLDouble("vocab_emb", vec, dim));
-		String matInputFile = outputSummaryDir + "/" + corpusName + "_In.mat";
-		String matInputFile2 = outputSummaryDir + "/" + corpusName + "_In2.mat";
-		String modelOutputFile = outputSummaryDir + "/" + corpusName + "_Model.mat";
-		String matOutputFile = outputSummaryDir + "/" + corpusName + "_Out.mat";
-		new MatFileWriter(matInputFile, list);
-		new MatFileWriter(matInputFile2, list2);
-		
-		ArrayList<FeatureVector> fvs = getSentenceVectors(matInputFile, matInputFile2, 
-				modelOutputFile, matOutputFile, proxy);
-		
-		if(fvs.size() != allPositives.size()){
-			System.out.println("fv size is not equal all Positives size");
-			System.exit(0);
-		}
-
-		instanceVectorMap = new HashMap<Instance, FeatureVector>();
-		for(int i=0; i<allPositives.size(); i++){
-			instanceVectorMap.put(tmpMap.get(allPositives_L.get(i)), fvs.get(i));
-		}
-		
-
-	}*/
-	
-	public static ArrayList<MLDouble> generateMatlabInput
+	private static ArrayList<MLDouble> generateMatlabInput
 	(ArrayList<String[]> instances, String name, int maxPatternSize, Alphabet dictionary){	
 		ArrayList<int[]> matrix = new ArrayList<int[]>();
 		ArrayList<int[]> lbl_matrix = new ArrayList<int[]>();
@@ -1130,121 +572,25 @@ public class FeatureVectorGenerator extends Pipe{
 		ret.add(new MLDouble(name+"_lbl", lbl_arr, instances.size()));
 		return ret;
 	}
-		
-	public static ArrayList<FeatureVector> getInstancesVectors(String modelOutputFile, String matInputFile, 
-			String matOutputFile, MatlabProxy proxy) 
-					throws MatlabInvocationException, FileNotFoundException, IOException{
-		
-		proxy.eval("addpath('/home/peng/Develop/Workspace/Mavericks/platform/src/main/java/edu"
-				+ "/pengli/nlp/platform/algorithms/neuralnetwork/DCNN')");
-		proxy.eval("MyScript('"+modelOutputFile+"',"+"'"+matInputFile+"',"+"'"+matOutputFile+"'"+")");
 
-		
-		MatFileReader red = new MatFileReader(matOutputFile);
-		MLDouble data = (MLDouble)red.getMLArray("M_3");
-		double[][] arr = data.getArray();
-		int m = data.getM();
-		int n = data.getN();
-		
-		ArrayList<FeatureVector> ret = new ArrayList<FeatureVector>();
-		for(int i=0; i<m; i++){
-			double[] vec = new double[n];
-			int[] idx = new int[n];
-			int c = 0;
-			for(int j=0; j<n; j++){
-				vec[c++] = arr[i][j];
-				idx[j] = j;
-			}
-			FeatureVector fv = new FeatureVector(idx, vec);
-			ret.add(fv);
-		}
-		return ret;
-	}
-	
-	public static FeatureVector getKeywordsVector(String outputSummaryDir, 
-			String[] keywords, int sizeofWordVector, MatlabProxy proxy){
-		
-		MatlabTypeConverter processor = new MatlabTypeConverter(proxy);
-		String modelOutputFile = outputSummaryDir + "/" + "ALL" + "_Model.mat";
-		FeatureVector fv = null;
-		
-		try {
-			
-			ObjectInputStream in= new ObjectInputStream(new FileInputStream(
-				outputSummaryDir + "/" + "ALL" + ".dict.ser"));
-			
-			Alphabet dictionary = (Alphabet)in.readObject();
-		
-			double[][] arr = new double[sizeofWordVector][dictionary.size()];
-	
-			proxy.eval("addpath('/home/peng/Develop/Workspace/Mavericks/platform/src/main/java/edu"
-					+ "/pengli/nlp/platform/algorithms/neuralnetwork/DCNN')");
-			proxy.eval("load('"+modelOutputFile+"')");
-			proxy.eval("[CR_E, CR_1, CR_1_b, CR_2, CR_2_b, CR_3, CR_3_b, CR_Z, ~, ~] "
-					+ "= stack2param(X, decodeInfo);");
-			
-			arr = processor.getNumericArray("CR_E")
-					.getRealArray2D();
-	
-			int rowNumber = sizeofWordVector;
-			int columnNumber = dictionary.size();
-			double[] vec = new double[rowNumber];
-			for(String word : keywords){
-				word = word.replaceAll(" ", "_");
-				int wordIdx = dictionary.lookupIndex(word, false);
-				for(int j=0; j< columnNumber; j++){
-					if(j == wordIdx){
-						for(int i=0; i<rowNumber; i++)
-							vec[i] += arr[i][j];
-					}	
-				}
-			}
-			
-/*			for (int a = 0; a < rowNumber; a++) {
-				vec[a] /= rowNumber;
-			}*/
-			
-			int[] idx = new int[rowNumber];
-			for(int a = 0; a < rowNumber; a++){
-				idx[a] = a;
-			}
-			
-			fv = new FeatureVector(idx, vec);
-			
-		} catch (FileNotFoundException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (MatlabInvocationException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-		return fv;
-	}
-
-
-	private HashMap<String, float[]> initializeWordVectorMap() throws IOException{
+	private void initializeWordVectorMap(){
 		System.out.println("Begin to load word vectors");
 		
 		int max_w = 50; // max length of vocabulary entries
         String modelPath = "/home/peng/Develop/Workspace/Mavericks/models"
         		+ "/word2vec/GoogleNews-vectors-negative300.bin";	
-		HashMap<String, float[]> wordMap = new HashMap<String, float[]>();
-		BufferedInputStream bis = new BufferedInputStream(new FileInputStream(
-				modelPath));
+
+		BufferedInputStream bis;
+		try {
+			bis = new BufferedInputStream(new FileInputStream(
+					modelPath));
+	
 		DataInputStream dis = new DataInputStream(bis);
 		int words, size;
 		double len;
 		String firstLine = dis.readLine();
 		words = Integer.parseInt(firstLine.split(" ")[0]);
 		size = Integer.parseInt(firstLine.split(" ")[1]);
-		int dimension = size;
 		String word;
 		float[] vectors = null;
 		for (int b = 0; b < words; b++) {
@@ -1263,11 +609,19 @@ public class FeatureVectorGenerator extends Pipe{
 			}		
 			wordMap.put(word, vectors);
 		}
+		
 		bis.close();
 		dis.close();
 		
-		return wordMap;
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		
+		System.out.println("load word vectors is done");	
 	}
 	
 	private static float readFloat(InputStream is) throws IOException {
