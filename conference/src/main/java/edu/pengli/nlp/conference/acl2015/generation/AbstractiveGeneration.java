@@ -491,277 +491,298 @@ public class AbstractiveGeneration {
 			}
 		}
 	}
-	
+
 	private ArrayList<ArrayList<IndexedWord>> travelAllPaths(
-			SemanticGraph graph, IndexedWord endNode){
-		
+			SemanticGraph graph, IndexedWord endNode) {
+
 		ArrayList<ArrayList<IndexedWord>> ret = new ArrayList<ArrayList<IndexedWord>>();
-		
+
 		Stack<IndexedWord> stack = new Stack<IndexedWord>();
 		Stack<IndexedWord> path = new Stack<IndexedWord>();
 		HashSet<IndexedWord> candidatePoints = new HashSet<IndexedWord>();
-		
-		//insert START
+
+		// insert START
 		stack.add(graph.getFirstRoot());
-		boolean stackEmpty = false;		
+		boolean stackEmpty = false;
 		boolean pathArriveEnd = false;
-		
+
 		while (!stack.isEmpty()) {
-			
-			if(!path.isEmpty() && stack.peek().index() == -2){
+
+			if (!path.isEmpty() && stack.peek().index() == -2) {
 				pathArriveEnd = true;
 			}
-				
+
 			boolean containsCandidate = false;
-			
-			//if path arrive end
-			if(pathArriveEnd){
+
+			// if path arrive end
+			if (pathArriveEnd) {
 
 				ArrayList<IndexedWord> pa = new ArrayList<IndexedWord>();
-				for(IndexedWord iw : path){
+				for (IndexedWord iw : path) {
 					pa.add(iw);
 				}
-				ret.add(pa);	
-				
-				//pop end
+				ret.add(pa);
+
+				// pop end
 				stack.pop();
-				if(stack.isEmpty()){
+				if (stack.isEmpty()) {
 					stackEmpty = true;
 					break;
 				}
-									
-				//Backtracking path, using top element of stack to decide backtracking point.
-				while(!path.isEmpty()){
-					
-					if(stackEmpty == false){
-						boolean isSibing = graph.getSiblings(path.peek()).contains(stack.peek());
-						int isParent = graph.isAncestor(stack.peek(), path.peek());
-						
-						//reach end
-						if(stack.peek().index() == -2){
+
+				// Backtracking path, using top element of stack to decide
+				// backtracking point.
+				while (!path.isEmpty()) {
+
+					if (stackEmpty == false) {
+						boolean isSibing = graph.getSiblings(path.peek())
+								.contains(stack.peek());
+						int isParent = graph.isAncestor(stack.peek(),
+								path.peek());
+
+						// reach end
+						if (stack.peek().index() == -2) {
 							pathArriveEnd = true;
 							break;
-						}else
+						} else
 							pathArriveEnd = false;
-						
-						//case 1: if stack.peek is the child of path.peek. then insert
-						if(isParent==1 && !path.contains(stack.peek())){
+
+						// case 1: if stack.peek is the child of path.peek. then
+						// insert
+						if (isParent == 1 && !path.contains(stack.peek())) {
 							path.push(stack.peek());
 							break;
-							
-						//case 2: if stack.peek is the sibling of path.peek. then walk towards sibling.
-						}else if(isSibing && !path.contains(stack.peek())){
-							if(path.size() == 1)
+
+							// case 2: if stack.peek is the sibling of
+							// path.peek. then walk towards sibling.
+						} else if (isSibing && !path.contains(stack.peek())) {
+							if (path.size() == 1)
 								break;
-							
+
 							path.pop();
-							
-							int parent = graph.isAncestor(stack.peek(), path.peek());
-							if(parent == 1){
+
+							int parent = graph.isAncestor(stack.peek(),
+									path.peek());
+							if (parent == 1) {
 								path.push(stack.peek());
 								break;
-							}else{
-								//find the parent of stack.peek on path
-								do{
+							} else {
+								// find the parent of stack.peek on path
+								do {
 									path.pop();
-									
-								}while(!path.empty() && graph.isAncestor(stack.peek(), path.peek()) != 1);
-								
+
+								} while (!path.empty()
+										&& graph.isAncestor(stack.peek(),
+												path.peek()) != 1);
+
 								path.push(stack.peek());
 								break;
 							}
-							
-						//case 3: stack.peek() equals path.peek()
-						}else if(stack.peek().equals(path.peek())){
-							
-							if(path.size() == 1)
+
+							// case 3: stack.peek() equals path.peek()
+						} else if (stack.peek().equals(path.peek())) {
+
+							if (path.size() == 1)
 								break;
-							
-							
+
 							IndexedWord flag = null;
-							do{
+							do {
 								flag = path.pop();
-								
-							}while(!path.empty()&&path.peek().index() != -1);
-							
-							
-							if(path.empty())
+
+							} while (!path.empty() && path.peek().index() != -1);
+
+							if (path.empty())
 								break;
-						
-							do{
+
+							do {
 								stack.pop();
-								if(stack.isEmpty()){
+								if (stack.isEmpty()) {
 									stackEmpty = true;
 									break;
 								}
-								
-							}while(!path.empty() && graph.isAncestor(stack.peek(), path.peek()) != 1 
+
+							} while (!path.empty()
+									&& graph.isAncestor(stack.peek(),
+											path.peek()) != 1
 									|| flag.equals(stack.peek()));
-							
-							if(stackEmpty == false){
-								if(!candidatePoints.contains(stack.peek())){
+
+							if (stackEmpty == false) {
+								if (!candidatePoints.contains(stack.peek())) {
 									candidatePoints.add(stack.peek());
-									path.push(stack.peek());	
-								}else{
+									path.push(stack.peek());
+								} else {
 									containsCandidate = true;
-									//choose candidate stack.peek
-									do{
+									// choose candidate stack.peek
+									do {
 										stack.pop();
-										if(stack.isEmpty()){
+										if (stack.isEmpty()) {
 											stackEmpty = true;
 											break;
 										}
-										
-									}while(!path.empty() && graph.isAncestor(stack.peek(), path.peek()) != 1 
-											|| flag.equals(stack.peek()) || candidatePoints.contains(stack.peek()));
+
+									} while (!path.empty()
+											&& graph.isAncestor(stack.peek(),
+													path.peek()) != 1
+											|| flag.equals(stack.peek())
+											|| candidatePoints.contains(stack
+													.peek()));
 								}
-									
-								
-							}	
-								
+
+							}
+
 							break;
-							
-						}else if(graph.isAncestor(endNode, path.peek()) == 1){
+
+						} else if (graph.isAncestor(endNode, path.peek()) == 1) {
 							pathArriveEnd = true;
 							break;
-						}else
+						} else
 							path.pop();
-					}else
+					} else
 						break;
 				}
-																
-			}else{
 
-				if(!path.contains(stack.peek()))
+			} else {
+
+				if (!path.contains(stack.peek()))
 					path.push(stack.peek());
-				else{
-					//choose another way
+				else {
+					// choose another way
 					stack.pop();
-					if(stack.isEmpty())
+					if (stack.isEmpty())
 						stackEmpty = true;
-					
-					//Backtracking path, using top element of stack to decide backtracking point.
-					while(!path.isEmpty()){
-						
-						if(stackEmpty == false){
-							boolean isSibing = graph.getSiblings(path.peek()).contains(stack.peek());
-							int isParent = graph.isAncestor(stack.peek(), path.peek());
-							
-							//reach end
-							if(stack.peek().index() == -2){
+
+					// Backtracking path, using top element of stack to decide
+					// backtracking point.
+					while (!path.isEmpty()) {
+
+						if (stackEmpty == false) {
+							boolean isSibing = graph.getSiblings(path.peek())
+									.contains(stack.peek());
+							int isParent = graph.isAncestor(stack.peek(),
+									path.peek());
+
+							// reach end
+							if (stack.peek().index() == -2) {
 								pathArriveEnd = true;
 								break;
-							}else
+							} else
 								pathArriveEnd = false;
-							
-							//case 1: if stack.peek is the child of path.peek. then insert
-							if(isParent==1 && !path.contains(stack.peek())){
+
+							// case 1: if stack.peek is the child of path.peek.
+							// then insert
+							if (isParent == 1 && !path.contains(stack.peek())) {
 								path.push(stack.peek());
 								break;
-								
-							//case 2: if stack.peek is the sibling of path.peek. then walk towards sibling.
-							}else if(isSibing && !path.contains(stack.peek())){
-								if(path.size() == 1)
+
+								// case 2: if stack.peek is the sibling of
+								// path.peek. then walk towards sibling.
+							} else if (isSibing && !path.contains(stack.peek())) {
+								if (path.size() == 1)
 									break;
-								
+
 								path.pop();
-								int parent = graph.isAncestor(stack.peek(), path.peek());
-								if(parent == 1){
+								int parent = graph.isAncestor(stack.peek(),
+										path.peek());
+								if (parent == 1) {
 									path.push(stack.peek());
 									break;
-								}else{
-									//find the parent of stack.peek on path
-									do{
+								} else {
+									// find the parent of stack.peek on path
+									do {
 										path.pop();
-										
-									}while(graph.isAncestor(stack.peek(), path.peek()) != 1);
-									
+
+									} while (graph.isAncestor(stack.peek(),
+											path.peek()) != 1);
+
 									path.push(stack.peek());
 									break;
 								}
-								
-							//case 3: stack.peek() equals path.peek()
-							}else if(stack.peek().equals(path.peek())){
-								
-								if(path.size() == 1)
+
+								// case 3: stack.peek() equals path.peek()
+							} else if (stack.peek().equals(path.peek())) {
+
+								if (path.size() == 1)
 									break;
 
-								
 								// flag is the next token of start, clear path
 								IndexedWord flag = null;
 								boolean jump = false;
-								do{
-									if(graph.isAncestor(endNode, path.peek()) == 1){
+								do {
+									if (graph.isAncestor(endNode, path.peek()) == 1) {
 										jump = true;
 										break;
 									}
 									flag = path.pop();
-									
-								}while(path.peek().index() != -1);
-								
-								if(jump == true){
+
+								} while (path.peek().index() != -1);
+
+								if (jump == true) {
 									pathArriveEnd = true;
 									break;
-								}	
-								
-								do{
+								}
+
+								do {
 									stack.pop();
-									if(stack.isEmpty()){
+									if (stack.isEmpty()) {
 										stackEmpty = true;
 										break;
 									}
-									
-								}while(graph.isAncestor(stack.peek(), path.peek()) != 1 
+
+								} while (graph.isAncestor(stack.peek(),
+										path.peek()) != 1
 										|| flag.equals(stack.peek()));
-								
-								if(stackEmpty == false){
-									if(!candidatePoints.contains(stack.peek())){
+
+								if (stackEmpty == false) {
+									if (!candidatePoints.contains(stack.peek())) {
 										candidatePoints.add(stack.peek());
-										path.push(stack.peek());	
-									}else{
+										path.push(stack.peek());
+									} else {
 										containsCandidate = true;
-										//choose another candidate stack.peek
-										do{
+										// choose another candidate stack.peek
+										do {
 											stack.pop();
-											if(stack.isEmpty()){
+											if (stack.isEmpty()) {
 												stackEmpty = true;
 												break;
 											}
-											
-										}while(graph.isAncestor(stack.peek(), path.peek()) != 1 
-												|| flag.equals(stack.peek()) || candidatePoints.contains(stack.peek()));
+
+										} while (graph.isAncestor(stack.peek(),
+												path.peek()) != 1
+												|| flag.equals(stack.peek())
+												|| candidatePoints
+														.contains(stack.peek()));
 									}
-									
-								}		
-								
+
+								}
+
 								break;
-								
-							}else if(graph.isAncestor(endNode, path.peek()) == 1){
+
+							} else if (graph.isAncestor(endNode, path.peek()) == 1) {
 								pathArriveEnd = true;
 								break;
-							}else
+							} else
 								path.pop();
-						}else
+						} else
 							break;
 					}
 				}
 			}
-			
-			if(pathArriveEnd == true)
+
+			if (pathArriveEnd == true)
 				continue;
-					
-			if(containsCandidate == true)
+
+			if (containsCandidate == true)
 				continue;
-			
-			if(stackEmpty == true)
+
+			if (stackEmpty == true)
 				break;
-					
-			Iterable<SemanticGraphEdge> iter = 
-					graph.outgoingEdgeIterable(stack.pop());	
-			for (SemanticGraphEdge edge : iter) 
-				stack.push(edge.getDependent());		
-		}	
-		
+
+			Iterable<SemanticGraphEdge> iter = graph.outgoingEdgeIterable(stack
+					.pop());
+			for (SemanticGraphEdge edge : iter)
+				stack.push(edge.getDependent());
+		}
+
 		return ret;
 	}
 
@@ -1059,18 +1080,19 @@ public class AbstractiveGeneration {
 			String corpusName, InstanceList patternCluster, MatlabProxy proxy,
 			FeatureVectorGenerator fvGenerator) throws FileNotFoundException,
 			IOException, MatlabInvocationException, ClassNotFoundException {
+		
+		//1. find the best pattern
 
 		ArrayList<String> tupleCandidates = tupleFusion(patternCluster);
 		ArrayList<String> patternCandidates = patternFusion(patternCluster);
 		if (tupleCandidates.size() == 0 || patternCandidates.size() == 0) {
-			System.out.println(" tuple or pattern set is empty");
-			System.exit(0);
+			System.out.println("tuple or pattern set is empty");
+			return null;
 		}
 		ArrayList<String> candidates = new ArrayList<String>();
 		candidates.addAll(patternCandidates);
 		candidates.addAll(tupleCandidates);
 
-		// need a way to generate vectors
 		ArrayList<FeatureVector> patternTupleVectors = new ArrayList<FeatureVector>();
 		HashMap<String, float[]> wordMap = fvGenerator.getWordMap();
 		int dimension = 50;
@@ -1162,7 +1184,6 @@ public class AbstractiveGeneration {
 			}
 		}
 
-		// ret.add(tupleCandidates.get(idx));
 		HashMap sortedScores = RankMap.sortHashMapByValues(scores, false);
 		Set<Integer> ids = sortedScores.keySet();
 		ArrayList<Integer> IDS = new ArrayList<Integer>();
@@ -1194,52 +1215,117 @@ public class AbstractiveGeneration {
 		return predicted.getClusters();
 	}
 
-	// this method currently can't work
 	private InstanceList[] seedBasedClustering(String outputSummaryDir,
-			InstanceList instances, String categoryId, MatlabProxy proxy)
-			throws ClassNotFoundException, IOException,
-			MatlabInvocationException {
-
-		int sizeofWordVector = 20;
+			InstanceList instances, String categoryId, MatlabProxy proxy,
+			FeatureVectorGenerator fvGenerator) throws ClassNotFoundException,
+			IOException, MatlabInvocationException {
+		
+		HashMap<String, float[]> wordMap = fvGenerator.getWordMap();
 		InstanceList seeds = new InstanceList(new Noop());
 		Category[] cats = Category.values();
+		int dimension = 300;
 		for (Category cat : cats) {
 			if (cat.getId() == Integer.parseInt(categoryId)) {
 				Map<String, String[]> aspects = cat.getAspects(cat.getId());
-				/*
-				 * ArrayList<FeatureVector> fvs = FeatureVectorGenerator.
-				 * batchGetSeedVectorsForClustering(
-				 */
-				ArrayList<FeatureVector> fvs = null;
-				for (FeatureVector fv : fvs) {
-					Instance seed = new Instance(fv, null, null, null);
-					seeds.add(seed);
+				Set<String> keys = aspects.keySet();
+				for (String k : keys) {
+
+					String[] words = aspects.get(k);
+					InstanceList wordsList = new InstanceList(null);
+					for (String word : words) {
+						double[] vec = new double[dimension];
+						int[] idx = new int[dimension];
+						
+						float[] wordVector = wordMap.get(word);
+						if (wordVector == null)
+							continue;
+						for (int a = 0; a < dimension; a++) {
+							vec[a] = wordVector[a];
+							idx[a] = a;
+						}
+						
+						FeatureVector fv = new FeatureVector(idx, vec);
+						Instance wordInst = new Instance(fv, null, null, word);
+						wordsList.add(wordInst);
+					}
+					
+					InstanceList[] groups = kmeans(wordsList, 4);
+					for(InstanceList il : groups){
+						double[] vec = new double[dimension];
+						int[] idx = new int[dimension];
+						
+						for(Instance inst : il){
+							String word = (String)inst.getSource();
+							float[] wordVector = wordMap.get(word);
+							if (wordVector == null)
+								continue;
+							for (int a = 0; a < dimension; a++) {
+								vec[a] += wordVector[a];
+							}
+						}
+						
+						float len = 0;
+						for (int a = 0; a < dimension; a++) {
+							len += vec[a] * vec[a];
+						}
+						len = (float) Math.sqrt(len);
+						for (int a = 0; a < dimension; a++) {
+							vec[a] /= len;
+						}
+						
+						for(int a = 0; a <dimension; a++){
+							idx[a] = a;
+						}
+						
+						double[] vec3 = new double[dimension*3];
+						int[] idx3 = new int[dimension*3];
+						
+						int c=0;
+						for(int i=0; i<dimension*3; i++){
+							vec3[i] = vec[c++];
+							if(c==dimension)
+								c = 0;
+						}
+						
+						int d = 0;
+						for(int i=0; i<dimension*3; i++){
+							idx3[i] = d++;
+						}
+						
+						FeatureVector fv = new FeatureVector(idx3, vec3);
+						Instance seed = new Instance(fv, null, null, null);
+						seeds.add(seed);
+					}
 				}
 			}
 		}
 
+		// below code for plot for debug InstanceList allInsts = new
 		/*
-		 * //below code for plot for debug InstanceList allInsts = new
-		 * InstanceList(null); for(Instance seed : seeds) allInsts.add(seed);
-		 * for(Instance inst : instances) allInsts.add(inst);
+		 * InstanceList allInsts = new InstanceList(null); for(Instance seed :
+		 * seeds) allInsts.add(seed); for(Instance inst : instances)
+		 * allInsts.add(inst);
 		 * 
-		 * double[][] points = new double[instances.size()+seeds.size()][20];
+		 * int dim = 900; double[][] points = new
+		 * double[instances.size()+seeds.size()][dim];
 		 * 
-		 * double[] arr = new double[(instances.size()+seeds.size())*20];
+		 * double[] arr = new double[(instances.size()+seeds.size())*dim];
 		 * 
-		 * int dim = sizeofWordVector; for (int i = 0; i < allInsts.size(); i++)
-		 * { FeatureVector fv_i = (FeatureVector) allInsts.get(i).getData();
-		 * for(int l=0; l<dim; l++) points[i][l] = fv_i.getValues()[l]; }
 		 * 
-		 * int c = 0; for(int l=0; l<dim; l++){ for (int i = 0; i <
-		 * allInsts.size(); i++) { arr[c++] = points[i][l]; } } ArrayList list =
-		 * new ArrayList(); list.add(new MLDouble("D", arr, allInsts.size()));
+		 * for (int i = 0; i < allInsts.size(); i++) { FeatureVector fv_i =
+		 * (FeatureVector) allInsts.get(i).getData(); for(int l=0; l<dim; l++)
+		 * points[i][l] = fv_i.getValues()[l]; }
+		 * 
+		 * int c = 0; for(int l=0; l<dim; l++){ for (int i = 0; i
+		 * <allInsts.size(); i++) { arr[c++] = points[i][l]; } } ArrayList list
+		 * = new ArrayList(); list.add(new MLDouble("D", arr, allInsts.size()));
 		 * String matInputFile_AllPosi = "/home/peng/Downloads/visual/D.mat";
 		 * try { new MatFileWriter(matInputFile_AllPosi, list); } catch
 		 * (IOException e) { // TODO Auto-generated catch block
 		 * e.printStackTrace(); }
 		 */
 
+			
 		Metric metric = new NormalizedDotProductMetric();
 		SemiSupervisedClustering semiClustering = new SemiSupervisedClustering(
 				new Noop(), seeds, metric, proxy);
@@ -1253,21 +1339,25 @@ public class AbstractiveGeneration {
 			throws NumberFormatException, IOException,
 			MatlabInvocationException, ClassNotFoundException {
 
+		System.out.println("Begin to train RNN to score patterns");
+		trainRNN(outputSummaryDir, corpusName);
+
 		System.out.println("Begin pattern clustering");
 		PrintWriter out = FileOperation.getPrintWriter(new File(
 				outputSummaryDir), corpusName);
 
-		int numClusters = 25;
+		int numClusters = 35;
 		int length = 0;
 		boolean flag = false;
 		// method 1: kmeans unsupervised clustering
-		// ROUGE-SU4 is 0.09051 (k = 5), 0.08618, 0.0834|||
-		// ROUGE-SU4 is 0.10102 (k = 10),0.10499, 0.09232|||
-		// ROUGE-SU4 is 0.09713(k = 15),0.09561, 0.09172|||
-		// ROUGE-SU4 is 0.09903 (k = 20),0.10165, 0.08731|||
-		// ROUGE-SU4 is 0.09818(k = 25),0.10134, 0.08475|||
-		// ROUGE-SU4 is 0.09922 (k = 30),0.09821, 0.08981|||
-		InstanceList[] groups_k = kmeans(instances, numClusters);
+		// ROUGE-SU4 is 0.05967 (k = 5)
+		// ROUGE-SU4 is 0.091033 (k = 10)
+		// ROUGE-SU4 is 0.095726 (k = 15)
+		// ROUGE-SU4 is 0.093626 (k = 20)
+		// ROUGE-SU4 is 0.097913 (k = 25)
+		// ROUGE-SU4 is 0.096833 (k = 30)
+		// ROUGE-SU4 is 0.097646 (k = 35)
+/*		InstanceList[] groups_k = kmeans(instances, numClusters);
 		HashMap<InstanceList, Integer> tmp = new HashMap<InstanceList, Integer>();
 		for (InstanceList il : groups_k)
 			tmp.put(il, il.size());
@@ -1279,6 +1369,102 @@ public class AbstractiveGeneration {
 			InstanceList il = (InstanceList) iter.next();
 			ArrayList<String> lines = realization(outputSummaryDir, corpusName,
 					il, proxy, fvGenerator);
+			if (lines == null)
+				continue;
+			for (String line : lines) {
+				String[] toks = line.split(" ");
+				length += toks.length;
+				if (length <= 100)
+					out.println(line);
+				else {
+					length -= toks.length;
+					boolean stop = false;
+					for (int i = 0; i < toks.length; i++) {
+						out.print(toks[i] + " ");
+						length++;
+						if (length > 100) {
+							stop = true;
+							break;
+						}
+					}
+					if (stop == true) {
+						flag = true;
+						break;
+					}
+				}
+			}
+
+			if (flag == true)
+				break;
+		}*/
+
+		// method 2: spectral unsupervised clustering
+		// ROUGE-SU4 is 0.062786 (k = 5)
+		// ROUGE-SU4 is 0.090616 (k = 10)
+		// ROUGE-SU4 is 0.092833 (k = 15)
+		// ROUGE-SU4 is 0.0917933 (k = 20)
+		// ROUGE-SU4 is 0.093276 (k = 25)
+		// ROUGE-SU4 is 0.0953133 (k = 30)
+		// ROUGE-SU4 is 0.0934 (k = 35)
+
+/*		InstanceList[] groups_s = spectral(instances, numClusters, proxy);
+		HashMap<InstanceList, Integer> tmp = new HashMap<InstanceList, Integer>();
+		for (InstanceList il : groups_s)
+			tmp.put(il, il.size());
+		HashMap rankedMap = RankMap.sortHashMapByValues(tmp, false);
+		Set keys = rankedMap.keySet();
+		Iterator iter = keys.iterator();
+		while (iter.hasNext()) {
+			InstanceList il = (InstanceList) iter.next();
+			ArrayList<String> lines = realization(outputSummaryDir, corpusName,
+					il, proxy, fvGenerator);
+			if (lines == null)
+				continue;
+			for (String line : lines) {
+				String[] toks = line.split(" ");
+				length += toks.length;
+				if (length <= 100)
+					out.println(line);
+				else {
+					length -= toks.length;
+					boolean stop = false;
+					for (int i = 0; i < toks.length; i++) {
+						out.print(toks[i] + " ");
+						length++;
+						if (length > 100) {
+							stop = true;
+							break;
+						}
+					}
+					if (stop == true) {
+						flag = true;
+						break;
+					}
+				}
+			}
+
+			if (flag == true)
+				break;
+		}*/
+
+		// method 3: seed based semi-supervised clusterting
+		//ROUGE-SU4 is 0.091013, keywords 3 group
+		//ROUGE-SU4 is 0.093033, keywords 4 group
+
+		InstanceList[] groups_seed = seedBasedClustering(outputSummaryDir,
+				instances, categoryId, proxy, fvGenerator);
+		HashMap<InstanceList, Integer> tmp = new HashMap<InstanceList, Integer>();
+		for (InstanceList il : groups_seed)
+			tmp.put(il, il.size());
+		HashMap rankedMap = RankMap.sortHashMapByValues(tmp, false);
+		Set keys = rankedMap.keySet();
+		Iterator iter = keys.iterator();
+		while (iter.hasNext()) {
+			InstanceList il = (InstanceList) iter.next();
+			ArrayList<String> lines = realization(outputSummaryDir, corpusName,
+					il, proxy, fvGenerator);
+			if (lines == null)
+				continue;
 			for (String line : lines) {
 				String[] toks = line.split(" ");
 				length += toks.length;
@@ -1305,46 +1491,6 @@ public class AbstractiveGeneration {
 			if (flag == true)
 				break;
 		}
-
-		// method 2: spectral unsupervised clustering
-		// ROUGE-SU4 is 0.05952(s) (spectral k=5), 0.06928, 0.07414
-		// ROUGE-SU4 is 0.09729(s) (spectral k=10),0.10292, 0.08499
-		// ROUGE-SU4 is 0.10181(s) (spectral k=15),0.0994, 0.07983
-		// ROUGE-SU4 is 0.10121(s) (spectral k=20),0.09283, 0.08105
-		// ROUGE-SU4 is 0.10036(s) (spectral k=25),0.08921, 0.08951
-		// ROUGE-SU4 is 0.09361(s) (spectral k=30),0.09891, 0.0865
-		/*
-		 * InstanceList[] groups_s = spectral(instances, numClusters, proxy);
-		 * HashMap<InstanceList, Integer> tmp = new HashMap<InstanceList,
-		 * Integer>(); for(InstanceList il : groups_s) tmp.put(il, il.size());
-		 * HashMap rankedMap = RankMap.sortHashMapByValues(tmp, false); Set keys
-		 * = rankedMap.keySet(); Iterator iter = keys.iterator();
-		 * while(iter.hasNext()){ InstanceList il = (InstanceList)iter.next();
-		 * ArrayList<String> lines = realization(outputSummaryDir, corpusName,
-		 * il, proxy); for(String line : lines){ String[] toks =
-		 * line.split(" "); length += toks.length; if(length <= 100)
-		 * out.println(line); else{ length -= toks.length; boolean stop = false;
-		 * for(int i=0; i<toks.length; i++){ out.print(toks[i]+" "); length++;
-		 * if(length > 100){ stop = true; break; } } if(stop == true){ flag =
-		 * true; break; } } }
-		 * 
-		 * if(flag == true) break; }
-		 */
-		// method 3: seed based semi-supervised clusterting
-		// ROUGE-SU4 is 0.06363
-		// ROUGE-SU4 is 0.06572
-		/*
-		 * InstanceList[] groups_seed = seedBasedClustering(outputSummaryDir,
-		 * instances, categoryId, proxy); for(InstanceList cluster
-		 * :groups_seed){ if(cluster.size() == 0){
-		 * System.out.println("cluster is empty"); //System.exit(0); continue; }
-		 * String line = realization(outputSummaryDir, corpusName, cluster,
-		 * proxy); String[] toks = line.split(" "); length += toks.length;
-		 * if(length <= 100) out.println(line); else{ length -= toks.length;
-		 * boolean stop = false; for(int i=0; i<toks.length; i++){
-		 * out.print(toks[i]+" "); length++; if(length > 100){ stop = true;
-		 * break; } } if(stop == true) break; } }
-		 */
 
 		out.close();
 	}
@@ -1434,13 +1580,106 @@ public class AbstractiveGeneration {
 		System.out.println("Begin generate feature vectors for patterns");
 		// fvGenerator.setFvsViaTrainedDCNN(outputSummaryDir, corpusName,
 		// patternList, proxy);
-		fvGenerator.setFvsViaTrainedRNN(outputSummaryDir, corpusName,
-				patternList);
+		fvGenerator.setFvsViaPreTrainedWord2VecModel(outputSummaryDir,
+				corpusName, patternList);
 		instances.addThruPipe(patternList.iterator());
 
 		System.out.println("Begin generate final summary");
 		generateFinalSummary(outputSummaryDir, corpusName, instances,
 				categoryId, proxy, fvGenerator);
+
+	}
+	
+	public void run_SimpleNLG(String inputCorpusDir, String outputSummaryDir,
+			String corpusName, PipeLine pipeLine, String categoryId,
+			MatlabProxy proxy) throws Exception {
+
+		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + corpusName + ".patterns.ser"));
+		HashSet<Pattern> patternSet = (HashSet<Pattern>) in.readObject();
+		in.close();
+
+		InstanceList patternList = new InstanceList(new Noop());
+		for (Pattern p : patternSet) {
+			Instance inst = new Instance(p, null, null, p);
+			patternList.add(inst);
+		}
+		InstanceList instances = new InstanceList(pipeLine);
+		FeatureVectorGenerator fvGenerator = (FeatureVectorGenerator) pipeLine
+				.getPipe(0);
+
+		System.out.println("Begin generate feature vectors for patterns");
+		// fvGenerator.setFvsViaTrainedDCNN(outputSummaryDir, corpusName,
+		// patternList, proxy);
+		fvGenerator.setFvsViaPreTrainedWord2VecModel(outputSummaryDir,
+				corpusName, patternList);
+		instances.addThruPipe(patternList.iterator());
+
+		System.out.println("Begin generate final summary");
+		PrintWriter out = FileOperation.getPrintWriter(new File(
+				outputSummaryDir), corpusName);
+		
+		int length = 0;
+		boolean flag = false;
+		
+		InstanceList[] groups_seed = seedBasedClustering(outputSummaryDir,
+				instances, categoryId, proxy, fvGenerator);
+		HashMap<InstanceList, Integer> tmp = new HashMap<InstanceList, Integer>();
+		for (InstanceList il : groups_seed)
+			tmp.put(il, il.size());
+		HashMap rankedMap = RankMap.sortHashMapByValues(tmp, false);
+		Set keys = rankedMap.keySet();
+		Iterator iter = keys.iterator();
+		Metric metric = new NormalizedDotProductMetric();
+		while (iter.hasNext()) {
+			InstanceList il = (InstanceList) iter.next();
+			if(il.size() == 0)
+				continue;
+			SparseVector clusterMean = KMeans.mean(il);
+			double mindist = Double.MAX_VALUE;
+			int idx = -1;
+			for(int i=0; i<il.size(); i++){
+				double dist = metric.distance(clusterMean, 
+						(FeatureVector)il.get(i).getData());
+				if(dist < mindist){
+					idx = i;
+					mindist = dist;
+				}
+			}
+			
+			Pattern p = (Pattern)il.get(idx).getSource();
+			SemanticGraph graph = p.getTuple().
+					getAnnotatedSentence().get(BasicDependenciesAnnotation.class);
+			String line = realization(p, graph);
+			if (line == null)
+				continue;
+
+			String[] toks = line.split(" ");
+			length += toks.length;
+			if (length <= 100)
+				out.println(line);
+			else {
+				length -= toks.length;
+				boolean stop = false;
+				for (int i = 0; i < toks.length; i++) {
+					out.print(toks[i] + " ");
+					length++;
+					if (length > 100) {
+						stop = true;
+						break;
+					}
+				}
+				if (stop == true) {
+					flag = true;
+					break;
+				}
+			}
+			
+			if (flag == true)
+				break;
+		}
+		
+		out.close();
 
 	}
 }
