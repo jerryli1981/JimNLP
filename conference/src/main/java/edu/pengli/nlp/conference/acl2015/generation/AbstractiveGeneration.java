@@ -40,9 +40,13 @@ import edu.pengli.nlp.conference.acl2015.types.Pattern;
 import edu.pengli.nlp.conference.acl2015.types.Predicate;
 import edu.pengli.nlp.conference.acl2015.types.Tuple;
 import edu.pengli.nlp.platform.algorithms.classify.Clustering;
+import edu.pengli.nlp.platform.algorithms.classify.HarmonicSemiSupervisedClustering;
 import edu.pengli.nlp.platform.algorithms.classify.KMeans;
+import edu.pengli.nlp.platform.algorithms.classify.LabelPropagationSemiSupervisedClustering;
+import edu.pengli.nlp.platform.algorithms.classify.LocalglobalConsistencySemiSupervisedClustering;
 import edu.pengli.nlp.platform.algorithms.classify.SemiSupervisedClustering;
 import edu.pengli.nlp.platform.algorithms.classify.Spectral;
+import edu.pengli.nlp.platform.algorithms.classify.SpectralClustering;
 import edu.pengli.nlp.platform.algorithms.miscellaneous.Merger;
 import edu.pengli.nlp.platform.pipe.Noop;
 import edu.pengli.nlp.platform.pipe.Pipe;
@@ -1022,8 +1026,7 @@ public class AbstractiveGeneration {
 	}
 
 	private HashMap<Instance, Double> getNbestMap(String outputSummaryDir,
-			String corpusName, ArrayList<String> candidates,
-			ArrayList<FeatureVector> vectors) throws NumberFormatException,
+			String corpusName, ArrayList<String> candidates) throws NumberFormatException,
 			IOException {
 
 		PrintWriter nbest = FileOperation.getPrintWriter(new File(
@@ -1062,7 +1065,7 @@ public class AbstractiveGeneration {
 		int i = 0;
 		while ((input_nbest = in_nbest.readLine()) != null
 				&& (input_score = in_score.readLine()) != null) {
-			Instance inst = new Instance(vectors.get(i++), null, null,
+			Instance inst = new Instance(candidates.get(i++), null, null,
 					input_nbest);
 			if (input_score.equals("-inf")) {
 				nbestmap.put(inst, -100.0);
@@ -1082,135 +1085,144 @@ public class AbstractiveGeneration {
 			IOException, MatlabInvocationException, ClassNotFoundException {
 		
 		//1. find the best pattern
-
 		ArrayList<String> tupleCandidates = tupleFusion(patternCluster);
-		ArrayList<String> patternCandidates = patternFusion(patternCluster);
+		ArrayList<String> patternCandidates = patternFusion(patternCluster);	
 		if (tupleCandidates.size() == 0 || patternCandidates.size() == 0) {
 			System.out.println("tuple or pattern set is empty");
 			return null;
 		}
-		ArrayList<String> candidates = new ArrayList<String>();
-		candidates.addAll(patternCandidates);
-		candidates.addAll(tupleCandidates);
-
-		ArrayList<FeatureVector> patternTupleVectors = new ArrayList<FeatureVector>();
-		HashMap<String, float[]> wordMap = fvGenerator.getWordMap();
-		int dimension = 50;
-		for (String s : candidates) {
-			double[] vec = new double[dimension];
-			String[] keywords = s.split(" ");
-			for (String word : keywords) {
-				word = fvGenerator.cleaning(word.toLowerCase());
-				float[] wordVector = wordMap.get(word);
-				if (wordVector == null)
-					continue;
-				for (int a = 0; a < dimension; a++) {
-					vec[a] += wordVector[a];
-				}
-			}
-			float len = 0;
-			for (int a = 0; a < dimension; a++) {
-				len += vec[a] * vec[a];
-			}
-			len = (float) Math.sqrt(len);
-			for (int a = 0; a < dimension; a++) {
-				vec[a] /= len;
-			}
-
-			int[] idx = new int[dimension];
-			for (int a = 0; a < dimension; a++) {
-				idx[a] = a;
-			}
-			FeatureVector fv = new FeatureVector(idx, vec);
-			patternTupleVectors.add(fv);
-		}
-
-		ArrayList<FeatureVector> patternVectors = new ArrayList<FeatureVector>();
-		ArrayList<FeatureVector> tupleVectors = new ArrayList<FeatureVector>();
-		int k = 0;
-		for (int i = 0; i < patternCandidates.size(); i++) {
-			patternVectors.add(patternTupleVectors.get(k++));
-		}
-		for (int j = 0; j < tupleCandidates.size(); j++) {
-			tupleVectors.add(patternTupleVectors.get(k++));
-		}
-
-		HashMap<Instance, Double> nbestMap = getNbestMap(outputSummaryDir,
-				corpusName, patternCandidates, patternVectors);
-		LinkedHashMap rankedmap = RankMap.sortHashMapByValues(nbestMap, true);
+		
+		HashMap<Instance, Double> nbestMap_pattern = getNbestMap(outputSummaryDir,
+				corpusName, patternCandidates);
+		LinkedHashMap rankedmap = RankMap.sortHashMapByValues(nbestMap_pattern, true);
 		Set<Instance> keys = rankedmap.keySet();
 		Iterator iter = keys.iterator();
-		FeatureVector bestPatternVector = null;
+		String bestPattern = null;
 		if (iter.hasNext()) {
 			Instance bestPatternInst = (Instance) iter.next();
-			bestPatternVector = (FeatureVector) bestPatternInst.getData();
+			bestPattern= (String) bestPatternInst.getData();
 		}
-		int idx = 0;
-		double max = Double.MIN_VALUE;
+		
+		HashMap<Instance, Double> nbestMap_tuple = getNbestMap(outputSummaryDir,
+				corpusName, tupleCandidates);
+		LinkedHashMap rankedmap_t = RankMap.sortHashMapByValues(nbestMap_tuple, true);
+		HashMap<Instance, Double> nbestMap_tuple_N = new HashMap<Instance, Double>();
+		Set<Instance> ks = rankedmap_t.keySet();
+		Iterator iks = ks.iterator();
+		double rank = 1.0;
+		while(iks.hasNext()){
+			Instance in = (Instance)iks.next();
+			nbestMap_tuple_N.put(in, 1/(rank++));
+		}
+		
+		HashMap<String, Double> tupleScoreMap = new HashMap<String, Double>();
+		HashMap<String, float[]> wordMap = fvGenerator.getWordMap();
+		Metric metric = new NormalizedDotProductMetric();
+		for(String tuple : tupleCandidates){
+			double coverageScore = 0.0;
+			String[] tokTup = tuple.split(" ");
+			String[] tokPat = bestPattern.split(" ");
+			for(String tokT : tokTup)
+				for(String tokP : tokPat){
+					tokP = fvGenerator.cleaning(tokP.toLowerCase());
+					float[] wordVector_P = wordMap.get(tokP);
+					
+					tokT = fvGenerator.cleaning(tokT.toLowerCase());
+					float[] wordVector_T = wordMap.get(tokT);
+									
+					if(wordVector_P != null && wordVector_T != null){
+						int[] idx = new int[wordVector_P.length];
+						for (int a = 0; a < wordVector_P.length; a++) {
+							idx[a] = a;
+						}
+						double[] wordVector_T_D = new double[wordVector_T.length];
+						double[] wordVector_P_D = new double[wordVector_P.length];
+						for(int a = 0; a < wordVector_T.length; a++){
+							wordVector_T_D[a] = wordVector_T[a];
+							wordVector_P_D[a] = wordVector_P[a];
+						}
+							
+						FeatureVector fv_t = new FeatureVector(idx, wordVector_T_D);
+						FeatureVector fv_p = new FeatureVector(idx, wordVector_P_D);
+	
+						coverageScore = 1- metric.distance(fv_t, fv_p);
+					}
+					
+				}
+			
+			double fluencyScore = 0.0;
+			Set<Instance> set = nbestMap_tuple_N.keySet();
+			Iterator iterKey = set.iterator();
+			while(iterKey.hasNext()){
+				Instance i = (Instance)iterKey.next();
+				if(tuple.equals((String)i.getData())){
+					fluencyScore = nbestMap_tuple_N.get(i);
+					break;
+				}
+			}
+			
+			fluencyScore = 1/(1+Math.exp(-fluencyScore));
+			double score = 0.7*coverageScore + 0.3*fluencyScore;
+			tupleScoreMap.put(tuple, score);
+		}
 
-		double[] vec_p = new double[bestPatternVector.getValues().length];
-		double len_p = 0;
-		for (int a = 0; a < bestPatternVector.getValues().length; a++) {
-			len_p += bestPatternVector.getValues()[a]
-					* bestPatternVector.getValues()[a];
-		}
-		len_p = (double) Math.sqrt(len_p);
-		for (int a = 0; a < bestPatternVector.getValues().length; a++) {
-			vec_p[a] /= len_p;
-		}
+		HashMap sortedScores = RankMap.sortHashMapByValues(tupleScoreMap, false);
 		ArrayList<String> ret = new ArrayList<String>();
-
-		HashMap<Integer, Double> scores = new HashMap<Integer, Double>();
-		for (int i = 0; i < tupleVectors.size(); i++) {
-			FeatureVector tfv = tupleVectors.get(i);
-			double[] vec_t = new double[tfv.getValues().length];
-			double len = 0;
-			for (int a = 0; a < tfv.getValues().length; a++) {
-				len += tfv.getValues()[a] * tfv.getValues()[a];
-			}
-			len = (double) Math.sqrt(len);
-			for (int a = 0; a < tfv.getValues().length; a++) {
-				vec_t[a] /= len;
-			}
-
-			double dist = 0.0;
-			for (int j = 0; j < tfv.getValues().length; j++) {
-				dist += vec_t[j] * vec_p[j];
-			}
-			scores.put(i, dist);
-			if (dist >= max) {
-				max = dist;
-				idx = i;
-			}
+		Set<String> ts = sortedScores.keySet();
+		Iterator its = ts.iterator();
+		int retNumber = 0;
+		while(its.hasNext() && retNumber < 1){
+			ret.add((String)its.next());
+			retNumber++;
 		}
-
-		HashMap sortedScores = RankMap.sortHashMapByValues(scores, false);
-		Set<Integer> ids = sortedScores.keySet();
-		ArrayList<Integer> IDS = new ArrayList<Integer>();
-		Iterator it = ids.iterator();
-		int number = 0;
-		while (it.hasNext() && number < 1) {
-			IDS.add((Integer) it.next());
-			number++;
-		}
-
-		for (Integer i : IDS)
-			ret.add(tupleCandidates.get(i));
-
 		return ret;
 	}
 
-	private InstanceList[] kmeans(InstanceList instances, int numClusters) {
-		Metric metric = new NormalizedDotProductMetric();
+	private InstanceList[] kmeans(InstanceList instances, int numClusters,
+			MatlabProxy proxy) {
+		
+	/*	Metric metric = new NormalizedDotProductMetric();
 		KMeans kmeans = new KMeans(new Noop(), numClusters, metric);
 		Clustering predicted = kmeans.cluster(instances);
-		return predicted.getClusters();
+		return predicted.getClusters();*/
+		
+		MatlabTypeConverter processor = new MatlabTypeConverter(proxy);
+		
+		FeatureVector vec = (FeatureVector)instances.get(0).getData();
+		int dimension = vec.getValues().length;
+		
+		double[][] dataMatrix = new double[instances.size()][dimension];
+		for (int i = 0; i < instances.size(); i++) {
+			FeatureVector fv_i = (FeatureVector) instances.get(i).getData();
+			for(int j=0; j<dimension; j++)
+				dataMatrix[i][j] = fv_i.getValues()[j];
+		}
+		
+		int clusterLabels[] = new int[instances.size()];
+		try {
+			
+			processor.setNumericArray("arr", new MatlabNumericArray(
+					dataMatrix, null));
+			proxy.eval("labels = kmeans(arr,"+numClusters+ ",'Replicates',20)");
+			double[][] labels = processor.getNumericArray("labels").getRealArray2D();
+			for (int i = 0; i < instances.size(); i++)
+				clusterLabels[i] = (int) labels[i][0]-1;
+			
+			
+		} catch (MatlabInvocationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return new Clustering(instances, numClusters, clusterLabels).getClusters();
 	}
 
 	private InstanceList[] spectral(InstanceList instances, int numClusters,
 			MatlabProxy proxy) {
 		Metric metric = new NormalizedDotProductMetric();
 		Spectral spectral = new Spectral(new Noop(), numClusters, metric, proxy);
+/*		SpectralClustering spectral = new SpectralClustering(new Noop(), 
+				numClusters, metric);*/
 		Clustering predicted = spectral.cluster(instances);
 		return predicted.getClusters();
 	}
@@ -1249,7 +1261,7 @@ public class AbstractiveGeneration {
 						wordsList.add(wordInst);
 					}
 					
-					InstanceList[] groups = kmeans(wordsList, 4);
+					InstanceList[] groups = kmeans(wordsList, 4, proxy);
 					for(InstanceList il : groups){
 						double[] vec = new double[dimension];
 						int[] idx = new int[dimension];
@@ -1327,7 +1339,11 @@ public class AbstractiveGeneration {
 
 			
 		Metric metric = new NormalizedDotProductMetric();
-		SemiSupervisedClustering semiClustering = new SemiSupervisedClustering(
+/*		SemiSupervisedClustering semiClustering = new 
+				LocalglobalConsistencySemiSupervisedClustering(
+				new Noop(), seeds, metric, proxy);*/
+		SemiSupervisedClustering semiClustering = new 
+				LabelPropagationSemiSupervisedClustering(
 				new Noop(), seeds, metric, proxy);
 		Clustering predicted = semiClustering.cluster(instances);
 		return predicted.getClusters();
@@ -1346,18 +1362,14 @@ public class AbstractiveGeneration {
 		PrintWriter out = FileOperation.getPrintWriter(new File(
 				outputSummaryDir), corpusName);
 
-		int numClusters = 35;
+		int numClusters = 7;
 		int length = 0;
 		boolean flag = false;
 		// method 1: kmeans unsupervised clustering
-		// ROUGE-SU4 is 0.05967 (k = 5)
-		// ROUGE-SU4 is 0.091033 (k = 10)
-		// ROUGE-SU4 is 0.095726 (k = 15)
-		// ROUGE-SU4 is 0.093626 (k = 20)
-		// ROUGE-SU4 is 0.097913 (k = 25)
-		// ROUGE-SU4 is 0.096833 (k = 30)
-		// ROUGE-SU4 is 0.097646 (k = 35)
-/*		InstanceList[] groups_k = kmeans(instances, numClusters);
+		// ROUGE-SU4 is 0.09306 (k = 25), ROUGE-2 is 0.05433, ROUGE-1 is 0.30567
+		// ROUGE-SU4 is 0.093573 (k = 30), ROUGE-2 is 0.055126, ROUGE-1 is 0.30468
+		// ROUGE-SU4 is 0.09244 (k = 35), ROUGE-2 is ?, ROUGE-1 is ?
+/*		InstanceList[] groups_k = kmeans(instances, numClusters, proxy);
 		HashMap<InstanceList, Integer> tmp = new HashMap<InstanceList, Integer>();
 		for (InstanceList il : groups_k)
 			tmp.put(il, il.size());
@@ -1399,13 +1411,14 @@ public class AbstractiveGeneration {
 		}*/
 
 		// method 2: spectral unsupervised clustering
-		// ROUGE-SU4 is 0.062786 (k = 5)
-		// ROUGE-SU4 is 0.090616 (k = 10)
-		// ROUGE-SU4 is 0.092833 (k = 15)
-		// ROUGE-SU4 is 0.0917933 (k = 20)
-		// ROUGE-SU4 is 0.093276 (k = 25)
-		// ROUGE-SU4 is 0.0953133 (k = 30)
-		// ROUGE-SU4 is 0.0934 (k = 35)
+		// ROUGE-SU4 is 0.066083 (k = 5), ROUGE-2 is 0.03363, ROUGE-1 is 0.216196
+		// ROUGE-SU4 is 0.089286 (k = 10), ROUGE-2 is 0.05308, ROUGE-1 is 0.299493
+		// ROUGE-SU4 is 0.0925066 (k = 15), ROUGE-2 is 0.053203, ROUGE-1 is 0.30444 
+		// ROUGE-SU4 is 0.0901866 (k = 20), ROUGE-2 is 0.053219(0.05314), ROUGE-1 is 0.30414
+		// ROUGE-SU4 is 0.091803 (0.09591) (k = 25), ROUGE-2 is 0.05639(0.052493), ROUGE-1 is 0.30768
+		// ROUGE-SU4 is 0.09262 (0.094746) (k = 30), ROUGE-2 is 0.053796(0.052106), ROUGE-1 is 0.30784
+		// ROUGE-SU4 is 0.092339 (k = 35), ROUGE-2 is 0.05696(0.054473), ROUGE-1 is 0.30273
+		// (k=40) ROUGE-2 is 0.052753
 
 /*		InstanceList[] groups_s = spectral(instances, numClusters, proxy);
 		HashMap<InstanceList, Integer> tmp = new HashMap<InstanceList, Integer>();
@@ -1448,8 +1461,14 @@ public class AbstractiveGeneration {
 		}*/
 
 		// method 3: seed based semi-supervised clusterting
-		//ROUGE-SU4 is 0.091013, keywords 3 group
-		//ROUGE-SU4 is 0.093033, keywords 4 group
+		//ROUGE-SU4 is 0.090953, keywords 3 group
+		//ROUGE-SU4 is 0.089889, keywords 4 group
+		
+		//ROUGE-2 is 0.050356, keywords 3 group
+		//ROUGE-2 is ?, keywords 4 group
+		
+		//ROUGE-1 is ?, keywords 3 group
+		//ROUGE-1 is ?, keywords 4 group
 
 		InstanceList[] groups_seed = seedBasedClustering(outputSummaryDir,
 				instances, categoryId, proxy, fvGenerator);
@@ -1569,9 +1588,14 @@ public class AbstractiveGeneration {
 		in.close();
 
 		InstanceList patternList = new InstanceList(new Noop());
+		HashSet<String> set = new HashSet<String>();
 		for (Pattern p : patternSet) {
 			Instance inst = new Instance(p, null, null, p);
-			patternList.add(inst);
+			if(!set.contains(p.toString())){
+				patternList.add(inst);
+				set.add(p.toString());
+			}
+			
 		}
 		InstanceList instances = new InstanceList(pipeLine);
 		FeatureVectorGenerator fvGenerator = (FeatureVectorGenerator) pipeLine
@@ -1583,7 +1607,7 @@ public class AbstractiveGeneration {
 		fvGenerator.setFvsViaPreTrainedWord2VecModel(outputSummaryDir,
 				corpusName, patternList);
 		instances.addThruPipe(patternList.iterator());
-
+		
 		System.out.println("Begin generate final summary");
 		generateFinalSummary(outputSummaryDir, corpusName, instances,
 				categoryId, proxy, fvGenerator);
@@ -1621,11 +1645,14 @@ public class AbstractiveGeneration {
 		
 		int length = 0;
 		boolean flag = false;
+		int numClusters = 25;
 		
-		InstanceList[] groups_seed = seedBasedClustering(outputSummaryDir,
+//		InstanceList[] groups = kmeans(instances, numClusters, proxy);
+//		InstanceList[] groups = spectral(instances, numClusters, proxy);
+		InstanceList[] groups = seedBasedClustering(outputSummaryDir,
 				instances, categoryId, proxy, fvGenerator);
 		HashMap<InstanceList, Integer> tmp = new HashMap<InstanceList, Integer>();
-		for (InstanceList il : groups_seed)
+		for (InstanceList il : groups)
 			tmp.put(il, il.size());
 		HashMap rankedMap = RankMap.sortHashMapByValues(tmp, false);
 		Set keys = rankedMap.keySet();

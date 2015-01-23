@@ -63,7 +63,7 @@ public class Baseline_SimpleNLG {
 				outputSummaryDir, corpusList, 
 				pipeLine, proxy, iterTime);*/
 			
-		String metric = "ROUGE-SU4";
+		String metric = "ROUGE-1";
 		double averageMetric = 0.0;
 		int iterTime = 3;
 		for(int k=0; k<iterTime; k++){

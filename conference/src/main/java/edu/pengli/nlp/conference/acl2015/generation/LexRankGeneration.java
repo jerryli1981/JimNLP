@@ -1,13 +1,21 @@
 package edu.pengli.nlp.conference.acl2015.generation;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.List;
 
 import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
 import edu.pengli.nlp.platform.algorithms.ranking.LexRank;
 import edu.pengli.nlp.platform.pipe.CharSequence2TokenSequence;
 import edu.pengli.nlp.platform.pipe.CharSequenceCoreNLPAnnotation;
+import edu.pengli.nlp.platform.pipe.FeatureDocFreqPipe;
 import edu.pengli.nlp.platform.pipe.FeatureSequence2FeatureVector;
 import edu.pengli.nlp.platform.pipe.Input2CharSequence;
 import edu.pengli.nlp.platform.pipe.Noop;
@@ -16,11 +24,16 @@ import edu.pengli.nlp.platform.pipe.TokenSequence2FeatureSequence;
 import edu.pengli.nlp.platform.pipe.TokenSequenceLowercase;
 import edu.pengli.nlp.platform.pipe.TokenSequenceRemoveStopwords;
 import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerFileIterator;
+import edu.pengli.nlp.platform.types.Alphabet;
+import edu.pengli.nlp.platform.types.FeatureCounter;
 import edu.pengli.nlp.platform.types.FeatureVector;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.types.InstanceList;
 import edu.pengli.nlp.platform.types.Summary;
 import edu.pengli.nlp.platform.util.FileOperation;
+import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
+import edu.stanford.nlp.pipeline.Annotation;
+import edu.stanford.nlp.util.CoreMap;
 
 public class LexRankGeneration {
 
@@ -106,40 +119,60 @@ public class LexRankGeneration {
 
 		return position;
 	}
+	
+	
 
 	public static void run(String inputCorpusDir, String outputSummaryDir,
-			String corpusName) {
+			String corpusName, PipeLine pipeLine) throws FileNotFoundException, IOException, ClassNotFoundException {
 
 		OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
 				inputCorpusDir + "/" + corpusName);
-
-		PipeLine pipeLine = new PipeLine();
-		pipeLine.addPipe(new Input2CharSequence("UTF-8"));
-		pipeLine.addPipe(new CharSequenceExtractContent(
+		PipeLine docFreqPipeLine = new PipeLine();
+		docFreqPipeLine.addPipe(new Input2CharSequence("UTF-8"));
+		docFreqPipeLine.addPipe(new CharSequenceExtractContent(
 				"<TEXT>[\\p{Graph}\\p{Space}]*</TEXT>"));
-		pipeLine.addPipe(new CharSequenceCoreNLPAnnotation());
-		pipeLine.addPipe(new CharSequence2TokenSequence());
-		pipeLine.addPipe(new TokenSequenceLowercase());
-		pipeLine.addPipe(new TokenSequenceRemoveStopwords());
-		pipeLine.addPipe(new TokenSequence2FeatureSequence());
-		pipeLine.addPipe(new FeatureSequence2FeatureVector());
-//		NewsCorpus corpus = new NewsCorpus(fIter, pipeLine, null);
-
-		pipeLine = new PipeLine();
-		pipeLine.addPipe(new Noop());
-//		NewsCorpus docs = new NewsCorpus(corpus.iterator(), null, null);
-		InstanceList docs = null;
-
+		docFreqPipeLine.addPipe(new CharSequence2TokenSequence());
+		docFreqPipeLine.addPipe(new TokenSequenceLowercase());
+		docFreqPipeLine.addPipe(new TokenSequenceRemoveStopwords());
+		docFreqPipeLine.addPipe(new TokenSequence2FeatureSequence());
+		InstanceList corpus = new InstanceList(docFreqPipeLine);
+		corpus.addThruPipe(fIter);
+		Alphabet dict = corpus.getDataAlphabet();
+		
+		FeatureDocFreqPipe dfCounterPipe = new FeatureDocFreqPipe(dict, null);
+		docFreqPipeLine = new PipeLine();
+		docFreqPipeLine.addPipe(dfCounterPipe);
+		InstanceList corpus2 = new InstanceList(docFreqPipeLine);
+		corpus2.addThruPipe(corpus.iterator());
+		FeatureCounter dfCounter = dfCounterPipe.getFeatureDocCounter();
+	
+/*		fIter = new OneInstancePerFileIterator(
+				inputCorpusDir + "/" + corpusName);
+		InstanceList docs = new InstanceList(pipeLine);
+		docs.addThruPipe(fIter);
+		
+		ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(
+				 outputSummaryDir + "/" +corpusName + ".ser.extractive")); 
+		docs.writeObject(out);
+	    out.close();*/
+		
+		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + corpusName + ".ser.extractive"));
+		InstanceList docs = new InstanceList(null);
+		docs.readObject(in);
+		in.close();
+		
 		InstanceList totalSentenceList = new InstanceList(null);
 		for (Instance doc : docs) {
-			InstanceList sentsList = (InstanceList) doc.getSource();
-			for (Instance inst : sentsList) {
-				Instance sent = new Instance(inst.getSource(), null,
-						inst.getName(), inst.getSource());
+			Annotation document = (Annotation) doc.getData();
+			List<CoreMap> sentences = document.get(SentencesAnnotation.class);
+			for(CoreMap cm :sentences){
+				String mention = cm.toString();
+				Instance sent = new Instance(mention, null, null, mention);
 				totalSentenceList.add(sent);
 			}
 		}
-
+		
 		pipeLine = new PipeLine();
 		pipeLine.addPipe(new CharSequence2TokenSequence());
 		pipeLine.addPipe(new TokenSequenceLowercase());
@@ -148,11 +181,31 @@ public class LexRankGeneration {
 		pipeLine.addPipe(new FeatureSequence2FeatureVector());
 		InstanceList tf_fvs = new InstanceList(pipeLine);
 		tf_fvs.addThruPipe(totalSentenceList.iterator());
+		
 
 		pipeLine = new PipeLine();
-//		pipeLine.addPipe(new FeatureVectorTFIDFWeight(tf_fvs));
 		InstanceList tf_idf_fvs = new InstanceList(pipeLine);
-		tf_idf_fvs.addThruPipe(tf_fvs.iterator());
+		int numDocs = docs.size();
+		for(Instance inst : tf_fvs){
+			
+			FeatureVector tf_fv = (FeatureVector) inst.getData();
+			int[] indexs = tf_fv.getIndices();
+			double[] vals = new double[indexs.length];
+			for (int i = 0; i < indexs.length; i++) {
+				int idx = indexs[i];
+				double df = dfCounter.get(idx);
+				double idf = Math.log10(numDocs / (df));
+				vals[i] = idf;
+			}
+
+			FeatureVector idf_fv = new FeatureVector(indexs, vals);
+			FeatureVector[] tf_idf_fv = new FeatureVector[2];
+			tf_idf_fv[0] = tf_fv;
+			tf_idf_fv[1] = idf_fv;
+
+			tf_idf_fvs.add(new Instance(tf_idf_fv, inst.getTarget(), 
+					inst.getName(), inst.getSource()));
+		}
 
 		double threshold = 0.2;
 		double damping = 0.1;

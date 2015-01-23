@@ -71,14 +71,14 @@ public class OurMethod {
 	public static void main(String[] args) throws Exception {
 		
 	    //Create a proxy, which we will use to control MATLAB
-/*		String matlabLocation = "/usr/local/MATLAB/R2012a/bin/matlab";
+		String matlabLocation = "/usr/local/MATLAB/R2012a/bin/matlab";
 		MatlabProxyFactoryOptions options = new MatlabProxyFactoryOptions.Builder()
         .setProxyTimeout(30000L).setMatlabLocation(matlabLocation)
         .setHidden(true)
         .build();
 		
 	    MatlabProxyFactory factory = new MatlabProxyFactory(options);
-	    MatlabProxy proxy = factory.getProxy();*/
+	    MatlabProxy proxy = factory.getProxy();
 
 
 		SAXBuilder builder = new SAXBuilder();
@@ -103,64 +103,67 @@ public class OurMethod {
 		FeatureVectorGenerator fvg = new FeatureVectorGenerator();
 		pipeLine.addPipe(fvg);
 		
-		int iterTime = corpusList.size();
-		
+				
 		//training DCNN for pattern representation, only used in the third phase
 /*		System.out.println("Begin to train DCNN pattern model");
 		trainingDCNN(inputCorpusDir, 
 				outputSummaryDir, corpusList, 
 				pipeLine, proxy, iterTime);*/
-		
-		
-		for (int i = 0; i < iterTime; i++) {
-			System.out.println("Corpus id is "+i);
-			Element topic = corpusList.get(i);
-			String categoryId = topic.getAttributeValue("category");
-			List<Element> docSets = topic.getChildren();
-			Element docSetA = docSets.get(1);
-			String corpusName = docSetA.getAttributeValue("id");
-			corpusNameList.add(corpusName);
-			AbstractiveGeneration ag = new AbstractiveGeneration();
-			ag.run(inputCorpusDir + "/" + topic.getAttributeValue("id"),
-					outputSummaryDir, corpusName, pipeLine, categoryId, null);
-		}
-		
-//		proxy.disconnect();
-
-		// Rouge Evaluation
-		String modelSummaryDir = "../data/ACL2015/ROUGE/models";
-		ArrayList<File> files = FileOperation.travelFileList(new File(
-				modelSummaryDir));
-		HashMap<String, ArrayList<String>> modelSummariesMap = new HashMap<String, ArrayList<String>>();
-		ArrayList<String> list = null;
-		for (File f : files) {
-			String fn = f.getName();
-			String[] toks = fn.split("\\.");
-			String idx = toks[0].split("-")[0]; // D1101
-			String abb = idx + toks[toks.length - 2] + "-"
-					+ toks[0].split("-")[1];
-			if (corpusNameList.contains(abb)) {
-
-				if (!modelSummariesMap.containsKey(abb)) {
-					list = new ArrayList<String>();
-					list.add(fn);
-				} else {
-					list = modelSummariesMap.get(abb);
-					list.add(fn);
-				}
-				modelSummariesMap.put(abb, list);
-
-			}
-		}
-		String confFilePath = "../data/ACL2015/ROUGE/conf.xml";
-		RougeEvaluationWrapper.setConfigurationFile(corpusNameList,
-				outputSummaryDir, modelSummaryDir, modelSummariesMap,
-				confFilePath);
+			
 		String metric = "ROUGE-SU4";
-		HashMap map = RougeEvaluationWrapper.runRough(confFilePath, metric);
-		System.out.println(metric + " is " + (Double) map.get(metric));
+		double averageMetric = 0.0;
+		int iterTime = 3;
+		for(int k=0; k<iterTime; k++){
+			System.out.println("Iter Time is "+k);
+			for (int i = 0; i < corpusList.size(); i++) {
+				System.out.println("Corpus id is "+i);
+				Element topic = corpusList.get(i);
+				String categoryId = topic.getAttributeValue("category");
+				List<Element> docSets = topic.getChildren();
+				Element docSetA = docSets.get(1);
+				String corpusName = docSetA.getAttributeValue("id");
+				corpusNameList.add(corpusName);
+				AbstractiveGeneration ag = new AbstractiveGeneration();
+				ag.run(inputCorpusDir + "/" + topic.getAttributeValue("id"),
+						outputSummaryDir, corpusName, pipeLine, categoryId, proxy);
+			}
+			
+			// Rouge Evaluation
+			String modelSummaryDir = "../data/ACL2015/ROUGE/models";
+			ArrayList<File> files = FileOperation.travelFileList(new File(
+					modelSummaryDir));
+			HashMap<String, ArrayList<String>> modelSummariesMap = new HashMap<String, ArrayList<String>>();
+			ArrayList<String> list = null;
+			for (File f : files) {
+				String fn = f.getName();
+				String[] toks = fn.split("\\.");
+				String idx = toks[0].split("-")[0]; // D1101
+				String abb = idx + toks[toks.length - 2] + "-"
+						+ toks[0].split("-")[1];
+				if (corpusNameList.contains(abb)) {
 
-		System.out.println("Our method is done");
+					if (!modelSummariesMap.containsKey(abb)) {
+						list = new ArrayList<String>();
+						list.add(fn);
+					} else {
+						list = modelSummariesMap.get(abb);
+						list.add(fn);
+					}
+					modelSummariesMap.put(abb, list);
 
+				}
+			}
+			String confFilePath = "../data/ACL2015/ROUGE/conf.xml";
+			RougeEvaluationWrapper.setConfigurationFile(corpusNameList,
+					outputSummaryDir, modelSummaryDir, modelSummariesMap,
+					confFilePath);
+			
+			HashMap map = RougeEvaluationWrapper.runRough(confFilePath, metric);
+			Double met = (Double) map.get(metric);
+			averageMetric += met;
+		}
+		
+		proxy.disconnect();
+		System.out.println(metric + " is " + averageMetric/iterTime);
 	}
 }

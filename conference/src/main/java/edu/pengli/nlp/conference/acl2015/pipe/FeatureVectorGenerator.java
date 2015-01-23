@@ -340,7 +340,7 @@ public class FeatureVectorGenerator extends Pipe{
 		else
 		    return mention;
 	}
-	public void setFvsViaTrainedRNN(String outputSummaryDir, 
+	public void setFvsViaPreTrainedWord2VecModel(String outputSummaryDir, 
 			String corpusName, InstanceList patternList){
 		ArrayList<FeatureVector> fvs = new ArrayList<FeatureVector>();
 		
@@ -386,7 +386,9 @@ public class FeatureVectorGenerator extends Pipe{
 			}
 						
 			double[] vec = new double[dimension*3];
+			double[] vec_small = new double[dimension];
 			int[] idx = new int[dimension*3];
+			int[] idx_small = new int[dimension];
 			int c = 0;
 			int d = 0;
 			for(int i=0; i<wordVectorArg1.length; i++){
@@ -401,6 +403,23 @@ public class FeatureVectorGenerator extends Pipe{
 			for(int i=0; i<wordVectorArg2.length; i++){
 				vec[c++] = wordVectorArg2[i];
 				idx[d] = d++;
+			}
+			for (int a = 0; a < dimension; a++) {
+				vec_small[a] += wordVectorArg1[a] + wordVectorPre[a]+
+						wordVectorArg2[a];
+			}
+			
+			float len = 0;
+			for (int a = 0; a < dimension; a++) {
+				len += vec_small[a] * vec_small[a];
+			}
+			len = (float) Math.sqrt(len);
+			for (int a = 0; a < dimension; a++) {
+				vec_small[a] /= len;
+			}
+			
+			for(int a = 0; a <dimension; a++){
+				idx_small[a] = a;
 			}
 			
 			FeatureVector fv = new FeatureVector(idx, vec);

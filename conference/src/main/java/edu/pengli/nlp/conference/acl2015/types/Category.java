@@ -4,7 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public enum Category {
-
+	
 	Accidents_and_Natural_Disasters(1, generateAspectsFor1()), 
 	Attacks(2,generateAspectsFor2()), 
 	Health_and_Safety(3, generateAspectsFor3()), 
@@ -42,6 +42,7 @@ public enum Category {
 
 	private static Map<String, String[]> generateAspectsFor1() {
 		type1aspects = new LinkedHashMap<String, String[]>();
+		
 		String[] keywordsForWhat = {"calamity", "casualty", "collision", 
 				"crash", "wreck", "incident", "pile", "smash", "catastrophe", "act god",
 				"explosion", "cave", "collapse", "train", "airplane", "ship", "boat", "submarine", 
@@ -50,6 +51,7 @@ public enum Category {
 				"landslide", "mudslide", "slide", "tornado", "tsunami", "volcano", "wildfire", "wild fire", 
 				"blizzard", "snow", "ice", "storm"};
 		type1aspects.put("what", keywordsForWhat);
+		
 
 		String[] keywordsForWhen = { "january", "jan", "february", "feb", "march", "mar", "april", "apr", "may", 
 				"june", "jun", "july", "jul", "august", "aug", "september", "sept", "sep", "october", 
@@ -61,30 +63,36 @@ public enum Category {
 
 		String[] keywordsForWhere = {"location", "locality", "point", "position", "site", "spot", "place", 
 				"nearby", "close to", "around", "adjacent to", "intersection", "street", "road", "highway",
-				"boulevard", "blvd", "interstate", "outside", "inside", "near", "location", 
-				"locality", "point", "position", "site", "spot", "place", "nearby", "close to", 
-				"around", "adjacent to", "landfall", "hit", "epicenter"};
+				"boulevard", "blvd", "interstate", "outside", "inside", "near", "landfall", "epicenter"};
 		type1aspects.put("where", keywordsForWhere);
 
 		String[] keywordsForWhy = {"broken", "faulty", "careless", "inattention", "bad judgment", "poor judgment", 
-				"fatigue", "faulty equipment", "defective equipment", "equipment failure", "weather related", "weather", 
-				"design", "cause", "explanation", "explain", "reason", "precipitate", "distract", "drug", "alcohol", 
-				"due to", "thermonuclear activity", "seismic activity", "seismic", "plate movement", "tectonic movement", 
-				"plate", "tectonic", "movement", "human exploration", "human involvement", "human inteference", "due to"};
+				"fatigue", "faulty equipment", "defective equipment", "equipment failure", 
+				"weather related", "weather", "design", "cause", "explanation", "explain", 
+				"reason", "precipitate", "distract", "drug", "alcohol", 
+				"due to", "thermonuclear activity", "seismic activity", "seismic", 
+				"plate movement", "tectonic movement", "plate", "tectonic", "movement", 
+				"human exploration", "human involvement", "human inteference"};
 		type1aspects.put("why", keywordsForWhy);
+		
 
-		String[] keywordsForWhoaffected = {"casualt", "death toll", "death", "dead", "wound", "injur", "loss of life", "decease", 
-				"demise", "mortality", "hurt", "harm", "survivor", "casualt", "death toll", "death", "dead", "wound", "injur", "loss of life", 
-				"decease", "demise", "mortality", "hurt", "harm", "missing", "threat", "survivor"};
+		String[] keywordsForWhoaffected = {"casualty",  "dead", "wound", "injur", "loss of life",
+				"demise", "mortality", "survivor", "casualt", "death toll", 
+				"wound", "injur", "loss of life", "decease",
+				"hurt", "harm", "death toll", "death", "missing", "threat"};
 		type1aspects.put("whoaffected", keywordsForWhoaffected);
 
-		String[] keywordsForDamages = {"property loss", "financial loss", "property", "possession", "belongings", "goods", "assets", "fiscal", 
-				"money", "economic", "financial", "loss", "damage", "ruin", "burn", "property loss", "financial loss", "property", "possession", 
-				"belongings", "goods", "assets", "fiscal", "money", "economic", "financial", "loss", "damage to", "disruption of", "damage", "ruin", "burn"};
+		String[] keywordsForDamages = { "property", "possession", "belongings", "goods", "assets", "fiscal", 
+				"money", "economic", "financial", "loss", "damage", "ruin", "burn", "property loss",
+				"financial loss", "property", "possession", "belongings", "goods", 
+				"assets", "fiscal", "money", "economic", "property loss", 
+				"financial loss","financial", "loss", "damage to", "disruption of"};
 		type1aspects.put("damages", keywordsForDamages);
 
-		String[] keywordsForCountermeasures = {"safety", "prevent", "hazardous condition", "unsafe condition", "hazardous", "unsafe", "maintenance", "repair", 
-				"correct", "recovery plan", "prevent", "prevention effort", "rescue effort", "rescue", "relief effort", "relief", "emergency plan", 
+		String[] keywordsForCountermeasures = {"safety", "prevent", "rescue", "hazardous condition",
+				"unsafe condition", "hazardous", "unsafe", "maintenance", "repair", 
+				"correct", "recovery plan", "prevent", "prevention effort", "rescue effort", 
+				"relief effort", "relief", "emergency plan", 
 				"risk reduction", "preparedness"};
 		type1aspects.put("countermeasures", keywordsForCountermeasures);
 		return type1aspects;
@@ -92,12 +100,16 @@ public enum Category {
 
 	private static Map<String, String[]> generateAspectsFor2() {
 		type2aspects = new LinkedHashMap<String, String[]>();
-		String[] keywordsForWhat = { "felony", "lawlessness", "malfeasance", "misdemeanor", "transgression", "unlawful", "violation", 
+		String[] keywordsForWhat = { "felony", "lawlessness", "malfeasance", "misdemeanor", "transgression",
+				"unlawful", "violation", 
 				"wrongdoing", "raid", "ambush", "assault", "insurrection", "violence", "calculated", "threat", 
 				 "riot", "violence", "raid", "ambush", "assault", "revolt", "violence", "massacre", "slaughter",
-				 "assault", "battery", "burglary", "theft", "home invasion", "murder", "rape", "child molestation", "molestation", 
-				 "sexual abuse", "abuse", "robbery", "manslaughter", "kidnapping", "abduction", "poisoning", "shooting", 
-				 "endangerment", "hate crime", "political", "religious", "guerilla", "nuclear", "chemical weapon", "biological weapon", 
+				 "assault", "battery", "burglary", "theft", "home invasion", "murder", "rape", 
+				 "child molestation", "molestation", 
+				 "sexual abuse", "abuse", "robbery", "manslaughter", "kidnapping", "abduction", 
+				 "poisoning", "shooting", 
+				 "endangerment", "hate crime", "political", "religious", "guerilla", "nuclear", 
+				 "chemical weapon", "biological weapon", 
 				 "chemic", "biologic", "weapon", "weapon of mass destruction", "bomb", "mass destruction",
 				 "bomb", "gunfire", "landmine", "explosion", "nuclear", "uprising"};
 		type2aspects.put("what", keywordsForWhat);
@@ -118,27 +130,28 @@ public enum Category {
 				};
 		type2aspects.put("why", keywordsForWhy);
 
-		String[] keywordsForWhoaffected = { "casualt", "death", "injur", "dead", "loss", "wound", "hurt", "hostage",
-				"casualt", "death", "loss", "injur", "damage", "dead", "missing", "wound", "harm", "captive", "hostage",
-				"casualt", "death", "injur", "loss", "dead", "wound", "missing", "captive", "hostage", "harm"};
+		String[] keywordsForWhoaffected = { "casualty", "death", "injur", "dead", "loss", "wound", "hurt", "hostage",
+				"casualt",  "damage",  "missing",  "harm", "captive"};
 		type2aspects.put("whoaffected", keywordsForWhoaffected);
 
-		String[] keywordsForDamages = { "property loss", "financial loss", "property", "possession", "belongings", "goods", 
+		String[] keywordsForDamages = {"property", "possession", "belongings", "goods", 
 				"assets", "fiscal", "money", "economic", "financial", "loss", "damage", "ruin", "burn", 
 				"smash", "destroy", "arson", "property loss", "financial loss", "property", "possession", "belongings", "goods", 
 				"assets", "fiscal", "money", "economic", "financial", "loss", "damage to", "disruption of", "damage", 
-				"ruin", "burn", "damage to", "disruption of", "property loss", "financial loss", "property", "possession", "belongings", 
-				"goods", "assets", "fiscal", "money", "economic", "financial", "loss", "damage to", "disruption of", 
-				"damage", "ruin", "burn", "damage to", "disruption of"};
+				"ruin", "burn", "damage to", "disruption of", "property loss", 
+				"financial loss", "property", "possession", "belongings", 
+				"goods", "assets", "fiscal", "money", "economic", "financial", 
+				"loss", "damage to", "disruption of", 
+				"damage", "ruin", "burn", "damage to", "disruption of",  "property loss", "financial loss"};
 		type2aspects.put("damages", keywordsForDamages);
 
-		String[] keywordsForCountermeasures = {"secur", "risk analysis", "prevent", "police response", "police", 
+		String[] keywordsForCountermeasures = {"secur",  "prevent", "police", 
 				"light", "surveillance camera", "surveillan", "camera", "patrol", "aware", 
 				"aware", "suspicious behavior", "suspicious", "unusual", "out of the ordinary", "watch list",
-				"secur", "prevent", "patrol", "aware", "surveillance", "police", "suspicious", "unusual"};
+				"secur", "prevent", "patrol", "aware", "surveillance", "police response","risk analysis", "police", "suspicious", "unusual"};
 		type2aspects.put("countermeasures", keywordsForCountermeasures);
 
-		String[] keywordsForPerpetrators = {"perpetrat", "commit", "culprit", "criminal", "incendiar", "wrongdoer", 
+		String[] keywordsForPerpetrators = {"perpetrate", "commit", "culprit", "criminal", "incendiar", "wrongdoer", 
 				"guilty party", "agent", "offender", "perp", "thug", "vandal", "accused", "suspect",
 				"terrorist", "subversive", "bomber", "guerilla", "incendiar", "radical", "rebel", "revolutionary", 
 				"jihadist", "anarchist", "insurgent", "attacker", "aggressor", "assailant", "assaulter", "mugger"};
@@ -154,12 +167,12 @@ public enum Category {
 				"community", "senior", "geront", "mental", "accident", "attack", "disaster"};
 		type3aspects.put("what", keywordsForWhat);
 
-		String[] keywordsForWhy = {"malnutrition", "infectious disease", "preventable disease", "cardiovascular disease", 
-				"disease", "poverty", "obesity", "medical care", "medical access", "lack of sanitation", 
+		String[] keywordsForWhy = {"malnutrition", "disease", "poverty", "infectious disease", "preventable disease", "cardiovascular disease", 
+				 "obesity", "medical care", "medical access", "lack of sanitation", 
 				"unsanitary", "due to", "attack", "accident", "disaster", "careless", "fatigue", "shortcuts", "due to"};
 		type3aspects.put("why", keywordsForWhy);
 
-		String[] keywordsForWhoaffected = {"dead", "ill", "famil", "relative", "community", "population", "elder", 
+		String[] keywordsForWhoaffected = {"dead", "ill", "family", "relative", "community", "population", "elder", 
 				"young", "children", "infants", "aged", "compromised", "injure", "survivor", "community"};
 		type3aspects.put("whoaffected", keywordsForWhoaffected);
 
@@ -167,8 +180,8 @@ public enum Category {
 				"loss of life", "coma", "unconscious", "mortalit",  "injur", "death", "dismemberment", "loss of life", "loss of limb"};
 		type3aspects.put("how", keywordsForHow);
 
-		String[] keywordsForCountermeasures = {"universal health care", "primary health care", "health care", "immuniz", "medic", 
-				"educat", "prevent", "maintenance", "repair", "educat"};
+		String[] keywordsForCountermeasures = {"educate", "prevent", "maintenance", "universal health care", "primary health care", "health care", "immuniz", "medic", 
+				 "repair", "educat"};
 		type3aspects.put("countermeasures", keywordsForCountermeasures);
 		return type3aspects;
 	}
@@ -182,11 +195,11 @@ public enum Category {
 				"wildflowers", "habitat", "culture", "biodiversity"};
 		type4aspects.put("what", keywordsForWhat);
 
-		String[] keywordsForImportance = {"sustain", "medical discover", "cure", "economic development", "economic", "health", "disaster resilience"};
+		String[] keywordsForImportance = {"sustain", "cure", "economic", "medical discover", "economic development",  "health", "disaster resilience"};
 		type4aspects.put("importance", keywordsForImportance);
 
-		String[] keywordsForThreats = {"nonnative speci", "nonnative", "invasive speci", "invasive", "market demand", "urban expansion", 
-				"expansion", "natural disaster", "disaster", "weather", "pollution", "global warming", "climate change", "war", "conflict", 
+		String[] keywordsForThreats = {"disaster", "weather", "pollution", "nonnative speci", "nonnative", "invasive speci", "invasive", "market demand", "urban expansion", 
+				"expansion", "natural disaster",  "global warming", "climate change", "war", "conflict", 
 				"deforestation", "acid rain", "greenhouse gas", "greenhouse effect", "habitat destruct"};
 		type4aspects.put("threats", keywordsForThreats);
 
@@ -205,7 +218,6 @@ public enum Category {
 		type5aspects.put("what", keywordsForWhat);
 		
 		
-		type5aspects = new LinkedHashMap<String, String[]>();
 		String[] keywordsForWho = {"suspect", "accuse", "culprit", "offend", "violat", 
 				"defendant", "plaintiff", "convict", "defense", "appellant"};
 		type5aspects.put("who", keywordsForWho);
@@ -217,8 +229,8 @@ public enum Category {
 				"arbitrator", "adjudicator", "judiciary", "court"};
 		type5aspects.put("who_inv", keywordsForWho_Inv);
 
-		String[] keywordsForWhy = {"accident", "wrongdoing", "death", "crime", "corruption", "theft", "fire", "abuse", "due to",
-				"determine guilt", "determine innocen", "guilt", "innocen", "charge", "justice", "verdict"};
+		String[] keywordsForWhy = {"accident",  "death", "crime", "corruption", "theft", "fire", "abuse", "due to",
+				"determine guilt", "determine innocen", "guilt", "innocen", "wrongdoing", "charge", "justice", "verdict"};
 		type5aspects.put("why", keywordsForWhy);
 
 		String[] keywordsForCharges = {"accus", "blame", "wrongdoing", "crime", "conspiracy", "violence", "drug", "alcohol", "offense", 
@@ -226,7 +238,7 @@ public enum Category {
 				"rape", "abuse", "robbery"};
 		type5aspects.put("charges", keywordsForCharges);
 
-		String[] keywordsForPlead = {"innocen", "denial", "admission", "wrongdoing", "circumstance", "explain", 
+		String[] keywordsForPlead = {"innocent", "denial", "admission", "wrongdoing", "circumstance", "explain", 
 				"explanation", "charges", "guilty", "not guilty", "no contest", "insanity", "nolo contendere", "failure to appear", 
 				"refus", "plea bargain", "drop charges", "reduce charges", "reduction of charges", "drop", "reduc", 
 				"charges"};

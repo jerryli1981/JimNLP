@@ -1,9 +1,12 @@
 package edu.pengli.nlp.platform.algorithms.classify;
 
+import edu.pengli.nlp.platform.pipe.Noop;
 import edu.pengli.nlp.platform.pipe.Pipe;
 import edu.pengli.nlp.platform.types.FeatureVector;
+import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.types.InstanceList;
 import edu.pengli.nlp.platform.types.Metric;
+import edu.pengli.nlp.platform.util.Maths;
 import matlabcontrol.MatlabInvocationException;
 import matlabcontrol.MatlabProxy;
 import matlabcontrol.extensions.MatlabNumericArray;
@@ -37,14 +40,52 @@ public class Spectral extends Clusterer {
 			FeatureVector fv_i = (FeatureVector) instances.get(i).getData();
 			for (int j = 0; j < instances.size(); j++) {
 				FeatureVector fv_j = (FeatureVector) instances.get(j).getData();
+				double sum = 0.0;
+				for(int k=0; k<fv_i.getValues().length; k++){
+					sum += Math.pow((fv_i.getValues()[k]-fv_j.getValues()[k]), 2)/10;
+				}
+		//		similarityMatrix[i][j] = 1-metric.distance(fv_i, fv_j);// 25, ROUGE-1, 0.30706
+		//		similarityMatrix[i][j] = metric.distance(fv_i, fv_j);// 25, ROUGE-1, 0.29664
+				similarityMatrix[i][j] = Math.exp(-sum); // 25, ROUGE-1, 0.30768
+			}
+		}
+		
+		// 25, ROUGE-1, 0.30184
+		// 25, ROUGE-1, 0.30707 below
+/*		int N = instances.size();
+		int[] degree = new int[N];
+		double threshold = 0.5;
+		double damping = 0.5;
+		for (int i = 0; i < instances.size(); i++) {
+			FeatureVector fv_i = (FeatureVector) instances.get(i).getData();
+			for (int j = 0; j < instances.size(); j++) {
+				FeatureVector fv_j = (FeatureVector) instances.get(j).getData();
 				similarityMatrix[i][j] = 1-metric.distance(fv_i, fv_j);
+				if (similarityMatrix[i][j] > threshold) {
+					similarityMatrix[i][j] = 1;
+					degree[i]++;
+				} else
+					similarityMatrix[i][j] = 0;
 			}
 		}
 
+		for (int i = 0; i < instances.size(); i++) {
+			for (int j = 0; j < instances.size(); j++) {
+				if (degree[i] == 0) {
+					similarityMatrix[i][j] = damping / N; // prevent NAN
+				} else {
+					similarityMatrix[i][j] = damping / N + (1 - damping)
+							* similarityMatrix[i][j] / degree[i]; // prevent NAN
+				}
+
+			}
+		}*/
+		
 		int clusterLabels[] = new int[instances.size()];
+		Clustering predicted = null;
 		
 		try {
-			processor.setNumericArray("A", new MatlabNumericArray(
+			processor.setNumericArray("W", new MatlabNumericArray(
 					similarityMatrix, null));
 
 			double[][] diagonalMatrix = new double[instances.size()][instances
@@ -59,7 +100,7 @@ public class Spectral extends Clusterer {
 			processor.setNumericArray("D", new MatlabNumericArray(
 					diagonalMatrix, null));
 
-			proxy.eval("L=D-A");
+			proxy.eval("L=D-W");
 			proxy.eval("L=D^(-0.5)*L*D^(-0.5)");
 			proxy.eval("[U,DV]=eig(L)");
 			proxy.eval("[eigval, idx] = sort(diag(DV))");
@@ -67,18 +108,25 @@ public class Spectral extends Clusterer {
 			proxy.eval("U=U./repmat(sqrt(sum(U.*U,2)),1," + numClusters + ")");
 			proxy.eval("labels = kmeans(U," + numClusters + ",'Replicates',20)");
 			
-/*			FeatureVector vec = (FeatureVector)instances.get(0).getData();
-			int dimension = vec.getValues().length;
-			double[][] dataMatrix = new double[instances.size()][dimension];
-			for (int i = 0; i < instances.size(); i++) {
-				FeatureVector fv_i = (FeatureVector) instances.get(i).getData();
-				for(int j=0; j<dimension; j++)
-					dataMatrix[i][j] = fv_i.getValues()[j];
+/*			double[][] U = processor.getNumericArray("U")
+					.getRealArray2D();
+			
+			InstanceList tmpList = new InstanceList(null);
+			for(int i=0; i<instances.size(); i++){
+				double[] val = new double[numClusters];
+				int[] idx = new int[numClusters];
+				for(int j=0; j<numClusters; j++){
+					val[j] = U[i][j];
+					idx[j] = j;
+				}
+				FeatureVector fv = new FeatureVector(idx, val);
+				Instance inst = new Instance(fv, null, null, instances.get(i).getSource());
+				tmpList.add(inst);
 			}
 			
-			processor.setNumericArray("arr", new MatlabNumericArray(
-					dataMatrix, null));
-			proxy.eval("labels = kmeans(arr,"+numClusters+")");*/
+			KMeans kmeans = new KMeans(new Noop(), numClusters, metric);
+			predicted = kmeans.cluster(tmpList);*/
+			
 
 			double[][] labels = processor.getNumericArray("labels")
 					.getRealArray2D();
@@ -92,7 +140,7 @@ public class Spectral extends Clusterer {
 		}
 
 		return new Clustering(instances, numClusters, clusterLabels);
-
+//		return predicted;
 	}
 
 }
