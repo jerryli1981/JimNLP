@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,14 +21,21 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.Stack;
+import java.util.concurrent.Callable;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 
 import com.jmatio.io.MatFileReader;
 import com.jmatio.io.MatFileWriter;
 import com.jmatio.types.MLCell;
 import com.jmatio.types.MLDouble;
 
+import lpsolve.LpSolve;
+import matlabcontrol.MatlabConnectionException;
 import matlabcontrol.MatlabInvocationException;
 import matlabcontrol.MatlabProxy;
+import matlabcontrol.MatlabProxyFactory;
+import matlabcontrol.MatlabProxyFactoryOptions;
 import matlabcontrol.extensions.MatlabNumericArray;
 import matlabcontrol.extensions.MatlabTypeConverter;
 import edu.pengli.nlp.conference.acl2015.pipe.FeatureVectorGenerator;
@@ -41,16 +49,24 @@ import edu.pengli.nlp.conference.acl2015.types.Predicate;
 import edu.pengli.nlp.conference.acl2015.types.Tuple;
 import edu.pengli.nlp.platform.algorithms.classify.Clustering;
 import edu.pengli.nlp.platform.algorithms.classify.HarmonicSemiSupervisedClustering;
-import edu.pengli.nlp.platform.algorithms.classify.KMeans;
+import edu.pengli.nlp.platform.algorithms.classify.KMeans_Java;
+import edu.pengli.nlp.platform.algorithms.classify.KMeans_Matlab;
 import edu.pengli.nlp.platform.algorithms.classify.LabelPropagationSemiSupervisedClustering;
 import edu.pengli.nlp.platform.algorithms.classify.LocalglobalConsistencySemiSupervisedClustering;
 import edu.pengli.nlp.platform.algorithms.classify.SemiSupervisedClustering;
-import edu.pengli.nlp.platform.algorithms.classify.Spectral;
-import edu.pengli.nlp.platform.algorithms.classify.SpectralClustering;
+import edu.pengli.nlp.platform.algorithms.classify.Spectral_Matlab;
+import edu.pengli.nlp.platform.algorithms.classify.Spectral_Java;
+import edu.pengli.nlp.platform.algorithms.miscellaneous.LongestCommonSubstring;
 import edu.pengli.nlp.platform.algorithms.miscellaneous.Merger;
+import edu.pengli.nlp.platform.algorithms.ranking.LexRank;
+import edu.pengli.nlp.platform.pipe.CharSequence2TokenSequence;
+import edu.pengli.nlp.platform.pipe.FeatureSequence2FeatureVector;
 import edu.pengli.nlp.platform.pipe.Noop;
 import edu.pengli.nlp.platform.pipe.Pipe;
 import edu.pengli.nlp.platform.pipe.PipeLine;
+import edu.pengli.nlp.platform.pipe.TokenSequence2FeatureSequence;
+import edu.pengli.nlp.platform.pipe.TokenSequenceLowercase;
+import edu.pengli.nlp.platform.pipe.TokenSequenceRemoveStopwords;
 import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerFileIterator;
 import edu.pengli.nlp.platform.types.Alphabet;
 import edu.pengli.nlp.platform.types.FeatureVector;
@@ -59,9 +75,12 @@ import edu.pengli.nlp.platform.types.InstanceList;
 import edu.pengli.nlp.platform.types.Metric;
 import edu.pengli.nlp.platform.types.NormalizedDotProductMetric;
 import edu.pengli.nlp.platform.types.SparseVector;
+import edu.pengli.nlp.platform.util.CallableTask;
 import edu.pengli.nlp.platform.util.FileOperation;
+import edu.pengli.nlp.platform.util.Maths;
 import edu.pengli.nlp.platform.util.RankMap;
 import edu.pengli.nlp.platform.util.TimeWait;
+import edu.pengli.nlp.platform.util.matrix.Matrix;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.semgraph.SemanticGraph;
@@ -496,7 +515,7 @@ public class AbstractiveGeneration {
 		}
 	}
 
-	private ArrayList<ArrayList<IndexedWord>> travelAllPaths(
+	public ArrayList<ArrayList<IndexedWord>> travelAllPaths(
 			SemanticGraph graph, IndexedWord endNode) {
 
 		ArrayList<ArrayList<IndexedWord>> ret = new ArrayList<ArrayList<IndexedWord>>();
@@ -637,10 +656,19 @@ public class AbstractiveGeneration {
 							break;
 
 						} else if (graph.isAncestor(endNode, path.peek()) == 1) {
+							/*ArrayList<IndexedWord> lastP = ret.get(ret.size()-1);
+							IndexedWord lastt = lastP.get(lastP.size()-1);
+							IndexedWord lastpath = path.peek();
+							if(!lastt.equals(lastpath)){
+								 pathArriveEnd = true;
+							}
+							 break;*/
 							pathArriveEnd = true;
 							break;
+							
 						} else
 							path.pop();
+								
 					} else
 						break;
 				}
@@ -762,9 +790,16 @@ public class AbstractiveGeneration {
 								break;
 
 							} else if (graph.isAncestor(endNode, path.peek()) == 1) {
+								/*ArrayList<IndexedWord> lastP = ret.get(ret.size()-1);
+								IndexedWord lastt = lastP.get(lastP.size()-1);
+								IndexedWord lastpath = path.peek();
+								if(!lastt.equals(lastpath)){
+									 pathArriveEnd = true;
+								}
+								 break;*/
 								pathArriveEnd = true;
 								break;
-							} else
+							}else
 								path.pop();
 						} else
 							break;
@@ -787,10 +822,13 @@ public class AbstractiveGeneration {
 				stack.push(edge.getDependent());
 		}
 
+		stack.clear();
+		path.clear();
+		candidatePoints.clear();
 		return ret;
 	}
 
-	private ArrayList<String> patternFusion(InstanceList patternCluster) {
+	private ArrayList<String> patternFusion(InstanceList patternCluster) throws NoSuchMethodException, SecurityException {
 
 		// Node Alignment
 		SemanticGraph graph = new SemanticGraph();
@@ -812,6 +850,7 @@ public class AbstractiveGeneration {
 		endNode.setTag("END");
 
 		// construct graph to merge patterns
+		ArrayList<IndexedWord> lastWords = new ArrayList<IndexedWord>();
 		for (int i = 0; i < patternCluster.size(); i++) {
 			Instance inst = patternCluster.get(i);
 			Pattern p = (Pattern) inst.getSource();
@@ -868,19 +907,54 @@ public class AbstractiveGeneration {
 			if (flagLastWord != null && flagEndRoot == null) {
 
 				graph.addEdge(flagLastWord, endNode, null, 0.0, false);
+				lastWords.add(flagLastWord);
 
 			} else if (flagLastWord != null && flagEndRoot != null) {
 				SemanticGraphEdge edge = graph.getEdge(flagLastWord,
 						flagEndRoot);
 				if (edge == null) {
 					graph.addEdge(flagLastWord, flagEndRoot, null, 0.0, false);
+					lastWords.add(flagLastWord);
 				}
 			}
+			
+			
 
 		}
+		
+		ArrayList<ArrayList<IndexedWord>> paths = new ArrayList<ArrayList<IndexedWord>>();
+		for(IndexedWord last : lastWords){
+			List<IndexedWord> path = graph.getPathToRoot(last);
+			path.add(0, last);
+			ArrayList<IndexedWord> reversePath = new ArrayList<IndexedWord>();
+			for(int i = path.size()-2; i>=0; i--){
+				reversePath.add(path.get(i));
+			}
+			paths.add(reversePath);
+		}
 
-		System.out.println("Begin travel the graph to generate new patterns");
-		ArrayList<ArrayList<IndexedWord>> paths = travelAllPaths(graph, endNode);
+//		System.out.println("Begin travel the graph to generate new patterns");
+//		ArrayList<ArrayList<IndexedWord>> paths = travelAllPaths(graph, endNode);
+/*		Method method = getClass().getDeclaredMethod("travelAllPaths", 
+				new Class[]{SemanticGraph.class, IndexedWord.class});
+		List<Object> args = new ArrayList<Object>();
+		args.add(graph);
+		args.add(endNode);
+		Callable call = new CallableTask(this, method, args);
+		FutureTask task = new FutureTask(call);
+		
+		Thread thread = new Thread(task);
+		thread.setDaemon(true);
+		thread.start();
+		ArrayList<ArrayList<IndexedWord>> paths = null;
+		try{
+			
+			paths = (ArrayList<ArrayList<IndexedWord>>) task.get(20, TimeUnit.SECONDS);
+			
+		}catch(Exception e){
+			System.out.println("pattern fusion can't be fininshed in time");
+			return null;
+		}*/
 
 		ArrayList<ArrayList<IndexedWord>> filteredPaths = new ArrayList<ArrayList<IndexedWord>>();
 		HashSet<String> set = new HashSet<String>();
@@ -915,7 +989,7 @@ public class AbstractiveGeneration {
 		return Merger.process(merged);
 	}
 
-	private ArrayList<String> tupleFusion(InstanceList tupleCluster) {
+	private ArrayList<String> tupleFusion(InstanceList tupleCluster) throws NoSuchMethodException, SecurityException {
 
 		// Node Alignment
 		SemanticGraph graph = new SemanticGraph();
@@ -935,8 +1009,10 @@ public class AbstractiveGeneration {
 		endNode.setLemma("END");
 		endNode.setValue("END");
 		endNode.setTag("END");
+		endNode.setOriginalText("END");
 
 		// construct graph to merge tuples
+//		ArrayList<IndexedWord> lastWords = new ArrayList<IndexedWord>();
 		for (int i = 0; i < tupleCluster.size(); i++) {
 			Instance inst = tupleCluster.get(i);
 			Pattern p = (Pattern) inst.getSource();
@@ -980,23 +1056,61 @@ public class AbstractiveGeneration {
 			if (flagLastWord != null && flagEndRoot == null) {
 
 				graph.addEdge(flagLastWord, endNode, null, 0.0, false);
+//				lastWords.add(flagLastWord);
 
 			} else if (flagLastWord != null && flagEndRoot != null) {
 				SemanticGraphEdge edge = graph.getEdge(flagLastWord,
 						flagEndRoot);
 				if (edge == null) {
 					graph.addEdge(flagLastWord, flagEndRoot, null, 0.0, false);
+//					lastWords.add(flagLastWord);
 				}
 			}
 		}
+		
+/*		ArrayList<ArrayList<IndexedWord>> paths = new ArrayList<ArrayList<IndexedWord>>();
+		for(IndexedWord last : lastWords){
+			List<IndexedWord> path = graph.getPathToRoot(last);
+			path.add(0, last);
+			ArrayList<IndexedWord> reversePath = new ArrayList<IndexedWord>();
+			for(int i = path.size()-2; i>=0; i--){
+				reversePath.add(path.get(i));
+			}
+			
+			ArrayList<IndexedWord> reversePath = 
+					(ArrayList<IndexedWord>) graph.getShortestDirectedPathNodes(startNode, last);
+			reversePath.remove(0);
+			paths.add(reversePath);
+		}*/
+			
 
-		System.out.println("Begin travel the graph to generate new tuples");
-		ArrayList<ArrayList<IndexedWord>> paths = travelAllPaths(graph, endNode);
+//		System.out.println("Begin travel the graph to generate new tuples");
+//		ArrayList<ArrayList<IndexedWord>> paths = travelAllPaths(graph, endNode);
+		Method method = getClass().getDeclaredMethod("travelAllPaths", 
+				new Class[]{SemanticGraph.class, IndexedWord.class});
+		List<Object> args = new ArrayList<Object>();
+		args.add(graph);
+		args.add(endNode);
+		Callable call = new CallableTask(this, method, args);
+		FutureTask task = new FutureTask(call);
+		
+		Thread thread = new Thread(task);
+		thread.setDaemon(true);
+		thread.start();
+		ArrayList<ArrayList<IndexedWord>> paths = null;
+		try{
+			
+			paths = (ArrayList<ArrayList<IndexedWord>>) task.get(20, TimeUnit.SECONDS);
+			
+		}catch(Exception e){
+			System.out.println("tuple fusion can't be fininshed in time");
+			return null;
+		}
 
-		ArrayList<ArrayList<IndexedWord>> filteredPaths = new ArrayList<ArrayList<IndexedWord>>();
+		ArrayList<List<IndexedWord>> filteredPaths = new ArrayList<List<IndexedWord>>();
 		HashSet<String> set = new HashSet<String>();
 		for (int i = 0; i < paths.size(); i++) {
-			ArrayList<IndexedWord> path = paths.get(i);
+			List<IndexedWord> path = paths.get(i);
 			StringBuilder sb = new StringBuilder();
 			for (IndexedWord iw : path) {
 				// keep consistent with dictionary
@@ -1009,7 +1123,7 @@ public class AbstractiveGeneration {
 		}
 
 		ArrayList<String> merged = new ArrayList<String>();
-		for (ArrayList<IndexedWord> path : filteredPaths) {
+		for (List<IndexedWord> path : filteredPaths) {
 			StringBuilder sb = new StringBuilder();
 			for (IndexedWord iw : path) {
 				// keep consistent with dictionary
@@ -1082,11 +1196,15 @@ public class AbstractiveGeneration {
 	private ArrayList<String> realization(String outputSummaryDir,
 			String corpusName, InstanceList patternCluster, MatlabProxy proxy,
 			FeatureVectorGenerator fvGenerator) throws FileNotFoundException,
-			IOException, MatlabInvocationException, ClassNotFoundException {
+			IOException, MatlabInvocationException, ClassNotFoundException, NoSuchMethodException, SecurityException {
 		
 		//1. find the best pattern
 		ArrayList<String> tupleCandidates = tupleFusion(patternCluster);
+		if(tupleCandidates == null)
+			return null;
 		ArrayList<String> patternCandidates = patternFusion(patternCluster);	
+		if(patternCandidates == null)
+			return null;
 		if (tupleCandidates.size() == 0 || patternCandidates.size() == 0) {
 			System.out.println("tuple or pattern set is empty");
 			return null;
@@ -1116,7 +1234,11 @@ public class AbstractiveGeneration {
 		}
 		
 		HashMap<String, Double> tupleScoreMap = new HashMap<String, Double>();
-		HashMap<String, float[]> wordMap = fvGenerator.getWordMap();
+		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + corpusName + ".smallWordMap"));
+		HashMap<String, float[]> wordMap = (HashMap<String, float[]>)in.readObject();
+		in.close();
+//		HashMap<String, float[]> wordMap = fvGenerator.getWordMap();
 		Metric metric = new NormalizedDotProductMetric();
 		for(String tuple : tupleCandidates){
 			double coverageScore = 0.0;
@@ -1145,7 +1267,7 @@ public class AbstractiveGeneration {
 						FeatureVector fv_t = new FeatureVector(idx, wordVector_T_D);
 						FeatureVector fv_p = new FeatureVector(idx, wordVector_P_D);
 	
-						coverageScore = 1- metric.distance(fv_t, fv_p);
+						coverageScore += (1- metric.distance(fv_t, fv_p));
 					}
 					
 				}
@@ -1177,62 +1299,22 @@ public class AbstractiveGeneration {
 		}
 		return ret;
 	}
-
-	private InstanceList[] kmeans(InstanceList instances, int numClusters,
-			MatlabProxy proxy) {
-		
-	/*	Metric metric = new NormalizedDotProductMetric();
-		KMeans kmeans = new KMeans(new Noop(), numClusters, metric);
-		Clustering predicted = kmeans.cluster(instances);
-		return predicted.getClusters();*/
-		
-		MatlabTypeConverter processor = new MatlabTypeConverter(proxy);
-		
-		FeatureVector vec = (FeatureVector)instances.get(0).getData();
-		int dimension = vec.getValues().length;
-		
-		double[][] dataMatrix = new double[instances.size()][dimension];
-		for (int i = 0; i < instances.size(); i++) {
-			FeatureVector fv_i = (FeatureVector) instances.get(i).getData();
-			for(int j=0; j<dimension; j++)
-				dataMatrix[i][j] = fv_i.getValues()[j];
-		}
-		
-		int clusterLabels[] = new int[instances.size()];
-		try {
-			
-			processor.setNumericArray("arr", new MatlabNumericArray(
-					dataMatrix, null));
-			proxy.eval("labels = kmeans(arr,"+numClusters+ ",'Replicates',20)");
-			double[][] labels = processor.getNumericArray("labels").getRealArray2D();
-			for (int i = 0; i < instances.size(); i++)
-				clusterLabels[i] = (int) labels[i][0]-1;
-			
-			
-		} catch (MatlabInvocationException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-		return new Clustering(instances, numClusters, clusterLabels).getClusters();
-	}
-
-	private InstanceList[] spectral(InstanceList instances, int numClusters,
-			MatlabProxy proxy) {
-		Metric metric = new NormalizedDotProductMetric();
-		Spectral spectral = new Spectral(new Noop(), numClusters, metric, proxy);
-/*		SpectralClustering spectral = new SpectralClustering(new Noop(), 
-				numClusters, metric);*/
-		Clustering predicted = spectral.cluster(instances);
-		return predicted.getClusters();
-	}
-
-	private InstanceList[] seedBasedClustering(String outputSummaryDir,
+	
+	private Object[] seedBasedClustering(String outputSummaryDir, String corpusName,
 			InstanceList instances, String categoryId, MatlabProxy proxy,
-			FeatureVectorGenerator fvGenerator) throws ClassNotFoundException,
-			IOException, MatlabInvocationException {
+			FeatureVectorGenerator fvGenerator, int sigma) throws ClassNotFoundException,
+			IOException, MatlabInvocationException{
 		
-		HashMap<String, float[]> wordMap = fvGenerator.getWordMap();
+//		HashMap<String, float[]> wordMap = fvGenerator.getWordMap();
+		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + corpusName + ".smallWordMap"));
+		HashMap<String, float[]> wordMap = (HashMap<String, float[]>)in.readObject();
+
+		in.close();
+		
+		Metric metric = new NormalizedDotProductMetric();
+		KMeans_Matlab km = new KMeans_Matlab(new Noop(), 4, metric,proxy);
+		
 		InstanceList seeds = new InstanceList(new Noop());
 		Category[] cats = Category.values();
 		int dimension = 300;
@@ -1261,7 +1343,7 @@ public class AbstractiveGeneration {
 						wordsList.add(wordInst);
 					}
 					
-					InstanceList[] groups = kmeans(wordsList, 4, proxy);
+					InstanceList[] groups = km.cluster(wordsList).getClusters();
 					for(InstanceList il : groups){
 						double[] vec = new double[dimension];
 						int[] idx = new int[dimension];
@@ -1305,7 +1387,7 @@ public class AbstractiveGeneration {
 						}
 						
 						FeatureVector fv = new FeatureVector(idx3, vec3);
-						Instance seed = new Instance(fv, null, null, null);
+						Instance seed = new Instance(fv, null, null, k);
 						seeds.add(seed);
 					}
 				}
@@ -1338,31 +1420,39 @@ public class AbstractiveGeneration {
 		 */
 
 			
-		Metric metric = new NormalizedDotProductMetric();
+/*		SemiSupervisedClustering semiClustering = new 
+				HarmonicSemiSupervisedClustering(
+				new Noop(), seeds, metric, proxy, sigma);*/
+		
 /*		SemiSupervisedClustering semiClustering = new 
 				LocalglobalConsistencySemiSupervisedClustering(
-				new Noop(), seeds, metric, proxy);*/
+				new Noop(), seeds, metric, proxy, sigma);*/
+		
 		SemiSupervisedClustering semiClustering = new 
 				LabelPropagationSemiSupervisedClustering(
-				new Noop(), seeds, metric, proxy);
+				new Noop(), seeds, metric, proxy, sigma);
+		
 		Clustering predicted = semiClustering.cluster(instances);
-		return predicted.getClusters();
+		Object[] ret = new Object[2];
+		ret[0] = predicted;
+		ret[1] = seeds;
+		return ret;
 	}
 
 	private void generateFinalSummary(String outputSummaryDir,
 			String corpusName, InstanceList instances, String categoryId,
-			MatlabProxy proxy, FeatureVectorGenerator fvGenerator)
+			MatlabProxy proxy, FeatureVectorGenerator fvGenerator, int sigma)
 			throws NumberFormatException, IOException,
-			MatlabInvocationException, ClassNotFoundException {
+			MatlabInvocationException, ClassNotFoundException, NoSuchMethodException, SecurityException{
 
-		System.out.println("Begin to train RNN to score patterns");
-		trainRNN(outputSummaryDir, corpusName);
+//		System.out.println("Begin to train RNN to score patterns");
+//		trainRNN(outputSummaryDir, corpusName);
 
-		System.out.println("Begin pattern clustering");
+		
 		PrintWriter out = FileOperation.getPrintWriter(new File(
 				outputSummaryDir), corpusName);
 
-		int numClusters = 7;
+//		int numClusters = 25;
 		int length = 0;
 		boolean flag = false;
 		// method 1: kmeans unsupervised clustering
@@ -1461,62 +1551,85 @@ public class AbstractiveGeneration {
 		}*/
 
 		// method 3: seed based semi-supervised clusterting
-		//ROUGE-SU4 is 0.090953, keywords 3 group
-		//ROUGE-SU4 is 0.089889, keywords 4 group
+		Object[] objs = seedBasedClustering(outputSummaryDir, corpusName,
+				instances, categoryId, proxy, fvGenerator, sigma);
+		Clustering predicted = (Clustering) objs[0];
+		InstanceList seeds = (InstanceList) objs[1];
+		HashMap<Integer, String> labelAspectMap = new HashMap<Integer, String>();
+		for(int i=0; i<seeds.size(); i++){
+			labelAspectMap.put(i, (String)seeds.get(i).getSource());
+		}
 		
-		//ROUGE-2 is 0.050356, keywords 3 group
-		//ROUGE-2 is ?, keywords 4 group
-		
-		//ROUGE-1 is ?, keywords 3 group
-		//ROUGE-1 is ?, keywords 4 group
-
-		InstanceList[] groups_seed = seedBasedClustering(outputSummaryDir,
-				instances, categoryId, proxy, fvGenerator);
-		HashMap<InstanceList, Integer> tmp = new HashMap<InstanceList, Integer>();
-		for (InstanceList il : groups_seed)
-			tmp.put(il, il.size());
-		HashMap rankedMap = RankMap.sortHashMapByValues(tmp, false);
-		Set keys = rankedMap.keySet();
-		Iterator iter = keys.iterator();
-		while (iter.hasNext()) {
-			InstanceList il = (InstanceList) iter.next();
-			ArrayList<String> lines = realization(outputSummaryDir, corpusName,
-					il, proxy, fvGenerator);
-			if (lines == null)
-				continue;
-			for (String line : lines) {
-				String[] toks = line.split(" ");
-				length += toks.length;
-				if (length <= 100)
-					out.println(line);
-				else {
-					length -= toks.length;
-					boolean stop = false;
-					for (int i = 0; i < toks.length; i++) {
-						out.print(toks[i] + " ");
-						length++;
-						if (length > 100) {
-							stop = true;
-							break;
+		InstanceList[] groups_seed = predicted.getClusters();
+		Category[] cats = Category.values();
+		for (Category cat : cats) {
+			if (cat.getId() == Integer.parseInt(categoryId)) {
+				
+				Map<String, String[]> aspects = cat.getAspects(cat.getId());
+				Set<String> aspectsSet = aspects.keySet();
+				for (String aspect : aspectsSet) {
+					ArrayList<InstanceList> localClusters = 
+							new ArrayList<InstanceList>();
+					
+					for(int i=0; i<groups_seed.length; i++){
+						if(labelAspectMap.get(i).equals(aspect)){
+							localClusters.add(groups_seed[i]);
 						}
 					}
-					if (stop == true) {
-						flag = true;
-						break;
+					
+					HashMap<InstanceList, Integer> tmp = new HashMap<InstanceList, Integer>();
+					for (InstanceList il : localClusters)
+						tmp.put(il, il.size());
+					
+					HashMap rankedMap = RankMap.sortHashMapByValues(tmp, false);
+					Set keys = rankedMap.keySet();
+					Iterator iter = keys.iterator();
+					while (iter.hasNext()) {
+						InstanceList il = (InstanceList) iter.next();
+						ArrayList<String> lines = realization(outputSummaryDir, corpusName,
+								il, proxy, fvGenerator);
+						if (lines == null)
+							continue;
+						for (String line : lines) {
+							String[] toks = line.split(" ");
+							length += toks.length;
+							if (length <= 100){
+								out.println(line);
+							}
+								
+							else {
+								length -= toks.length;
+								boolean stop = false;
+								for (int i = 0; i < toks.length; i++) {
+									out.print(toks[i] + " ");
+									length++;
+									if (length > 100) {
+										stop = true;
+										break;
+									}
+								}
+								if (stop == true) {
+									flag = true;
+									break;
+								}
+							}
+						}
+
+						if (flag == true)
+							break;
 					}
-				}
-			}
-
-			if (flag == true)
-				break;
+					
+				}	
+				
+			}//end if find aspects
+			
 		}
-
+		
 		out.close();
 	}
 
 	private void trainRNN(String outputSummaryDir, String corpusName)
 			throws IOException {
-		System.out.println("train RNNLM to scoring generated patterns");
 		PrintWriter out_valid = new PrintWriter(new FileOutputStream(new File(
 				outputSummaryDir + "/" + corpusName + ".patterns.valid")));
 
@@ -1559,12 +1672,14 @@ public class AbstractiveGeneration {
 			e.printStackTrace();
 		}
 	}
+	
+
 
 	public void run(String inputCorpusDir, String outputSummaryDir,
 			String corpusName, PipeLine pipeLine, String categoryId,
-			MatlabProxy proxy) throws Exception {
+			MatlabProxy proxy, int sigma) throws Exception {
 
-		InstanceList docs = new InstanceList(pipeLine);
+//		InstanceList docs = new InstanceList(pipeLine);
 
 		/*
 		 * OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
@@ -1582,7 +1697,7 @@ public class AbstractiveGeneration {
 		 * generatePatterns(outputSummaryDir, corpusName, docs, headAnnotator );
 		 */
 
-		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
+/*		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
 				outputSummaryDir + "/" + corpusName + ".patterns.ser"));
 		HashSet<Pattern> patternSet = (HashSet<Pattern>) in.readObject();
 		in.close();
@@ -1596,27 +1711,41 @@ public class AbstractiveGeneration {
 				set.add(p.toString());
 			}
 			
-		}
+		}*/
 		InstanceList instances = new InstanceList(pipeLine);
 		FeatureVectorGenerator fvGenerator = (FeatureVectorGenerator) pipeLine
 				.getPipe(0);
+		
+/*		fvGenerator.generateSmallWordVector
+		       (outputSummaryDir, corpusName, patternList, categoryId);*/
 
-		System.out.println("Begin generate feature vectors for patterns");
+//		System.out.println("Begin generate feature vectors for patterns");
 		// fvGenerator.setFvsViaTrainedDCNN(outputSummaryDir, corpusName,
 		// patternList, proxy);
-		fvGenerator.setFvsViaPreTrainedWord2VecModel(outputSummaryDir,
+/*		fvGenerator.setFvsViaPreTrainedWord2VecModel(outputSummaryDir,
 				corpusName, patternList);
+
 		instances.addThruPipe(patternList.iterator());
 		
-		System.out.println("Begin generate final summary");
+		ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(
+				outputSummaryDir + "/" + corpusName + ".featuredInsts"));
+		instances.writeObject(out);
+		out.close();*/
+		
+		ObjectInputStream inInst = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + corpusName + ".featuredInsts"));
+		instances.readObject(inInst);
+		inInst.close();
+		
+//		System.out.println("Begin generate final summary");
 		generateFinalSummary(outputSummaryDir, corpusName, instances,
-				categoryId, proxy, fvGenerator);
+				categoryId, proxy, fvGenerator, sigma);
 
 	}
 	
 	public void run_SimpleNLG(String inputCorpusDir, String outputSummaryDir,
 			String corpusName, PipeLine pipeLine, String categoryId,
-			MatlabProxy proxy) throws Exception {
+			MatlabProxy proxy, int sigma) throws Exception {
 
 		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
 				outputSummaryDir + "/" + corpusName + ".patterns.ser"));
@@ -1632,25 +1761,32 @@ public class AbstractiveGeneration {
 		FeatureVectorGenerator fvGenerator = (FeatureVectorGenerator) pipeLine
 				.getPipe(0);
 
-		System.out.println("Begin generate feature vectors for patterns");
+//		System.out.println("Begin generate feature vectors for patterns");
 		// fvGenerator.setFvsViaTrainedDCNN(outputSummaryDir, corpusName,
 		// patternList, proxy);
-		fvGenerator.setFvsViaPreTrainedWord2VecModel(outputSummaryDir,
+/*		fvGenerator.setFvsViaPreTrainedWord2VecModel(outputSummaryDir,
 				corpusName, patternList);
-		instances.addThruPipe(patternList.iterator());
+		instances.addThruPipe(patternList.iterator());*/
+		
+		ObjectInputStream inInst = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + corpusName + ".featuredInsts"));
+		instances.readObject(inInst);
+		inInst.close();
 
-		System.out.println("Begin generate final summary");
+//		System.out.println("Begin generate final summary");
 		PrintWriter out = FileOperation.getPrintWriter(new File(
 				outputSummaryDir), corpusName);
 		
 		int length = 0;
 		boolean flag = false;
-		int numClusters = 25;
+//		int numClusters = 25;
 		
 //		InstanceList[] groups = kmeans(instances, numClusters, proxy);
 //		InstanceList[] groups = spectral(instances, numClusters, proxy);
-		InstanceList[] groups = seedBasedClustering(outputSummaryDir,
-				instances, categoryId, proxy, fvGenerator);
+		Object[] objs = seedBasedClustering(outputSummaryDir, corpusName,
+				instances, categoryId, proxy, fvGenerator, sigma);
+		Clustering predicted = (Clustering) objs[0];
+		InstanceList[] groups = predicted.getClusters();
 		HashMap<InstanceList, Integer> tmp = new HashMap<InstanceList, Integer>();
 		for (InstanceList il : groups)
 			tmp.put(il, il.size());
@@ -1662,7 +1798,7 @@ public class AbstractiveGeneration {
 			InstanceList il = (InstanceList) iter.next();
 			if(il.size() == 0)
 				continue;
-			SparseVector clusterMean = KMeans.mean(il);
+			SparseVector clusterMean = KMeans_Java.mean(il);
 			double mindist = Double.MAX_VALUE;
 			int idx = -1;
 			for(int i=0; i<il.size(); i++){
@@ -1708,5 +1844,1187 @@ public class AbstractiveGeneration {
 		
 		out.close();
 
+	}
+	
+	public void run_ActiveLearning(String inputCorpusDir, String outputSummaryDir,
+			String corpusName, PipeLine pipeLine, int parameter, MatlabProxy proxy) throws Exception {
+		int topN = 10;
+		double threshold = 0.7;
+		int nIter = 5;
+		
+		InstanceList instances = new InstanceList(pipeLine);
+		Metric metric = new NormalizedDotProductMetric();
+		
+		ObjectInputStream inInst = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + corpusName + ".featuredInsts"));
+		instances.readObject(inInst);
+		inInst.close();
+		
+		FeatureVector fv_0 = (FeatureVector) instances.get(0).getData();
+		double[][] dataMatrix = new double[fv_0.getIndices().length][instances
+		                        				.size()];
+		                        		
+		for (int i = 0; i < instances.size(); i++) {
+			FeatureVector fv_i = (FeatureVector) instances.get(i).getData();
+		    double[] vals = fv_i.getValues();
+		    for(int j=0; j< vals.length; j++)
+		    dataMatrix[j][i] = vals[j];
+
+		}
+		                        		
+		double[][] X0 = new double[instances.size()][instances.size()];
+		Random rand = new Random();     		
+		for (int i = 0; i < instances.size(); i++) {
+			for(int j=0; j<instances.size(); j++)
+				X0[i][j]= rand.nextDouble();
+		}
+		                        	
+		MatlabTypeConverter processor = new MatlabTypeConverter(proxy);
+		
+		try {
+				
+			processor.setNumericArray("A", new MatlabNumericArray(
+					dataMatrix, null));
+			
+			processor.setNumericArray("Y", new MatlabNumericArray(
+					dataMatrix, null));
+			
+			processor.setNumericArray("X0", new MatlabNumericArray(
+					X0, null));
+
+			proxy.eval("n = size(A,2)");
+			proxy.eval("p = size(A,2)");
+			proxy.eval("Xi = sqrt(sum(X0.*X0,2)+eps)");
+			proxy.eval("d = 0.5./(Xi)");
+			proxy.eval("AX = A*X0-Y");
+			proxy.eval("Xi1 = sqrt(sum(AX.*AX,1)+eps)");
+			proxy.eval("d1 = 0.5./Xi1");
+			proxy.eval("AA = A'*A");
+			proxy.eval("AY = A'*Y");
+			
+			proxy.eval("X=zeros(n,n)");
+			for(int i=1; i<=nIter; i++){
+				proxy.eval("D = spdiags(d,0,n,n)");
+				for(int j=1; j<=instances.size(); j++){
+					proxy.eval("X(:,"+j+") = mldivide((d1("+j+")*AA+"+
+				parameter+"*D),(d1("+j+")*AY(:,"+j+")))");	
+				}
+				proxy.eval("Xi = sqrt(sum(X.*X,2)+eps)");
+				proxy.eval("d = 0.5./Xi");
+				proxy.eval("AX = A*X-Y");
+				proxy.eval("Xi1 = sqrt(sum(AX.*AX,1)+eps)");
+				proxy.eval("d1 = 0.5./Xi1");
+//				proxy.eval("obj("+i+") = (sum(Xi1) + r*sum(Xi))");
+			}
+			
+			proxy.eval("a = sum(abs(X),2)");
+			proxy.eval("[rank_value, rank_idx] = sort(a,'descend')");
+		
+		} catch (MatlabInvocationException e) {
+			e.printStackTrace();
+		}
+		
+      
+
+		double[][] rank_idx = processor.getNumericArray("rank_idx").getRealArray2D();  
+		InstanceList patternCluster = new InstanceList(pipeLine);
+		for(int i=0; i<topN; i++){
+			patternCluster.add(instances.get((int)(rank_idx[i][0]-1)));
+		}
+			
+		//realization
+		ArrayList<String> tupleCandidates = tupleFusion(patternCluster);
+		if(tupleCandidates == null)
+			return;
+/*		ArrayList<String> patternCandidates = patternFusion(patternCluster);	
+		if(patternCandidates == null)
+			return ;
+		if (tupleCandidates.size() == 0 || patternCandidates.size() == 0) {
+			System.out.println("tuple or pattern set is empty");
+			return;
+		}*/
+		
+		FeatureVectorGenerator fvGenerator = (FeatureVectorGenerator) pipeLine
+				.getPipe(0);
+		
+		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + corpusName + ".smallWordMap"));
+		HashMap<String, float[]> wordMap = (HashMap<String, float[]>)in.readObject();
+		in.close();
+		
+/*		InstanceList patternInstances = new InstanceList(pipeLine);
+		for(String pattern : patternCandidates){
+			double[] vec_P = new double[300];
+			int[] idx_P = new int[300];
+			for(int a = 0; a <300; a++){
+				idx_P[a] = a;
+			}
+			
+			String[] tokPat = pattern.split(" ");
+			for(String tokP : tokPat){
+				tokP = fvGenerator.cleaning(tokP.toLowerCase());
+				float[] wordVector_P = wordMap.get(tokP);
+				if (wordVector_P == null)
+					continue;
+				for (int a = 0; a < 300; a++) {
+					vec_P[a] += wordVector_P[a];
+				}	
+				
+				float len = 0;
+				for (int a = 0; a < 300; a++) {
+					len += vec_P[a] * vec_P[a];
+				}
+				len = (float) Math.sqrt(len);
+				for (int a = 0; a < 300; a++) {
+					vec_P[a] /= len;
+				}
+	
+			}
+			
+			FeatureVector fv = new FeatureVector(idx_P, vec_P);
+			Instance patternInst = new Instance(fv, null, null, pattern);
+			patternInstances.add(patternInst);
+		}*/
+		
+/*		fv_0 = (FeatureVector) patternInstances.get(0).getData();
+		dataMatrix = new double[fv_0.getIndices().length][patternInstances
+		  		                        				.size()];
+		
+		for (int i = 0; i < patternInstances.size(); i++) {
+			FeatureVector fv_i = (FeatureVector) patternInstances.get(i).getData();
+		    double[] vals = fv_i.getValues();
+		    for(int j=0; j< vals.length; j++)
+		    dataMatrix[j][i] = vals[j];
+
+		}
+		 
+		X0 = new double[patternInstances.size()][patternInstances.size()];
+		for (int i = 0; i < patternInstances.size(); i++) {
+			for(int j=0; j<patternInstances.size(); j++)
+				X0[i][j]= rand.nextDouble();
+		}
+		                        	
+		try {
+				
+			processor.setNumericArray("A", new MatlabNumericArray(
+					dataMatrix, null));
+			
+			processor.setNumericArray("Y", new MatlabNumericArray(
+					dataMatrix, null));
+			
+			processor.setNumericArray("X0", new MatlabNumericArray(
+					X0, null));
+
+			proxy.eval("n = size(A,2)");
+			proxy.eval("p = size(A,2)");
+			proxy.eval("Xi = sqrt(sum(X0.*X0,2)+eps)");
+			proxy.eval("d = 0.5./(Xi)");
+			proxy.eval("AX = A*X0-Y");
+			proxy.eval("Xi1 = sqrt(sum(AX.*AX,1)+eps)");
+			proxy.eval("d1 = 0.5./Xi1");
+			proxy.eval("AA = A'*A");
+			proxy.eval("AY = A'*Y");
+			
+			proxy.eval("X=zeros(n,n)");
+			for(int i=1; i<=nIter; i++){
+				proxy.eval("D = spdiags(d,0,n,n)");
+				for(int j=1; j<=patternInstances.size(); j++){
+					proxy.eval("X(:,"+j+") = mldivide((d1("+j+")*AA+"+
+				parameter+"*D),(d1("+j+")*AY(:,"+j+")))");	
+				}
+				proxy.eval("Xi = sqrt(sum(X.*X,2)+eps)");
+				proxy.eval("d = 0.5./Xi");
+				proxy.eval("AX = A*X-Y");
+				proxy.eval("Xi1 = sqrt(sum(AX.*AX,1)+eps)");
+				proxy.eval("d1 = 0.5./Xi1");
+//				proxy.eval("obj("+i+") = (sum(Xi1) + r*sum(Xi))");
+			}
+			
+			proxy.eval("a = sum(abs(X),2)");
+			proxy.eval("[rank_value, rank_idx] = sort(a,'descend')");
+		
+		} catch (MatlabInvocationException e) {
+			e.printStackTrace();
+		}
+		
+		
+		rank_idx = processor.getNumericArray("rank_idx").getRealArray2D();  
+		patternCluster = new InstanceList(pipeLine);
+		for(int i=0; i<topN; i++){
+			if(i < patternInstances.size())
+				patternCluster.add(patternInstances.get((int)(rank_idx[i][0]-1)));				
+			else{
+				patternCluster.add(patternInstances.get((int)(rank_idx[patternInstances.size()-1][0]-1)));
+			}
+		}*/
+		
+		//construct tuple Instances
+		InstanceList tupleInstances = new InstanceList(pipeLine);
+		for(String tuple : tupleCandidates){
+
+			String[] tokTup = tuple.split(" ");
+			double[] vec_T = new double[300];
+			int[] idx_T = new int[300];
+			for(int a = 0; a <300; a++){
+				idx_T[a] = a;
+			}
+			
+			for(String tokT : tokTup){
+				tokT = fvGenerator.cleaning(tokT.toLowerCase());
+				float[] wordVector_T = wordMap.get(tokT);
+				
+				if (wordVector_T == null)
+						continue;
+				for (int a = 0; a < 300; a++) {
+					vec_T[a] += wordVector_T[a];
+				}	
+				
+				float len = 0;
+				for (int a = 0; a < 300; a++) {
+					len += vec_T[a] * vec_T[a];
+				}
+				len = (float) Math.sqrt(len);
+				for (int a = 0; a < 300; a++) {
+					vec_T[a] /= len;
+				}
+				
+			}
+				
+			FeatureVector fv = new FeatureVector(idx_T, vec_T);
+			Instance tupleInst = new Instance(fv, null, null, tuple);
+			tupleInstances.add(tupleInst);
+		}
+		
+		//LGC semi supervised learning
+		SemiSupervisedClustering semiClustering = new 
+		LocalglobalConsistencySemiSupervisedClustering(
+		new Noop(), patternCluster, metric, proxy, 30);
+		
+		Clustering clusters = semiClustering.cluster(tupleInstances);
+		
+		//begin to rank tuples in each clusters
+		HashMap<Instance, Double> nbestMap_tuple = getNbestMap(outputSummaryDir,
+				corpusName, tupleCandidates);
+		LinkedHashMap rankedmap_t = RankMap.sortHashMapByValues(nbestMap_tuple, true);
+		HashMap<Instance, Double> nbestMap_tuple_N = new HashMap<Instance, Double>();
+		Set<Instance> ks = rankedmap_t.keySet();
+		Iterator iks = ks.iterator();
+		double rank = 1.0;
+		while(iks.hasNext()){
+			Instance inst = (Instance)iks.next();
+			nbestMap_tuple_N.put(inst, 1/(rank++));
+		}
+		
+		HashMap<Instance, Double> tupleScoreMap = new HashMap<Instance, Double>();
+		InstanceList rankedInstanceList = new InstanceList(pipeLine);
+		int[] labels = new int[tupleInstances.size()];
+		
+		int clusterIdx = 0;
+		int labelIdx = 0;
+		Iterator iter = patternCluster.iterator();
+		while (iter.hasNext() && clusterIdx < patternCluster.size()) {
+			Instance patternInst = (Instance) iter.next();
+			String pattern= (String) patternInst.getSource();
+		
+			InstanceList tuplesIncluster = clusters.getCluster(clusterIdx);
+			for(Instance tupleInst : tuplesIncluster){
+				double coverageScore = 0.0;
+				String tuple = (String)tupleInst.getSource();
+				String[] tokTup = tuple.split(" ");
+				String[] tokPat = pattern.split(" ");
+				double[] vec_T = new double[300];
+				int[] idx_T = new int[300];
+				for(int a = 0; a <300; a++){
+					idx_T[a] = a;
+				}
+				
+				for(String tokT : tokTup){
+					tokT = fvGenerator.cleaning(tokT.toLowerCase());
+					float[] wordVector_T = wordMap.get(tokT);
+					
+					if (wordVector_T == null)
+							continue;
+					for (int a = 0; a < 300; a++) {
+						vec_T[a] += wordVector_T[a];
+					}	
+					
+					float len = 0;
+					for (int a = 0; a < 300; a++) {
+						len += vec_T[a] * vec_T[a];
+					}
+					len = (float) Math.sqrt(len);
+					for (int a = 0; a < 300; a++) {
+						vec_T[a] /= len;
+					}
+					
+					for(String tokP : tokPat){
+						tokP = fvGenerator.cleaning(tokP.toLowerCase());
+						float[] wordVector_P = wordMap.get(tokP);				
+						if(wordVector_P != null && wordVector_T != null){
+							int[] idx = new int[wordVector_P.length];
+							for (int a = 0; a < wordVector_P.length; a++) {
+								idx[a] = a;
+							}
+							double[] wordVector_T_D = new double[wordVector_T.length];
+							double[] wordVector_P_D = new double[wordVector_P.length];
+							for(int a = 0; a < wordVector_T.length; a++){
+								wordVector_T_D[a] = wordVector_T[a];
+								wordVector_P_D[a] = wordVector_P[a];
+							}
+								
+							FeatureVector fv_t = new FeatureVector(idx, wordVector_T_D);
+							FeatureVector fv_p = new FeatureVector(idx, wordVector_P_D);
+		
+							coverageScore += (1- metric.distance(fv_t, fv_p));
+							
+						}
+						
+					}
+				}
+					
+				double fluencyScore = 0.0;
+				Set<Instance> set = nbestMap_tuple_N.keySet();
+				Iterator iterKey = set.iterator();
+				while(iterKey.hasNext()){
+					Instance i = (Instance)iterKey.next();
+					if(tuple.equals((String)i.getData())){
+						fluencyScore = nbestMap_tuple_N.get(i);
+						break;
+					}
+				}
+				
+				fluencyScore = 1/(1+Math.exp(-fluencyScore));
+				coverageScore = 1/(1+Math.exp(-coverageScore));
+				
+				double score = 0.7*coverageScore + 0.3*fluencyScore;
+				tupleScoreMap.put(tupleInst, score);
+			}
+			
+			HashMap sortedScores = RankMap.sortHashMapByValues(tupleScoreMap, false);
+			Set<String> ts = sortedScores.keySet();
+			Iterator its = ts.iterator();
+			int j = 0;
+			while(its.hasNext() && (j++) < tuplesIncluster.size()){
+				Instance tupleInst = (Instance)its.next();
+				rankedInstanceList.add(tupleInst);
+				labels[labelIdx++] = clusterIdx;
+			}
+			
+			clusterIdx++;
+				
+		}
+	
+		Clustering rankedClusters = new Clustering(rankedInstanceList,
+				patternCluster.size(), labels);
+		
+		//generate final summary with simple greedy method
+		double[][] matrix = new double[patternCluster.size()][rankedInstanceList.size()];
+		PrintWriter out = FileOperation.getPrintWriter(new File(
+				outputSummaryDir), corpusName);
+		for(int label = 0; label < patternCluster.size(); label++){
+			int[] idxs = rankedClusters.getIndicesWithLabel(label);
+			if(idxs.length == 0){
+				for(int i=0; i<rankedInstanceList.size(); i++)
+						matrix[label][i] = -1;		
+			}else{
+				for(int i=0; i<rankedInstanceList.size(); i++){
+					if(i < idxs.length)
+						matrix[label][i] = idxs[i];
+					else
+						matrix[label][i] = -1;
+				}
+			}
+		}
+		
+		Matrix Mat = new Matrix(matrix);
+		Matrix transMat = Mat.transpose();
+		
+		HashSet<String> dup = new HashSet<String>();
+		int length = 0;
+		boolean flag = false;
+		for(int i=0; i< rankedInstanceList.size(); i++){
+			for(int j = 0; j<patternCluster.size(); j++){
+				double idx = transMat.get(i, j);
+				if(idx != -1){
+					Instance tuple = rankedInstanceList.get((int)idx);
+					String line = (String)tuple.getSource();
+					boolean included = true;
+					if(dup.size() != 0 ){
+						for(String s : dup){
+							double sim = LongestCommonSubstring.getSim(s, line);
+							if(sim > threshold)
+								included = false;
+						}
+					}
+					
+					if(!dup.contains(line) && included){
+						dup.add(line);
+					}else
+						continue;
+					String[] toks = line.split(" ");
+					length += toks.length;
+					if (length <= 200)
+						out.println(line);
+					else {
+						length -= toks.length;
+						boolean stop = false;
+						for (int k = 0; k < toks.length; k++) {
+							out.print(toks[k] + " ");
+							length++;
+							if (length > 200) {
+								stop = true;
+								break;
+							}
+						}
+						if (stop == true) {
+							flag = true;
+							break;
+						}
+					}
+					
+					if (flag == true)
+						break;
+				}
+			}
+		}
+		
+		out.close();
+		
+		//begin ILP
+/*		LpSolve solver = LpSolve.makeLp(0, rankedClusters.getInstances().size());
+		solver.setOutputfile("");
+
+		for (int i = 0; i < rankedClusters.getInstances().size(); i++) {
+			solver.setColName(i + 1, "s" + i);
+			solver.setBinary(i + 1, true);
+		}
+
+		//set Objective Function
+		StringBuffer sb_o = new StringBuffer();
+		InstanceList[] cs = rankedClusters.getClusters();
+		for (int c = 0; c < cs.length; c++) {
+			InstanceList cluster = cs[c];
+			for (int l = 0; l < cluster.size(); l++) {
+				int posi = l + 1;
+				sb_o.append(posi + " ");
+			}
+		}
+
+		solver.strSetObjFn(sb_o.toString().trim());
+		solver.setMinim();
+
+		// length constraints
+		StringBuffer sb_L_N = new StringBuffer();
+		for (int c = 0; c < cs.length; c++) {
+			InstanceList cluster = cs[c];
+			for (int l = 0; l < cluster.size(); l++) {
+				Instance sent = cluster.get(l);
+				String sentMention = (String) sent.getSource();
+				sb_L_N.append(sentMention.split(" ").length + " ");
+
+			}
+
+		}
+
+		solver.strAddConstraint(sb_L_N.toString().trim(), LpSolve.LE,
+				300);
+
+		// exclusivity constraints
+		HashMap<String, Integer> map = new HashMap<String, Integer>();
+		int globalIdx = 0;
+		for (int c = 0; c < cs.length; c++) {
+			InstanceList cluster = cs[c];
+			for (int l = 0; l < cluster.size(); l++) {
+				map.put(c + "_" + l, globalIdx++);
+			}
+		}
+
+		int start = 0;
+		for (int g = 0; g < cs.length; g++) {
+			StringBuffer sb_E_N = new StringBuffer();
+			for (int c = 0; c < cs.length; c++) {
+				InstanceList cluster = cs[c];
+				for (int k = 0; k < cluster.size(); k++) {
+					int idx = map.get(c + "_" + k);
+					if (idx >= start && idx <= start + cluster.size() - 1) {
+						sb_E_N.append(1 + " ");
+					} else
+						sb_E_N.append(0 + " ");
+
+				}
+
+			}
+			start += cs[g].size();
+			solver.strAddConstraint(sb_E_N.toString().trim(), LpSolve.EQ, 1);
+		}
+
+		// Redundancy Constraints
+		for (int i = 0; i < cs.length; i++) {
+			InstanceList clusteri = cs[i];
+			for (int m = 0; m < clusteri.size(); m++) {
+
+				for (int j = i + 1; j < cs.length; j++) {
+					InstanceList clusterj = cs[j];
+					for (int n = 0; n < clusterj.size(); n++) {
+
+						solver.strAddConstraint(
+								buildStrVector(m, n, i, j, 
+										rankedClusters, rankedInstanceList.size(), metric),
+								LpSolve.LE, 0.9);
+
+					}
+
+				}
+
+			}
+
+		}
+
+		solver.solve();
+
+		solver.setVerbose(LpSolve.IMPORTANT);
+		double[] var = solver.getPtrVariables();
+		PrintWriter out = FileOperation.getPrintWriter(new File(
+				outputSummaryDir), corpusName);
+		for (int i = 0; i < var.length; i++) {
+			if (var[i] == 1.0) {
+				Instance sent = rankedClusters.getInstances().get(i);
+				out.println(sent.getSource());
+			}
+		}
+		out.close();*/
+	
+	}
+	
+	public void run_ActiveLearning2(String inputCorpusDir, String outputSummaryDir,
+			String corpusName, PipeLine pipeLine, int parameter, MatlabProxy proxy) throws Exception {
+		//1. find representative patterns as seeds
+		int topN = 10;
+		double threshold = 0.7;
+		int nIter = 5;
+		InstanceList instances = new InstanceList(pipeLine);
+		Metric metric = new NormalizedDotProductMetric();
+		
+		ObjectInputStream inInst = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + corpusName + ".featuredInsts"));
+		instances.readObject(inInst);
+		inInst.close();
+		
+		FeatureVector fv_0 = (FeatureVector) instances.get(0).getData();
+		double[][] dataMatrix = new double[fv_0.getIndices().length][instances
+		                        				.size()];
+		                        		
+		for (int i = 0; i < instances.size(); i++) {
+			FeatureVector fv_i = (FeatureVector) instances.get(i).getData();
+		    double[] vals = fv_i.getValues();
+		    for(int j=0; j< vals.length; j++)
+		    dataMatrix[j][i] = vals[j];
+
+		}
+		                        		
+		double[][] X0 = new double[instances.size()][instances.size()];
+		Random rand = new Random();     		
+		for (int i = 0; i < instances.size(); i++) {
+			for(int j=0; j<instances.size(); j++)
+				X0[i][j]= rand.nextDouble();
+		}
+		                        	
+		MatlabTypeConverter processor = new MatlabTypeConverter(proxy);
+		
+		try {
+				
+			processor.setNumericArray("A", new MatlabNumericArray(
+					dataMatrix, null));
+			
+			processor.setNumericArray("Y", new MatlabNumericArray(
+					dataMatrix, null));
+			
+			processor.setNumericArray("X0", new MatlabNumericArray(
+					X0, null));
+
+			proxy.eval("n = size(A,2)");
+			proxy.eval("p = size(A,2)");
+			proxy.eval("Xi = sqrt(sum(X0.*X0,2)+eps)");
+			proxy.eval("d = 0.5./(Xi)");
+			proxy.eval("AX = A*X0-Y");
+			proxy.eval("Xi1 = sqrt(sum(AX.*AX,1)+eps)");
+			proxy.eval("d1 = 0.5./Xi1");
+			proxy.eval("AA = A'*A");
+			proxy.eval("AY = A'*Y");
+			
+			proxy.eval("X=zeros(n,n)");
+			for(int i=1; i<=nIter; i++){
+				proxy.eval("D = spdiags(d,0,n,n)");
+				for(int j=1; j<=instances.size(); j++){
+					proxy.eval("X(:,"+j+") = mldivide((d1("+j+")*AA+"+
+				parameter+"*D),(d1("+j+")*AY(:,"+j+")))");	
+				}
+				proxy.eval("Xi = sqrt(sum(X.*X,2)+eps)");
+				proxy.eval("d = 0.5./Xi");
+				proxy.eval("AX = A*X-Y");
+				proxy.eval("Xi1 = sqrt(sum(AX.*AX,1)+eps)");
+				proxy.eval("d1 = 0.5./Xi1");
+//				proxy.eval("obj("+i+") = (sum(Xi1) + r*sum(Xi))");
+			}
+			
+			proxy.eval("a = sum(abs(X),2)");
+			proxy.eval("[rank_value, rank_idx] = sort(a,'descend')");
+		
+		} catch (MatlabInvocationException e) {
+			e.printStackTrace();
+		}
+		
+		double[][] rank_idx = processor.getNumericArray("rank_idx").getRealArray2D();  
+		InstanceList patternCluster = new InstanceList(pipeLine);
+		for(int i=0; i<topN; i++){
+			patternCluster.add(instances.get((int)(rank_idx[i][0]-1)));
+		}
+			
+	
+		//2, clustering tuples with LGC semi supervised learning
+		SemiSupervisedClustering semiClustering = new 
+		LocalglobalConsistencySemiSupervisedClustering(
+		new Noop(), patternCluster, metric, proxy, 30);
+		Clustering clusters = semiClustering.cluster(instances);
+		
+		//3, generate final summary
+		FeatureVectorGenerator fvGenerator = (FeatureVectorGenerator) pipeLine
+				.getPipe(0);
+		int length = 0;
+		boolean flag = false;
+		InstanceList[] groups = clusters.getClusters();
+		PrintWriter out = FileOperation.getPrintWriter(new File(
+				outputSummaryDir), corpusName);
+		HashMap<InstanceList, Integer> tmp = new HashMap<InstanceList, Integer>();
+		for (InstanceList il : groups)
+			tmp.put(il, il.size());
+		HashMap rankedMap = RankMap.sortHashMapByValues(tmp, false);
+		Set keys = rankedMap.keySet();
+		Iterator iter = keys.iterator();
+
+		while (iter.hasNext()) {
+			InstanceList il = (InstanceList) iter.next();
+			ArrayList<String> lines = realization(outputSummaryDir, corpusName,
+					il, proxy, fvGenerator);
+			if (lines == null)
+				continue;
+			for (String line : lines) {
+				String[] toks = line.split(" ");
+				length += toks.length;
+				if (length <= 100)
+					out.println(line);
+				else {
+					length -= toks.length;
+					boolean stop = false;
+					for (int i = 0; i < toks.length; i++) {
+						out.print(toks[i] + " ");
+						length++;
+						if (length > 100) {
+							stop = true;
+							break;
+						}
+					}
+					if (stop == true) {
+						flag = true;
+						break;
+					}
+				}
+			}
+
+			if (flag == true)
+				break;
+		}
+		
+		out.close();
+	}
+	
+	public void run_ActiveLearning3(String inputCorpusDir, String outputSummaryDir,
+			String corpusName, PipeLine pipeLine, int topN, MatlabProxy proxy) throws Exception {
+		int parameter = 10;
+		//1. find representative patterns as seeds
+//		System.out.println("find representative patterns as seeds");
+		double threshold = 0.7;
+		int nIter = 7;
+		InstanceList instances = new InstanceList(pipeLine);
+		Metric metric = new NormalizedDotProductMetric();
+		
+		ObjectInputStream inInst = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + corpusName + ".featuredInsts"));
+		instances.readObject(inInst);
+		inInst.close();
+		
+		MatlabTypeConverter processor = new MatlabTypeConverter(proxy);
+		
+/*		FeatureVector fv_0 = (FeatureVector) instances.get(0).getData();
+		double[][] dataMatrix = new double[fv_0.getIndices().length][instances
+		                        				.size()];
+		                        		
+		for (int i = 0; i < instances.size(); i++) {
+			FeatureVector fv_i = (FeatureVector) instances.get(i).getData();
+		    double[] vals = fv_i.getValues();
+		    for(int j=0; j< vals.length; j++)
+		    dataMatrix[j][i] = vals[j];
+
+		}
+		                        		
+		double[][] X0 = new double[instances.size()][instances.size()];
+		Random rand = new Random();     		
+		for (int i = 0; i < instances.size(); i++) {
+			for(int j=0; j<instances.size(); j++)
+				X0[i][j]= rand.nextDouble();
+		}
+		                        			
+		try {
+				
+			processor.setNumericArray("A", new MatlabNumericArray(
+					dataMatrix, null));
+			
+			processor.setNumericArray("Y", new MatlabNumericArray(
+					dataMatrix, null));
+			
+			processor.setNumericArray("X0", new MatlabNumericArray(
+					X0, null));
+
+			proxy.eval("n = size(A,2)");
+			proxy.eval("p = size(A,2)");
+			proxy.eval("Xi = sqrt(sum(X0.*X0,2)+eps)");
+			proxy.eval("d = 0.5./(Xi)");
+			proxy.eval("AX = A*X0-Y");
+			proxy.eval("Xi1 = sqrt(sum(AX.*AX,1)+eps)");
+			proxy.eval("d1 = 0.5./Xi1");
+			proxy.eval("AA = A'*A");
+			proxy.eval("AY = A'*Y");
+			
+			proxy.eval("X=zeros(n,n)");
+			for(int i=1; i<=nIter; i++){
+				proxy.eval("D = spdiags(d,0,n,n)");
+				for(int j=1; j<=instances.size(); j++){
+					proxy.eval("X(:,"+j+") = mldivide((d1("+j+")*AA+"+
+				parameter+"*D),(d1("+j+")*AY(:,"+j+")))");	
+				}
+				proxy.eval("Xi = sqrt(sum(X.*X,2)+eps)");
+				proxy.eval("d = 0.5./Xi");
+				proxy.eval("AX = A*X-Y");
+				proxy.eval("Xi1 = sqrt(sum(AX.*AX,1)+eps)");
+				proxy.eval("d1 = 0.5./Xi1");
+//				proxy.eval("obj("+i+") = (sum(Xi1) + r*sum(Xi))");
+			}
+			
+			proxy.eval("a = sum(abs(X),2)");
+			proxy.eval("[rank_value, rank_idx] = sort(a,'descend')");
+		
+		} catch (MatlabInvocationException e) {
+			e.printStackTrace();
+		}
+		
+		double[][] rank_idx = processor.getNumericArray("rank_idx").getRealArray2D();  
+		InstanceList patternCluster = new InstanceList(pipeLine);
+		for(int i=0; i<topN; i++){
+			patternCluster.add(instances.get((int)(rank_idx[i][0]-1)));
+		}
+		
+		ObjectOutputStream outP = new ObjectOutputStream(new FileOutputStream(
+				 outputSummaryDir + "/" +corpusName + ".patternCluster."+parameter+"."+topN)); 
+		patternCluster.writeObject(outP);
+		outP.close();*/
+		
+		InstanceList patternCluster = new InstanceList(pipeLine);
+		ObjectInputStream inPatternCluster = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + corpusName + ".patternCluster."+parameter));
+		patternCluster.readObject(inPatternCluster);
+		inPatternCluster.close();
+			
+		//2, clustering tuples with LGC semi supervised learning
+//		System.out.println("clustering tuples with LGC semi supervised learning");
+		SemiSupervisedClustering semiClustering = new 
+		HarmonicSemiSupervisedClustering(
+		new Noop(), patternCluster, metric, proxy, 20);
+		Clustering clusters = semiClustering.cluster(instances);
+				
+/*		FeatureVector vec = (FeatureVector)instances.get(0).getData();
+		int dimension = vec.getValues().length;
+		
+		double[][] dataMatrix = new double[instances.size()][dimension];
+		for (int i = 0; i < instances.size(); i++) {
+			FeatureVector fv_i = (FeatureVector) instances.get(i).getData();
+			for(int j=0; j<dimension; j++)
+				dataMatrix[i][j] = fv_i.getValues()[j];
+		}
+		
+		int clusterLabels[] = new int[instances.size()];
+		try {
+			
+			processor.setNumericArray("arr", new MatlabNumericArray(
+					dataMatrix, null));
+			proxy.eval("labels = kmeans(arr,"+topN+ ",'Replicates',20)");
+			double[][] labels = processor.getNumericArray("labels").getRealArray2D();
+			for (int i = 0; i < instances.size(); i++)
+				clusterLabels[i] = (int) labels[i][0]-1;
+			
+		} catch (MatlabInvocationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		Clustering clusters = new Clustering(instances, topN, clusterLabels);*/
+		
+		
+/*		Spectral spectral = new Spectral(new Noop(), topN, metric, proxy);
+		Clustering clusters = spectral.cluster(instances);*/
+	
+		
+		//3, begin to fuse tuples and rank new tuples in each clusters
+//		System.out.println("fuse and rank tuples");
+		FeatureVectorGenerator fvGenerator = (FeatureVectorGenerator) pipeLine
+				.getPipe(0);
+		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + corpusName + ".smallWordMap"));
+		HashMap<String, float[]> wordMap = (HashMap<String, float[]>)in.readObject();
+		in.close();
+		InstanceList[] groups = clusters.getClusters();
+		
+		InstanceList rankedInstanceList = new InstanceList(pipeLine);
+		ArrayList<Integer> labelsList = new ArrayList<Integer>();
+		int clusterIdx = 0;
+		int labelIdx = 0;
+		for(int i=0; i<groups.length; i++){
+			Instance patternInst = patternCluster.get(i);
+			String bestPattern= (String) patternInst.getSource().toString();
+			InstanceList group = groups[i];
+			ArrayList<String> tupleCandidates = tupleFusion(group);
+			if(tupleCandidates == null)
+				return;
+			
+			HashMap<Instance, Double> nbestMap_tuple = getNbestMap(outputSummaryDir,
+					corpusName, tupleCandidates);
+			LinkedHashMap rankedmap_t = RankMap.sortHashMapByValues(nbestMap_tuple, true);
+			HashMap<Instance, Double> nbestMap_tuple_N = new HashMap<Instance, Double>();
+			Set<Instance> ks = rankedmap_t.keySet();
+			Iterator iks = ks.iterator();
+			double rank = 1.0;
+			while(iks.hasNext()){
+				Instance ins = (Instance)iks.next();
+				nbestMap_tuple_N.put(ins, 1/(rank++));
+			}
+			
+			HashMap<Instance, Double> tupleScoreMap = new HashMap<Instance, Double>();
+
+			for(String tuple : tupleCandidates){
+				String[] tokTup = tuple.split(" ");
+				double[] vec_T = new double[300];
+				int[] idx_T = new int[300];
+				for(int a = 0; a <300; a++){
+					idx_T[a] = a;
+				}
+				
+				for(String tokT : tokTup){
+					tokT = fvGenerator.cleaning(tokT.toLowerCase());
+					float[] wordVector_T = wordMap.get(tokT);
+					
+					if (wordVector_T == null)
+							continue;
+					for (int a = 0; a < 300; a++) {
+						vec_T[a] += wordVector_T[a];
+					}	
+					
+					float len = 0;
+					for (int a = 0; a < 300; a++) {
+						len += vec_T[a] * vec_T[a];
+					}
+					len = (float) Math.sqrt(len);
+					for (int a = 0; a < 300; a++) {
+						vec_T[a] /= len;
+					}
+					
+				}
+					
+
+				
+				double coverageScore = 0.0;
+				
+				String[] tokPat = bestPattern.split(" ");
+				for(String tokT : tokTup)
+					for(String tokP : tokPat){
+						tokP = fvGenerator.cleaning(tokP.toLowerCase());
+						float[] wordVector_P = wordMap.get(tokP);
+						
+						tokT = fvGenerator.cleaning(tokT.toLowerCase());
+						float[] wordVector_T = wordMap.get(tokT);
+										
+						if(wordVector_P != null && wordVector_T != null){
+							int[] idx = new int[wordVector_P.length];
+							for (int a = 0; a < wordVector_P.length; a++) {
+								idx[a] = a;
+							}
+							double[] wordVector_T_D = new double[wordVector_T.length];
+							double[] wordVector_P_D = new double[wordVector_P.length];
+							for(int a = 0; a < wordVector_T.length; a++){
+								wordVector_T_D[a] = wordVector_T[a];
+								wordVector_P_D[a] = wordVector_P[a];
+							}
+								
+							FeatureVector fv_t = new FeatureVector(idx, wordVector_T_D);
+							FeatureVector fv_p = new FeatureVector(idx, wordVector_P_D);
+		
+							coverageScore += (1- metric.distance(fv_t, fv_p));
+						}
+						
+					}
+				
+				double fluencyScore = 0.0;
+				Set<Instance> set = nbestMap_tuple_N.keySet();
+				Iterator iterKey = set.iterator();
+				while(iterKey.hasNext()){
+					Instance ins = (Instance)iterKey.next();
+					if(tuple.equals((String)ins.getData())){
+						fluencyScore = nbestMap_tuple_N.get(ins);
+						break;
+					}
+				}
+				
+				fluencyScore = 1/(1+Math.exp(-fluencyScore));
+				coverageScore = 1/(1+Math.exp(-coverageScore));
+				double score = 0.7*coverageScore + 0.3*fluencyScore;
+				
+				FeatureVector fv = new FeatureVector(idx_T, vec_T);
+				Instance tupleInst = new Instance(fv, null, null, tuple);		
+				tupleScoreMap.put(tupleInst, score);
+			}
+			
+			HashMap sortedScores = RankMap.sortHashMapByValues(tupleScoreMap, false);
+			Set<String> ts = sortedScores.keySet();
+			Iterator its = ts.iterator();
+			while(its.hasNext() ){
+				Instance tupleInst = (Instance)its.next();
+				rankedInstanceList.add(tupleInst);
+				labelsList.add(labelIdx++, clusterIdx);
+			}
+			
+			clusterIdx++;
+				
+		}
+	
+		int[] labels = new int[labelsList.size()];
+		for(int i=0; i<labels.length; i++)
+			labels[i] = labelsList.get(i);
+		Clustering rankedClusters = new Clustering(rankedInstanceList,
+				topN, labels);
+		
+		//4, generate final summary with simple greedy method
+/*		double[][] matrix = new double[patternCluster.size()][rankedInstanceList.size()];
+		PrintWriter out = FileOperation.getPrintWriter(new File(
+				outputSummaryDir), corpusName);
+		for(int label = 0; label < patternCluster.size(); label++){
+			int[] idxs = rankedClusters.getIndicesWithLabel(label);
+			if(idxs.length == 0){
+				for(int i=0; i<rankedInstanceList.size(); i++)
+						matrix[label][i] = -1;		
+			}else{
+				for(int i=0; i<rankedInstanceList.size(); i++){
+					if(i < idxs.length)
+						matrix[label][i] = idxs[i];
+					else
+						matrix[label][i] = -1;
+				}
+			}
+		}
+		
+		Matrix Mat = new Matrix(matrix);
+		Matrix transMat = Mat.transpose();
+		
+		HashSet<String> dup = new HashSet<String>();
+		int length = 0;
+		boolean flag = false;
+		for(int i=0; i< rankedInstanceList.size(); i++){
+			for(int j = 0; j<patternCluster.size(); j++){
+				double idx = transMat.get(i, j);
+				if(idx != -1){
+					Instance tuple = rankedInstanceList.get((int)idx);
+					String line = (String)tuple.getSource();
+					boolean included = true;
+					if(dup.size() != 0 ){
+						for(String s : dup){
+							double sim = LongestCommonSubstring.getSim(s, line);
+							if(sim > threshold)
+								included = false;
+						}
+					}
+					
+					if(!dup.contains(line) && included){
+						dup.add(line);
+					}else
+						continue;
+					String[] toks = line.split(" ");
+					length += toks.length;
+					if (length <= 200)
+						out.println(line);
+					else {
+						length -= toks.length;
+						boolean stop = false;
+						for (int k = 0; k < toks.length; k++) {
+							out.print(toks[k] + " ");
+							length++;
+							if (length > 200) {
+								stop = true;
+								break;
+							}
+						}
+						if (stop == true) {
+							flag = true;
+							break;
+						}
+					}
+					
+					if (flag == true)
+						break;
+				}
+			}
+		}
+		
+		out.close();*/
+		
+		//begin ILP
+//		System.out.println("ILP");
+		LpSolve solver = LpSolve.makeLp(0, rankedClusters.getInstances().size());
+		solver.setOutputfile("");
+
+		for (int i = 0; i < rankedClusters.getInstances().size(); i++) {
+			solver.setColName(i + 1, "s" + i);
+			solver.setBinary(i + 1, true);
+		}
+
+		//set Objective Function
+		StringBuffer sb_o = new StringBuffer();
+		InstanceList[] cs = rankedClusters.getClusters();
+		for (int c = 0; c < cs.length; c++) {
+			InstanceList cluster = cs[c];
+			for (int l = 0; l < cluster.size(); l++) {
+				int posi = l + 1;
+				sb_o.append(posi + " ");
+			}
+		}
+
+		solver.strSetObjFn(sb_o.toString().trim());
+		solver.setMinim();
+
+		// length constraints
+		StringBuffer sb_L_N = new StringBuffer();
+		for (int c = 0; c < cs.length; c++) {
+			InstanceList cluster = cs[c];
+			for (int l = 0; l < cluster.size(); l++) {
+				Instance sent = cluster.get(l);
+				String sentMention = (String) sent.getSource();
+				sb_L_N.append(sentMention.split(" ").length + " ");
+
+			}
+
+		}
+
+		solver.strAddConstraint(sb_L_N.toString().trim(), LpSolve.LE,
+				150);
+
+		// exclusivity constraints
+		HashMap<String, Integer> map = new HashMap<String, Integer>();
+		int globalIdx = 0;
+		for (int c = 0; c < cs.length; c++) {
+			InstanceList cluster = cs[c];
+			for (int l = 0; l < cluster.size(); l++) {
+				map.put(c + "_" + l, globalIdx++);
+			}
+		}
+
+		int start = 0;
+		for (int g = 0; g < cs.length; g++) {
+			StringBuffer sb_E_N = new StringBuffer();
+			for (int c = 0; c < cs.length; c++) {
+				InstanceList cluster = cs[c];
+				for (int k = 0; k < cluster.size(); k++) {
+					int idx = map.get(c + "_" + k);
+					if (idx >= start && idx <= start + cluster.size() - 1) {
+						sb_E_N.append(1 + " ");
+					} else
+						sb_E_N.append(0 + " ");
+
+				}
+
+			}
+			start += cs[g].size();
+			solver.strAddConstraint(sb_E_N.toString().trim(), LpSolve.EQ, 1);
+		}
+
+/*		// Redundancy Constraints
+		for (int i = 0; i < cs.length; i++) {
+			InstanceList clusteri = cs[i];
+			for (int m = 0; m < clusteri.size(); m++) {
+				for (int j = i + 1; j < cs.length; j++) {
+					InstanceList clusterj = cs[j];
+					for (int n = 0; n < clusterj.size(); n++) {
+						solver.strAddConstraint(
+								buildStrVector(m, n, i, j, 
+										rankedClusters, rankedInstanceList.size(), metric),
+								LpSolve.LE, 0.1);
+					}
+				}
+			}
+		}*/
+
+		solver.solve();
+
+		solver.setVerbose(LpSolve.IMPORTANT);
+		double[] var = solver.getPtrVariables();
+		PrintWriter out = FileOperation.getPrintWriter(new File(
+				outputSummaryDir), corpusName);
+		for (int i = 0; i < var.length; i++) {
+			if (var[i] == 1.0) {
+				Instance sent = rankedClusters.getInstances().get(i);
+				out.println(sent.getSource());
+			}
+		}
+		out.close();
+		
+	}
+	
+	private String buildStrVector(int m, int n, int i, int j,
+			Clustering clusters, int instanceSize, Metric metric) {
+
+		InstanceList[] cs = clusters.getClusters();
+
+		InstanceList clusteri = cs[i];
+		Instance instm = clusteri.get(m);
+
+		InstanceList clusterj = cs[j];
+		Instance instn = clusterj.get(n);
+
+		double sim = 1- metric.distance((FeatureVector)instm.getData(), 
+				(FeatureVector)instn.getData());
+
+		int mdirect = 0;
+
+		for (int k = 0; k < clusters.getNumClusters(); k++) {
+			if (k == i) {
+				mdirect += m;
+				break;
+			} else
+				mdirect += cs[k].size();
+		}
+
+		int ndirect = 0;
+		for (int k = 0; k < clusters.getNumClusters(); k++) {
+			if (k == j) {
+				ndirect += n;
+				break;
+			} else
+				ndirect += cs[k].size();
+		}
+
+		StringBuffer sb = new StringBuffer();
+		for (int k = 0; k < instanceSize; k++) {
+			if (k == mdirect || k == ndirect) {
+				sb.append(sim + " ");
+			} else
+				sb.append(0 + " ");
+		}
+
+		return sb.toString().trim();
 	}
 }

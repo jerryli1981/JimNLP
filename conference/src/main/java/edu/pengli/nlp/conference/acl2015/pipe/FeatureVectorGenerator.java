@@ -49,18 +49,18 @@ import edu.stanford.nlp.util.CoreMap;
 public class FeatureVectorGenerator extends Pipe{
 	
 	
-	private HashMap<Instance, FeatureVector> instanceVectorMap;
-	private HashMap<String, float[]> wordMap;
+	private HashMap<Instance, FeatureVector> instanceVectorMap = null;
+	private HashMap<String, float[]> wordMap = null;
 	
 	public FeatureVectorGenerator() throws IOException{
 		instanceVectorMap = new HashMap<Instance, FeatureVector>();
-		wordMap = new HashMap<String, float[]>();
-		initializeWordVectorMap();
+//		wordMap = new HashMap<String, float[]>();
+//		initializeWordVectorMap();
 	}
 	
-	public HashMap<String, float[]> getWordMap(){
+/*	public HashMap<String, float[]> getWordMap(){
 		return wordMap;
-	}
+	}*/
 	
 	
 	protected Instance pipe(Instance inst) {
@@ -340,12 +340,104 @@ public class FeatureVectorGenerator extends Pipe{
 		else
 		    return mention;
 	}
+	public void generateSmallWordVector(String outputSummaryDir, 
+			String corpusName, InstanceList patternList, String categoryId) throws FileNotFoundException, IOException{
+		//wordEmbeding dimension is 300
+		int dimension = 300;
+		HashMap<String, float[]> smallWordMap = new HashMap<String, float[]>();
+		
+		for(Instance inst : patternList){
+			Pattern p = (Pattern)inst.getData();
+			Tuple t = p.getTuple();
+			ArrayList<IndexedWord> wordList = new ArrayList<IndexedWord>();
+			wordList.addAll(t.getArg1());
+			wordList.addAll(t.getRel());
+			wordList.addAll(t.getArg2());
+			for(IndexedWord iw : wordList){
+				float[] wv = wordMap.get(iw.originalText());
+				smallWordMap.put(iw.originalText(), wv);
+			}
+			String Arg1 = p.getArg1().getHead().ner().toLowerCase();
+			String Pre = p.getRel().getHead().originalText().toLowerCase();
+			String Arg2 = p.getArg2().getHead().ner().toLowerCase();
+			float[] wordVectorArg1 = wordMap.get(cleaning(Arg1));
+			float[] wordVectorPre = wordMap.get(cleaning(Pre));
+			float[] wordVectorArg2 = wordMap.get(cleaning(Arg2));
+			if(wordVectorArg1 == null){
+				if(Arg1.contains("_")){ 
+					String[] toks = Arg1.split("_");
+					for(int i=0; i<toks.length; i++){
+						wordVectorArg1 = wordMap.get(toks[i]);
+					}
+				}else if(Arg1.contains(" ")){
+					String[] toks = Arg1.split(" ");
+					for(int i=0; i<toks.length; i++){
+						wordVectorArg1 = wordMap.get(toks[i]);
+					}
+				}
+
+			}
+			
+			if(wordVectorPre == null){
+				System.out.println(cleaning(Pre));
+			}
+			
+			if(wordVectorArg2 == null){
+				if(Arg2.contains("_")){ 
+					String[] toks = Arg2.split("_");
+					for(int i=0; i<toks.length; i++){
+						wordVectorArg2 = wordMap.get(toks[i]);
+					}
+				}else if(Arg2.contains(" ")){
+					String[] toks = Arg2.split(" ");
+					for(int i=0; i<toks.length; i++){
+						wordVectorArg2 = wordMap.get(toks[i]);
+					}
+				}
+				
+			}
+			
+			smallWordMap.put(cleaning(Arg1), wordVectorArg1);
+			smallWordMap.put(cleaning(Pre), wordVectorPre);
+			smallWordMap.put(cleaning(Arg2), wordVectorArg2);
+				
+		}
+		
+		Category[] cats = Category.values();
+		for (Category cat : cats) {
+			if (cat.getId() == Integer.parseInt(categoryId)) {
+				Map<String, String[]> aspects = cat.getAspects(cat.getId());
+				Set<String> keys = aspects.keySet();
+				for (String k : keys) {
+					String[] words = aspects.get(k);
+					for (String word : words) {
+				
+						float[] wordVector = wordMap.get(word);
+						if (wordVector == null)
+							continue;
+						smallWordMap.put(word, wordVector);
+
+					}		
+				}
+			}
+		}	
+		
+		ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(
+				outputSummaryDir + "/" + corpusName + ".smallWordMap"));
+		out.writeObject(smallWordMap);
+		out.close();
+	}
+	
 	public void setFvsViaPreTrainedWord2VecModel(String outputSummaryDir, 
-			String corpusName, InstanceList patternList){
+			String corpusName, InstanceList patternList) throws FileNotFoundException, IOException, ClassNotFoundException{
 		ArrayList<FeatureVector> fvs = new ArrayList<FeatureVector>();
 		
 		//wordEmbeding dimension is 300
 		int dimension = 300;
+		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
+				outputSummaryDir + "/" + corpusName + ".smallWordMap"));
+		HashMap<String, float[]> wordMap = (HashMap<String, float[]>)in.readObject();
+		in.close();
 		
 		for(Instance inst : patternList){
 			Pattern p = (Pattern)inst.getData();

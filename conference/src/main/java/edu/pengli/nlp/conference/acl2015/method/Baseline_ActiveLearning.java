@@ -1,74 +1,27 @@
 package edu.pengli.nlp.conference.acl2015.method;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 
-import matlabcontrol.MatlabInvocationException;
 import matlabcontrol.MatlabProxy;
 import matlabcontrol.MatlabProxyFactory;
 import matlabcontrol.MatlabProxyFactoryOptions;
-import matlabcontrol.extensions.MatlabTypeConverter;
 
 import org.jdom2.Document;
 import org.jdom2.Element;
-import org.jdom2.JDOMException;
 import org.jdom2.input.SAXBuilder;
-import org.json.JSONException;
 
 import edu.pengli.nlp.conference.acl2015.generation.AbstractiveGeneration;
-import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
 import edu.pengli.nlp.conference.acl2015.pipe.FeatureVectorGenerator;
-import edu.pengli.nlp.conference.acl2015.pipe.RelationExtractionbyOpenIE;
-import edu.pengli.nlp.conference.acl2015.types.Pattern;
-import edu.pengli.nlp.platform.pipe.CharSequenceCoreNLPAnnotation;
-import edu.pengli.nlp.platform.pipe.Input2CharSequence;
-import edu.pengli.nlp.platform.pipe.Noop;
 import edu.pengli.nlp.platform.pipe.PipeLine;
-import edu.pengli.nlp.platform.types.Instance;
-import edu.pengli.nlp.platform.types.InstanceList;
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.RougeEvaluationWrapper;
 
-public class OurMethod {
+public class Baseline_ActiveLearning {
 	
-	private static void trainingDCNN(String inputCorpusDir, 
-			String outputSummaryDir, List<Element> corpusList, 
-			PipeLine pipeLine, MatlabProxy proxy, int iterTime) throws 
-			FileNotFoundException, IOException, 
-			ClassNotFoundException, MatlabInvocationException{
-		
-		InstanceList patternList = new InstanceList(new Noop());
-		
-		for (int i = 0; i < iterTime; i++) {
-			Element topic = corpusList.get(i);
-			List<Element> docSets = topic.getChildren();
-			Element docSetA = docSets.get(1);
-			String corpusName = docSetA.getAttributeValue("id");
-			
-			ObjectInputStream in = new ObjectInputStream(new FileInputStream(
-					outputSummaryDir + "/" + corpusName + ".patterns.ser"));
-			HashSet<Pattern> patternSet = (HashSet<Pattern>) in.readObject();
-			for (Pattern p : patternSet) {
-				Instance inst = new Instance(p, null, null, p);
-				patternList.add(inst);
-			}
-			in.close();
-		}
-				
-		FeatureVectorGenerator fvGenerator = 
-				(FeatureVectorGenerator) pipeLine.getPipe(0);	
-		
-		fvGenerator.trainingDCNN(outputSummaryDir, patternList, proxy);
-	}
-
 	public static void main(String[] args) throws Exception {
 		
 	    //Create a proxy, which we will use to control MATLAB
@@ -78,8 +31,8 @@ public class OurMethod {
         .setHidden(true)
         .build();
 		
-		MatlabProxyFactory factory = new MatlabProxyFactory(options);
-		MatlabProxy proxy = factory.getProxy();
+	    MatlabProxyFactory factory = new MatlabProxyFactory(options);
+	    MatlabProxy proxy = factory.getProxy();
 
 
 		SAXBuilder builder = new SAXBuilder();
@@ -92,7 +45,6 @@ public class OurMethod {
 		String outputSummaryDir = "../data/ACL2015/Output";
 		String modelSummaryDir = "../data/ACL2015/ROUGE/models";
 		String confFilePath = "../data/ACL2015/ROUGE/conf.xml";
-		
 		PipeLine pipeLine = new PipeLine();
 		//only used in the first phase
 /*		pipeLine.addPipe(new Input2CharSequence("UTF-8"));
@@ -113,31 +65,28 @@ public class OurMethod {
 				outputSummaryDir, corpusList, 
 				pipeLine, proxy, iterTime);*/
 			
-		
 		String[] metrics = {"ROUGE-1", "ROUGE-2", "ROUGE-SU4"};
-		int[] sigmas = {10, 70};
-
+		int[] topNs = {10};
 		PrintWriter out = FileOperation.getPrintWriter(new File(outputSummaryDir), 
 				"experiment_result");
 		
 		for(int m=0; m<metrics.length; m++){
 			String metric = metrics[m];
-			for(int j=0; j<sigmas.length; j++){
-				int sigma = sigmas[j];
+			for(int j=0; j<topNs.length; j++){
+				int topN = topNs[j];
 				double averageMetric = 0.0;
-				int iterTime = 3;
+				int iterTime = 2;
 				for(int k=0; k<iterTime; k++){
 					for (int i = 0; i < corpusList.size(); i++) {				
 						System.out.println("Corpus id is "+i);
 						Element topic = corpusList.get(i);
-						String categoryId = topic.getAttributeValue("category");
 						List<Element> docSets = topic.getChildren();
 						Element docSetA = docSets.get(1);
 						String corpusName = docSetA.getAttributeValue("id");
 						corpusNameList.add(corpusName);
 						AbstractiveGeneration ag = new AbstractiveGeneration();
-						ag.run(inputCorpusDir + "/" + topic.getAttributeValue("id"),
-								outputSummaryDir, corpusName, pipeLine, categoryId, proxy, sigma);
+						ag.run_ActiveLearning3(inputCorpusDir + "/" + topic.getAttributeValue("id"),
+								outputSummaryDir, corpusName, pipeLine, topN, proxy);
 					}
 					
 					// Rouge Evaluation
@@ -171,12 +120,12 @@ public class OurMethod {
 					
 					HashMap map = RougeEvaluationWrapper.runRough(confFilePath, metric);
 					Double met = (Double) map.get(metric);
-					System.out.println(metric+" "+sigma+" "+met);
+					System.out.println(metric+" "+topN+" "+met);
 					averageMetric += met;
 				}
 				
-				System.out.println(metric + " Sigma "+ sigma + " : " + averageMetric/iterTime);
-				out.println(metric + " Sigma "+ sigma + " : " + averageMetric/iterTime);
+				System.out.println(metric + " parameter "+ topN + " : " + averageMetric/iterTime);
+				out.println(metric + " parameter "+ topN + " : " + averageMetric/iterTime);
 			}
 
 		}
@@ -184,4 +133,5 @@ public class OurMethod {
 		proxy.disconnect();
 		out.close();
 	}
+
 }

@@ -12,13 +12,13 @@ import matlabcontrol.MatlabProxy;
 import matlabcontrol.extensions.MatlabNumericArray;
 import matlabcontrol.extensions.MatlabTypeConverter;
 
-public class Spectral extends Clusterer {
+public class Spectral_Matlab extends Clusterer {
 
 	Metric metric;
 	int numClusters;
 	MatlabProxy proxy;
 
-	public Spectral(Pipe instancePipe, int numClusters, Metric metric,
+	public Spectral_Matlab(Pipe instancePipe, int numClusters, Metric metric,
 			MatlabProxy proxy) {
 
 		super(instancePipe);
@@ -40,13 +40,12 @@ public class Spectral extends Clusterer {
 			FeatureVector fv_i = (FeatureVector) instances.get(i).getData();
 			for (int j = 0; j < instances.size(); j++) {
 				FeatureVector fv_j = (FeatureVector) instances.get(j).getData();
-				double sum = 0.0;
+/*				double sum = 0.0;
 				for(int k=0; k<fv_i.getValues().length; k++){
 					sum += Math.pow((fv_i.getValues()[k]-fv_j.getValues()[k]), 2)/10;
-				}
-		//		similarityMatrix[i][j] = 1-metric.distance(fv_i, fv_j);// 25, ROUGE-1, 0.30706
-		//		similarityMatrix[i][j] = metric.distance(fv_i, fv_j);// 25, ROUGE-1, 0.29664
-				similarityMatrix[i][j] = Math.exp(-sum); // 25, ROUGE-1, 0.30768
+				}*/
+//				similarityMatrix[i][j] = Math.exp(-sum); // 25, ROUGE-1, 0.30768
+				similarityMatrix[i][j] = 1-metric.distance(fv_i, fv_j);// 25, ROUGE-1, 0.30706
 			}
 		}
 		

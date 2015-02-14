@@ -21,8 +21,7 @@ import edu.pengli.nlp.platform.types.SparseVector;
 import edu.pengli.nlp.platform.util.FileOperation;
 import gnu.trove.set.hash.TIntHashSet;
 
-public class KMeans extends Clusterer {
-	private static final long serialVersionUID = 1L;
+public class KMeans_Java extends Clusterer {
 
 	// Stop after movement of means is less than this
 	static double MEANS_TOLERANCE = 1e-2;
@@ -66,7 +65,7 @@ public class KMeans extends Clusterer {
 	 * @param emptyAction
 	 *            Specify what should happen when an empty cluster occurs
 	 */
-	public KMeans(Pipe instancePipe, int numClusters, Metric metric,
+	public KMeans_Java(Pipe instancePipe, int numClusters, Metric metric,
 			int emptyAction) {
 
 		super(instancePipe);
@@ -92,7 +91,7 @@ public class KMeans extends Clusterer {
 	 *            <p/>
 	 *            If an empty cluster occurs, it is considered an error.
 	 */
-	public KMeans(Pipe instancePipe, int numClusters, Metric metric) {
+	public KMeans_Java(Pipe instancePipe, int numClusters, Metric metric) {
 		this(instancePipe, numClusters, metric, EMPTY_ERROR);
 	}
 
@@ -386,7 +385,7 @@ public class KMeans extends Clusterer {
 
 		int numClusters = 7;
 		Metric metric = null;
-		KMeans kmeans = null;
+		KMeans_Java kmeans = null;
 		InstanceList instances = null;
 		Clustering predicted = kmeans.cluster(instances);
 		int[] truelabels = new int[instances.size()];

@@ -1,6 +1,7 @@
 package edu.pengli.nlp.conference.acl2015.method;
 
 import java.io.File;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,7 +43,8 @@ public class Baseline_SimpleNLG {
 		List<Element> corpusList = root.getChildren();
 		ArrayList<String> corpusNameList = new ArrayList<String>();
 		String outputSummaryDir = "../data/ACL2015/Output";
-		
+		String modelSummaryDir = "../data/ACL2015/ROUGE/models";
+		String confFilePath = "../data/ACL2015/ROUGE/conf.xml";
 		PipeLine pipeLine = new PipeLine();
 		//only used in the first phase
 /*		pipeLine.addPipe(new Input2CharSequence("UTF-8"));
@@ -63,61 +65,75 @@ public class Baseline_SimpleNLG {
 				outputSummaryDir, corpusList, 
 				pipeLine, proxy, iterTime);*/
 			
-		String metric = "ROUGE-1";
-		double averageMetric = 0.0;
-		int iterTime = 3;
-		for(int k=0; k<iterTime; k++){
-			System.out.println("Iter Time is "+k);
-			for (int i = 0; i < corpusList.size(); i++) {
-				System.out.println("Corpus id is "+i);
-				Element topic = corpusList.get(i);
-				String categoryId = topic.getAttributeValue("category");
-				List<Element> docSets = topic.getChildren();
-				Element docSetA = docSets.get(1);
-				String corpusName = docSetA.getAttributeValue("id");
-				corpusNameList.add(corpusName);
-				AbstractiveGeneration ag = new AbstractiveGeneration();
-				ag.run_SimpleNLG(inputCorpusDir + "/" + topic.getAttributeValue("id"),
-						outputSummaryDir, corpusName, pipeLine, categoryId, proxy);
-			}
-			
-			// Rouge Evaluation
-			String modelSummaryDir = "../data/ACL2015/ROUGE/models";
-			ArrayList<File> files = FileOperation.travelFileList(new File(
-					modelSummaryDir));
-			HashMap<String, ArrayList<String>> modelSummariesMap = new HashMap<String, ArrayList<String>>();
-			ArrayList<String> list = null;
-			for (File f : files) {
-				String fn = f.getName();
-				String[] toks = fn.split("\\.");
-				String idx = toks[0].split("-")[0]; // D1101
-				String abb = idx + toks[toks.length - 2] + "-"
-						+ toks[0].split("-")[1];
-				if (corpusNameList.contains(abb)) {
+		String[] metrics = {"ROUGE-1", "ROUGE-2", "ROUGE-SU4"};
+		int[] sigmas = {10, 30, 50};
 
-					if (!modelSummariesMap.containsKey(abb)) {
-						list = new ArrayList<String>();
-						list.add(fn);
-					} else {
-						list = modelSummariesMap.get(abb);
-						list.add(fn);
+		PrintWriter out = FileOperation.getPrintWriter(new File(outputSummaryDir), 
+				"experiment_result");
+		
+		for(int m=0; m<metrics.length; m++){
+			String metric = metrics[m];
+			for(int j=0; j<sigmas.length; j++){
+				int sigma = sigmas[j];
+				double averageMetric = 0.0;
+				int iterTime = 3;
+				for(int k=0; k<iterTime; k++){
+					for (int i = 0; i < corpusList.size(); i++) {				
+						System.out.println("Corpus id is "+i);
+						Element topic = corpusList.get(i);
+						String categoryId = topic.getAttributeValue("category");
+						List<Element> docSets = topic.getChildren();
+						Element docSetA = docSets.get(1);
+						String corpusName = docSetA.getAttributeValue("id");
+						corpusNameList.add(corpusName);
+						AbstractiveGeneration ag = new AbstractiveGeneration();
+						ag.run_SimpleNLG(inputCorpusDir + "/" + topic.getAttributeValue("id"),
+								outputSummaryDir, corpusName, pipeLine, categoryId, proxy, sigma);
 					}
-					modelSummariesMap.put(abb, list);
+					
+					// Rouge Evaluation
+					ArrayList<File> files = FileOperation.travelFileList(new File(
+							modelSummaryDir));
+					HashMap<String, ArrayList<String>> modelSummariesMap = new HashMap<String, ArrayList<String>>();
+					ArrayList<String> list = null;
+					for (File f : files) {
+						String fn = f.getName();
+						String[] toks = fn.split("\\.");
+						String idx = toks[0].split("-")[0];
+						String abb = idx + toks[toks.length - 2] + "-"
+								+ toks[0].split("-")[1];
+						if (corpusNameList.contains(abb)) {
 
+							if (!modelSummariesMap.containsKey(abb)) {
+								list = new ArrayList<String>();
+								list.add(fn);
+							} else {
+								list = modelSummariesMap.get(abb);
+								list.add(fn);
+							}
+							modelSummariesMap.put(abb, list);
+
+						}
+					}
+					
+					RougeEvaluationWrapper.setConfigurationFile(corpusNameList,
+							outputSummaryDir, modelSummaryDir, modelSummariesMap,
+							confFilePath);
+					
+					HashMap map = RougeEvaluationWrapper.runRough(confFilePath, metric);
+					Double met = (Double) map.get(metric);
+					System.out.println(metric+" "+sigma+" "+met);
+					averageMetric += met;
 				}
+				
+				System.out.println(metric + " Sigma "+ sigma + " : " + averageMetric/iterTime);
+				out.println(metric + " Sigma "+ sigma + " : " + averageMetric/iterTime);
 			}
-			String confFilePath = "../data/ACL2015/ROUGE/conf.xml";
-			RougeEvaluationWrapper.setConfigurationFile(corpusNameList,
-					outputSummaryDir, modelSummaryDir, modelSummariesMap,
-					confFilePath);
-			
-			HashMap map = RougeEvaluationWrapper.runRough(confFilePath, metric);
-			Double met = (Double) map.get(metric);
-			averageMetric += met;
+
 		}
 		
 		proxy.disconnect();
-		System.out.println(metric + " is " + averageMetric/iterTime);
+		out.close();
 	}
 
 }
