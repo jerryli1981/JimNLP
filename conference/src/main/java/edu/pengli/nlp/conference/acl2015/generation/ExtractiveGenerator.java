@@ -35,7 +35,7 @@ import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.util.CoreMap;
 
-public class LexRankGeneration {
+public class ExtractiveGenerator {
 
 	// cosine similarity
 	private static double getRedundancyScore(Instance candidate,

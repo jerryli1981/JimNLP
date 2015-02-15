@@ -14,14 +14,13 @@ import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.input.SAXBuilder;
 
-import edu.pengli.nlp.conference.acl2015.generation.AbstractiveGeneration;
-import edu.pengli.nlp.conference.acl2015.pipe.FeatureVectorGenerator;
-import edu.pengli.nlp.platform.pipe.PipeLine;
+import edu.pengli.nlp.conference.acl2015.generation.AbstractiveGenerator;
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.RougeEvaluationWrapper;
 
-public class Baseline_ActiveLearning {
+public class Baseline_SIGIRMethod {
 	
+
 	public static void main(String[] args) throws Exception {
 		
 	    //Create a proxy, which we will use to control MATLAB
@@ -31,8 +30,8 @@ public class Baseline_ActiveLearning {
         .setHidden(true)
         .build();
 		
-	    MatlabProxyFactory factory = new MatlabProxyFactory(options);
-	    MatlabProxy proxy = factory.getProxy();
+		MatlabProxyFactory factory = new MatlabProxyFactory(options);
+		MatlabProxy proxy = factory.getProxy();
 
 
 		SAXBuilder builder = new SAXBuilder();
@@ -45,48 +44,50 @@ public class Baseline_ActiveLearning {
 		String outputSummaryDir = "../data/ACL2015/Output";
 		String modelSummaryDir = "../data/ACL2015/ROUGE/models";
 		String confFilePath = "../data/ACL2015/ROUGE/conf.xml";
-		PipeLine pipeLine = new PipeLine();
-		//only used in the first phase
-/*		pipeLine.addPipe(new Input2CharSequence("UTF-8"));
+		
+		/*
+		 * Pattern Generation
+		 */
+/*		PipeLine pipeLine = new PipeLine();
+		pipeLine.addPipe(new Input2CharSequence("UTF-8"));
 		pipeLine.addPipe(new CharSequenceExtractContent(
 				"<TEXT>[\\p{Graph}\\p{Space}]*</TEXT>"));
 		pipeLine.addPipe(new CharSequenceCoreNLPAnnotation());
-		pipeLine.addPipe(new RelationExtractionbyOpenIE());*/
+		pipeLine.addPipe(new RelationExtractionbyOpenIE());
+		HeadAnnotation headAnnotator = new HeadAnnotation(); 
+		FramenetTagger framenetTagger = new FramenetTagger(); 
+		WordnetTagger wordnetTagger = new WordnetTagger();*/
 		
 		
-		//only used in the third phase
-		FeatureVectorGenerator fvg = new FeatureVectorGenerator();
-		pipeLine.addPipe(fvg);
 		
-				
-		//training DCNN for pattern representation, only used in the third phase
-/*		System.out.println("Begin to train DCNN pattern model");
-		trainingDCNN(inputCorpusDir, 
-				outputSummaryDir, corpusList, 
-				pipeLine, proxy, iterTime);*/
-			
 		String[] metrics = {"ROUGE-1", "ROUGE-2", "ROUGE-SU4"};
-		int[] topNs = {10};
+		int[] sigmas = {10, 70};
+
 		PrintWriter out = FileOperation.getPrintWriter(new File(outputSummaryDir), 
 				"experiment_result");
 		
 		for(int m=0; m<metrics.length; m++){
 			String metric = metrics[m];
-			for(int j=0; j<topNs.length; j++){
-				int topN = topNs[j];
+			for(int j=0; j<sigmas.length; j++){
+				int sigma = sigmas[j];
 				double averageMetric = 0.0;
-				int iterTime = 2;
+				int iterTime = 3;
 				for(int k=0; k<iterTime; k++){
 					for (int i = 0; i < corpusList.size(); i++) {				
 						System.out.println("Corpus id is "+i);
 						Element topic = corpusList.get(i);
+						String categoryId = topic.getAttributeValue("category");
 						List<Element> docSets = topic.getChildren();
 						Element docSetA = docSets.get(1);
 						String corpusName = docSetA.getAttributeValue("id");
 						corpusNameList.add(corpusName);
-						AbstractiveGeneration ag = new AbstractiveGeneration();
-						ag.run_ActiveLearning3(inputCorpusDir + "/" + topic.getAttributeValue("id"),
-								outputSummaryDir, corpusName, pipeLine, topN, proxy);
+/*						PatternGenerator pg = new PatternGenerator(headAnnotator, 
+								framenetTagger, wordnetTagger);
+						pg.run(inputCorpusDir, outputSummaryDir, corpusName, pipeLine);*/
+						
+						AbstractiveGenerator sg = new AbstractiveGenerator();
+						sg.sigirMethod(inputCorpusDir + "/" + topic.getAttributeValue("id"),
+								outputSummaryDir, corpusName, categoryId, proxy, sigma);
 					}
 					
 					// Rouge Evaluation
@@ -120,12 +121,12 @@ public class Baseline_ActiveLearning {
 					
 					HashMap map = RougeEvaluationWrapper.runRough(confFilePath, metric);
 					Double met = (Double) map.get(metric);
-					System.out.println(metric+" "+topN+" "+met);
+					System.out.println(metric+" "+sigma+" "+met);
 					averageMetric += met;
 				}
 				
-				System.out.println(metric + " parameter "+ topN + " : " + averageMetric/iterTime);
-				out.println(metric + " parameter "+ topN + " : " + averageMetric/iterTime);
+				System.out.println(metric + " Sigma "+ sigma + " : " + averageMetric/iterTime);
+				out.println(metric + " Sigma "+ sigma + " : " + averageMetric/iterTime);
 			}
 
 		}
@@ -133,5 +134,4 @@ public class Baseline_ActiveLearning {
 		proxy.disconnect();
 		out.close();
 	}
-
 }

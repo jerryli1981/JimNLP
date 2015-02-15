@@ -18,7 +18,7 @@ import edu.pengli.nlp.conference.acl2015.generation.AbstractiveGenerator;
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.RougeEvaluationWrapper;
 
-public class Baseline_SimpleNLG {
+public class Baseline_IJCAJMethod {
 	
 	public static void main(String[] args) throws Exception {
 		
@@ -44,6 +44,7 @@ public class Baseline_SimpleNLG {
 		String modelSummaryDir = "../data/ACL2015/ROUGE/models";
 		String confFilePath = "../data/ACL2015/ROUGE/conf.xml";
 
+		
 		/*
 		 * Pattern Generation
 		 */
@@ -58,33 +59,27 @@ public class Baseline_SimpleNLG {
 		WordnetTagger wordnetTagger = new WordnetTagger();*/
 			
 		String[] metrics = {"ROUGE-1", "ROUGE-2", "ROUGE-SU4"};
-		int[] sigmas = {10, 30, 50};
-
+		int[] topNs = {10};
 		PrintWriter out = FileOperation.getPrintWriter(new File(outputSummaryDir), 
 				"experiment_result");
 		
 		for(int m=0; m<metrics.length; m++){
 			String metric = metrics[m];
-			for(int j=0; j<sigmas.length; j++){
-				int sigma = sigmas[j];
+			for(int j=0; j<topNs.length; j++){
+				int topN = topNs[j];
 				double averageMetric = 0.0;
-				int iterTime = 3;
+				int iterTime = 2;
 				for(int k=0; k<iterTime; k++){
 					for (int i = 0; i < corpusList.size(); i++) {				
 						System.out.println("Corpus id is "+i);
 						Element topic = corpusList.get(i);
-						String categoryId = topic.getAttributeValue("category");
 						List<Element> docSets = topic.getChildren();
 						Element docSetA = docSets.get(1);
 						String corpusName = docSetA.getAttributeValue("id");
 						corpusNameList.add(corpusName);
-/*						PatternGenerator pg = new PatternGenerator(headAnnotator, 
-								framenetTagger, wordnetTagger);
-						pg.run(inputCorpusDir, outputSummaryDir, corpusName, pipeLine);*/
-						
 						AbstractiveGenerator sg = new AbstractiveGenerator();
-						sg.NLGMethod(inputCorpusDir + "/" + topic.getAttributeValue("id"),
-								outputSummaryDir, corpusName, categoryId, proxy, sigma);
+						sg.ijcaiMethod(inputCorpusDir + "/" + topic.getAttributeValue("id"),
+								outputSummaryDir, corpusName, topN, proxy);
 					}
 					
 					// Rouge Evaluation
@@ -118,12 +113,12 @@ public class Baseline_SimpleNLG {
 					
 					HashMap map = RougeEvaluationWrapper.runRough(confFilePath, metric);
 					Double met = (Double) map.get(metric);
-					System.out.println(metric+" "+sigma+" "+met);
+					System.out.println(metric+" "+topN+" "+met);
 					averageMetric += met;
 				}
 				
-				System.out.println(metric + " Sigma "+ sigma + " : " + averageMetric/iterTime);
-				out.println(metric + " Sigma "+ sigma + " : " + averageMetric/iterTime);
+				System.out.println(metric + " "+ topN + " : " + averageMetric/iterTime);
+				out.println(metric + " "+ topN + " : " + averageMetric/iterTime);
 			}
 
 		}

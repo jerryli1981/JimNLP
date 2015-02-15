@@ -15,6 +15,8 @@ import edu.pengli.nlp.conference.acl2015.pipe.HeadAnnotation;
 import edu.pengli.nlp.conference.acl2015.pipe.WordnetTagger;
 import edu.pengli.nlp.conference.acl2015.types.Pattern;
 import edu.pengli.nlp.conference.acl2015.types.Tuple;
+import edu.pengli.nlp.platform.pipe.PipeLine;
+import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerFileIterator;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.pengli.nlp.platform.types.InstanceList;
 import edu.pengli.nlp.platform.util.FileOperation;
@@ -23,17 +25,33 @@ import edu.stanford.nlp.util.CoreMap;
 
 public class PatternGenerator {
 	
+	HeadAnnotation headAnnotator;
 	FramenetTagger framenetTagger;
 	WordnetTagger wordnetTagger;
 	
-	public PatternGenerator(FramenetTagger framenetTagger, WordnetTagger wordnetTagger){
+	public PatternGenerator(HeadAnnotation headAnnotator, 
+			FramenetTagger framenetTagger, WordnetTagger wordnetTagger){
+		this.headAnnotator = headAnnotator;
 		this.framenetTagger = framenetTagger;
 		this.wordnetTagger = wordnetTagger;
 	}
 	
-	public void run(String outputSummaryDir, String corpusName,
-			InstanceList corpus, HeadAnnotation headAnnotator) throws Exception {
+	public void run(String inputCorpusDir, String outputSummaryDir, 
+			String corpusName, PipeLine pipeLine) throws Exception {
+		
+		InstanceList corpus = new InstanceList(pipeLine);
+		
+		
+/*		OneInstancePerFileIterator fIter = new OneInstancePerFileIterator(
+		  inputCorpusDir + "/" + corpusName); 
+		corpus.addThruPipe(fIter);
+		ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(
+		 outputSummaryDir + "/" +corpusName + ".ser")); 
+		corpus.writeObject(out);
+		out.close();*/
+		
 
+	
 		ObjectInputStream in = new ObjectInputStream(new FileInputStream(
 				outputSummaryDir + "/" + corpusName + ".ser"));
 

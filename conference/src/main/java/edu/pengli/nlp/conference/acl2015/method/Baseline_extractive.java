@@ -9,7 +9,7 @@ import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.input.SAXBuilder;
 
-import edu.pengli.nlp.conference.acl2015.generation.LexRankGeneration;
+import edu.pengli.nlp.conference.acl2015.generation.ExtractiveGenerator;
 import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
 import edu.pengli.nlp.platform.pipe.CharSequence2TokenSequence;
 import edu.pengli.nlp.platform.pipe.CharSequenceCoreNLPAnnotation;
@@ -55,7 +55,7 @@ public class Baseline_extractive {
 				Element docSetA = docSets.get(1);
 				String corpusName = docSetA.getAttributeValue("id");
 				corpusNameList.add(corpusName);
-				LexRankGeneration.run(inputCorpusDir + "/" + topic.getAttributeValue("id"),
+				ExtractiveGenerator.run(inputCorpusDir + "/" + topic.getAttributeValue("id"),
 						outputSummaryDir, corpusName, pipeLine1);
 			}
 			

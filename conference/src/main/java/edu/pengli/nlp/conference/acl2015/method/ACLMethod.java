@@ -15,21 +15,14 @@ import matlabcontrol.MatlabInvocationException;
 import matlabcontrol.MatlabProxy;
 import matlabcontrol.MatlabProxyFactory;
 import matlabcontrol.MatlabProxyFactoryOptions;
-import matlabcontrol.extensions.MatlabTypeConverter;
 
 import org.jdom2.Document;
 import org.jdom2.Element;
-import org.jdom2.JDOMException;
 import org.jdom2.input.SAXBuilder;
-import org.json.JSONException;
 
-import edu.pengli.nlp.conference.acl2015.generation.AbstractiveGeneration;
-import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
+import edu.pengli.nlp.conference.acl2015.generation.AbstractiveGenerator;
 import edu.pengli.nlp.conference.acl2015.pipe.FeatureVectorGenerator;
-import edu.pengli.nlp.conference.acl2015.pipe.RelationExtractionbyOpenIE;
 import edu.pengli.nlp.conference.acl2015.types.Pattern;
-import edu.pengli.nlp.platform.pipe.CharSequenceCoreNLPAnnotation;
-import edu.pengli.nlp.platform.pipe.Input2CharSequence;
 import edu.pengli.nlp.platform.pipe.Noop;
 import edu.pengli.nlp.platform.pipe.PipeLine;
 import edu.pengli.nlp.platform.types.Instance;
@@ -37,7 +30,7 @@ import edu.pengli.nlp.platform.types.InstanceList;
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.RougeEvaluationWrapper;
 
-public class OurMethod {
+public class ACLMethod {
 	
 	private static void trainingDCNN(String inputCorpusDir, 
 			String outputSummaryDir, List<Element> corpusList, 
@@ -94,17 +87,19 @@ public class OurMethod {
 		String confFilePath = "../data/ACL2015/ROUGE/conf.xml";
 		
 		PipeLine pipeLine = new PipeLine();
-		//only used in the first phase
+		
+		/*
+		 * Pattern Generation
+		 */
 /*		pipeLine.addPipe(new Input2CharSequence("UTF-8"));
 		pipeLine.addPipe(new CharSequenceExtractContent(
 				"<TEXT>[\\p{Graph}\\p{Space}]*</TEXT>"));
 		pipeLine.addPipe(new CharSequenceCoreNLPAnnotation());
-		pipeLine.addPipe(new RelationExtractionbyOpenIE());*/
+		pipeLine.addPipe(new RelationExtractionbyOpenIE());
+		HeadAnnotation headAnnotator = new HeadAnnotation(); 
+		FramenetTagger framenetTagger = new FramenetTagger(); 
+		WordnetTagger wordnetTagger = new WordnetTagger();*/
 		
-		
-		//only used in the third phase
-		FeatureVectorGenerator fvg = new FeatureVectorGenerator();
-		pipeLine.addPipe(fvg);
 		
 				
 		//training DCNN for pattern representation, only used in the third phase
@@ -135,9 +130,13 @@ public class OurMethod {
 						Element docSetA = docSets.get(1);
 						String corpusName = docSetA.getAttributeValue("id");
 						corpusNameList.add(corpusName);
-						AbstractiveGeneration ag = new AbstractiveGeneration();
-						ag.run(inputCorpusDir + "/" + topic.getAttributeValue("id"),
-								outputSummaryDir, corpusName, pipeLine, categoryId, proxy, sigma);
+/*						PatternGenerator pg = new PatternGenerator(headAnnotator, 
+								framenetTagger, wordnetTagger);
+						pg.run(inputCorpusDir, outputSummaryDir, corpusName, pipeLine);*/
+						
+						AbstractiveGenerator sg = new AbstractiveGenerator();
+						sg.sigirMethod(inputCorpusDir + "/" + topic.getAttributeValue("id"),
+								outputSummaryDir, corpusName, categoryId, proxy, sigma);
 					}
 					
 					// Rouge Evaluation
@@ -184,4 +183,5 @@ public class OurMethod {
 		proxy.disconnect();
 		out.close();
 	}
+
 }

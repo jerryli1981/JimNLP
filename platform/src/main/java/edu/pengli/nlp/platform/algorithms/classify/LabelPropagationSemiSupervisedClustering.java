@@ -21,7 +21,9 @@ import edu.pengli.nlp.platform.types.Metric;
 
 public class LabelPropagationSemiSupervisedClustering 
 				extends SemiSupervisedClustering{
+	
 	int sigma = 0;
+	
 	public LabelPropagationSemiSupervisedClustering(Pipe instancePipe,
 			InstanceList seeds, Metric metric, MatlabProxy proxy, int sigma) {
 		super(instancePipe, seeds, metric, proxy);
@@ -30,6 +32,8 @@ public class LabelPropagationSemiSupervisedClustering
 	}
 
 	public Clustering cluster(InstanceList instances){
+		
+		
 
 		double[][] weightMatrix = new double[instances.size()+seeds.size()][instances
 				.size()+seeds.size()];
@@ -108,21 +112,6 @@ public class LabelPropagationSemiSupervisedClustering
 				proxy.eval("W = sqrt(abs(d)+eps)");
 				proxy.eval("obj("+i+") = 0.99*0.5*sum(sum((A.*W)))+0.01*trace((F-Y)'*(F-Y))");
 			}
-			
-/*			double[][] obj = processor.getNumericArray("obj").getRealArray2D();
-			double[] arr = new double[20];
-			for(int i=0; i<processor.getNumericArray("obj").getLength(); i++)
-				arr[i] = obj[i][0];
-					
-			
-			ArrayList list= new ArrayList(); 
-			list.add(new MLDouble("obj", arr, processor.getNumericArray("obj").getLength()));
-			String matInputFile = "/home/peng/Downloads/visual/obj.mat";
-			 try { 
-				 new MatFileWriter(matInputFile, list); 
-			} catch(IOException e) { // TODO Auto-generated catch block
-				 e.printStackTrace(); 
-			}*/
 			
 			double[][] F = processor.getNumericArray("F").getRealArray2D();
 			for(int i=0; i<instances.size(); i++){
