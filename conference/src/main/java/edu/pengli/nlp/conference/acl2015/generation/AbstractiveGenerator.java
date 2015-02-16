@@ -12,6 +12,7 @@ import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -22,13 +23,16 @@ import java.util.Random;
 import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import lpsolve.LpSolve;
 import lpsolve.LpSolveException;
 import matlabcontrol.MatlabInvocationException;
 import matlabcontrol.MatlabProxy;
+import matlabcontrol.extensions.MatlabNumericArray;
 import matlabcontrol.extensions.MatlabTypeConverter;
 import edu.pengli.nlp.conference.acl2015.pipe.FeatureVectorGenerator;
 import edu.pengli.nlp.conference.acl2015.types.Category;
@@ -58,6 +62,8 @@ import edu.stanford.nlp.semgraph.SemanticGraphEdge;
 import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.BasicDependenciesAnnotation;
 
 public class AbstractiveGenerator {
+	
+	private static int count = 0;
 	
 	public void NLGMethod(String inputCorpusDir, String outputSummaryDir,
 			String corpusName, String categoryId, MatlabProxy proxy,  int sigma){
@@ -511,12 +517,12 @@ public class AbstractiveGenerator {
 			
 		//2, clustering tuples with LGC semi supervised learning
 //		System.out.println("clustering tuples with LGC semi supervised learning");
-		SemiSupervisedClustering semiClustering = new 
+/*		SemiSupervisedClustering semiClustering = new 
 		HarmonicSemiSupervisedClustering(
 		new Noop(), patternCluster, metric, proxy, 20);
-		Clustering clusters = semiClustering.cluster(instances);
+		Clustering clusters = semiClustering.cluster(instances);*/
 				
-/*		FeatureVector vec = (FeatureVector)instances.get(0).getData();
+		FeatureVector vec = (FeatureVector)instances.get(0).getData();
 		int dimension = vec.getValues().length;
 		
 		double[][] dataMatrix = new double[instances.size()][dimension];
@@ -541,7 +547,7 @@ public class AbstractiveGenerator {
 			e.printStackTrace();
 		}
 		
-		Clustering clusters = new Clustering(instances, topN, clusterLabels);*/
+		Clustering clusters = new Clustering(instances, topN, clusterLabels);
 		
 		
 /*		Spectral spectral = new Spectral(new Noop(), topN, metric, proxy);
@@ -840,7 +846,7 @@ public class AbstractiveGenerator {
 			solver.strAddConstraint(sb_E_N.toString().trim(), LpSolve.EQ, 1);
 		}
 
-/*		// Redundancy Constraints
+		// Redundancy Constraints
 		for (int i = 0; i < cs.length; i++) {
 			InstanceList clusteri = cs[i];
 			for (int m = 0; m < clusteri.size(); m++) {
@@ -850,11 +856,11 @@ public class AbstractiveGenerator {
 						solver.strAddConstraint(
 								buildStrVector(m, n, i, j, 
 										rankedClusters, rankedInstanceList.size(), metric),
-								LpSolve.LE, 0.1);
+								LpSolve.LE, 0.8);
 					}
 				}
 			}
-		}*/
+		}
 
 		solver.solve();
 
@@ -1157,7 +1163,7 @@ public class AbstractiveGenerator {
 		endNode.setLemma("END");
 		endNode.setValue("END");
 		endNode.setTag("END");
-		endNode.setOriginalText("END");
+//		endNode.setOriginalText("END");
 		
 		if(content == "tuple"){
 			for (int i = 0; i < cluster.size(); i++) {
@@ -1277,57 +1283,49 @@ public class AbstractiveGenerator {
 				
 			}
 		}
-
 		
-		
-/*		ArrayList<ArrayList<IndexedWord>> paths = new ArrayList<ArrayList<IndexedWord>>();
-		for(IndexedWord last : lastWords){
-			List<IndexedWord> path = graph.getPathToRoot(last);
-			path.add(0, last);
-			ArrayList<IndexedWord> reversePath = new ArrayList<IndexedWord>();
-			for(int i = path.size()-2; i>=0; i--){
-				reversePath.add(path.get(i));
-			}
-			
-			ArrayList<IndexedWord> reversePath = 
-					(ArrayList<IndexedWord>) graph.getShortestDirectedPathNodes(startNode, last);
-			reversePath.remove(0);
-			paths.add(reversePath);
-		}*/
-			
+		ArrayList<ArrayList<IndexedWord>> paths = new ArrayList<ArrayList<IndexedWord>>();
+	    IndexedWord currentNode = startNode;
+	    List<IndexedWord> visited = new ArrayList<IndexedWord>();
+	    visited.add(startNode);
+	  
 
+	    findAllPaths(graph, visited, paths, currentNode, endNode);
+	    count = 0;
+			
 //		System.out.println("Begin travel the graph to generate new tuples");
 //		ArrayList<ArrayList<IndexedWord>> paths = travelAllPaths(graph, endNode);
-		Method method;
-		FutureTask task = null;
+		
+/*		ArrayList<ArrayList<IndexedWord>> paths = null;
 		try {
-			method = getClass().getDeclaredMethod("travelAllPaths", 
+			Method method = getClass().getDeclaredMethod("travelAllPaths", 
 					new Class[]{SemanticGraph.class, IndexedWord.class});
 			List<Object> args = new ArrayList<Object>();
 			args.add(graph);
 			args.add(endNode);
 			Callable call = new CallableTask(this, method, args);
-			task = new FutureTask(call);
+			FutureTask task = new FutureTask(call);
 			Thread thread = new Thread(task);
 			thread.setDaemon(true);
 			thread.start();
+			paths = (ArrayList<ArrayList<IndexedWord>>) task.get(20, TimeUnit.SECONDS);
+			
 		} catch (NoSuchMethodException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		} catch (SecurityException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
-		}
-
-		ArrayList<ArrayList<IndexedWord>> paths = null;
-		try{
-			
-			paths = (ArrayList<ArrayList<IndexedWord>>) task.get(20, TimeUnit.SECONDS);
-			
-		}catch(Exception e){
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ExecutionException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (TimeoutException e) {
 			System.out.println("tuple fusion can't be fininshed in time");
 			return null;
-		}
+		}*/
 
 		ArrayList<List<IndexedWord>> filteredPaths = new ArrayList<List<IndexedWord>>();
 		HashSet<String> set = new HashSet<String>();
@@ -1361,6 +1359,32 @@ public class AbstractiveGenerator {
 		return Merger.process(merged);
 	}
 	
+	//what if graph contains cycles?
+	private void findAllPaths(SemanticGraph graph, List<IndexedWord> visited, 
+			List<ArrayList<IndexedWord>> paths, IndexedWord currentNode, IndexedWord endNode) {     
+		count++;
+		if(count >= 3000)
+			return;
+		
+	    if (currentNode.equals(endNode)) { 
+	        paths.add(new ArrayList(Arrays.asList(visited.toArray())));
+	        return;
+	    }
+	    else {
+	    	List<IndexedWord> nodes = graph.getChildList(currentNode);
+	        for (IndexedWord node : nodes) {    	
+	            if (visited.contains(node)) {
+	                continue;
+	            } 
+	            List<IndexedWord> temp = new ArrayList<IndexedWord>();
+	            temp.addAll(visited);
+	            temp.add(node);
+	            findAllPaths(graph, temp, paths, node, endNode);
+	        }
+	    }
+	}
+	
+	// this method have bugs
 	public ArrayList<ArrayList<IndexedWord>> travelAllPaths(
 			SemanticGraph graph, IndexedWord endNode) {
 

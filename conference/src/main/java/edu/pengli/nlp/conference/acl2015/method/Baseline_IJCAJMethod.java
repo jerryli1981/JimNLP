@@ -68,9 +68,9 @@ public class Baseline_IJCAJMethod {
 			for(int j=0; j<topNs.length; j++){
 				int topN = topNs[j];
 				double averageMetric = 0.0;
-				int iterTime = 2;
+				int iterTime = 1;
 				for(int k=0; k<iterTime; k++){
-					for (int i = 0; i < corpusList.size(); i++) {				
+					for (int i = 16; i < corpusList.size(); i++) {				
 						System.out.println("Corpus id is "+i);
 						Element topic = corpusList.get(i);
 						List<Element> docSets = topic.getChildren();
