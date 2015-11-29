@@ -52,7 +52,6 @@ public abstract class Pipe implements Serializable{
 			return pipe(inst);
 		}
 
-		@Override
 		public void remove() {
 			throw new IllegalStateException("Not supported");
 

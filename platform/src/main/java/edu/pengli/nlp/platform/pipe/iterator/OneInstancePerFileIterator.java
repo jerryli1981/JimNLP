@@ -24,20 +24,20 @@ public class OneInstancePerFileIterator implements Iterator<Instance> {
 		fileIterator = fs.iterator();
 	}
 
-	@Override
+
 	public boolean hasNext() {
 		// TODO Auto-generated method stub
 		return fileIterator.hasNext();
 	}
 
-	@Override
+
 	public Instance next() {
 		File f = fileIterator.next();
 		String name = f.getName();
 		return new Instance(f, null, name);
 	}
 
-	@Override
+
 	public void remove() {
 		throw new IllegalStateException("Not supported");
 	}

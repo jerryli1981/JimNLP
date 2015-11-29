@@ -43,7 +43,7 @@ public class PurityEvaluator implements ClusteringEvaluator {
 		return Double.toString(purity);
 	}
 
-	@Override
+
 	public double[] getEvaluationScores(Clustering truth, Clustering predicted) {
 		// TODO Auto-generated method stub
 		return null;

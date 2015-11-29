@@ -23,7 +23,6 @@ public class AccuracyEvaluator implements ClusteringEvaluator {
 		return ("accuracy=" + ((double)correctTotal / comparisonsTotal));
 	}
 
-	@Override
 	public double[] getEvaluationScores(Clustering truth, Clustering predicted) {
 		int correct = 0;
 		int comparisons = 0;

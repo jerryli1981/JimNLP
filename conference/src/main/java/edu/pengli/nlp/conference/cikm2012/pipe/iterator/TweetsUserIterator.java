@@ -89,20 +89,20 @@ public class TweetsUserIterator implements Iterator<Instance> {
 		tUsersIter = users.iterator();
 	}
 
-	@Override
+
 	public boolean hasNext() {
 		// TODO Auto-generated method stub
 		return tUsersIter.hasNext();
 	}
 
-	@Override
+
 	public Instance next() {
 		// TODO Auto-generated method stub
 		Instance user = tUsersIter.next();
 		return new Instance(user, null, user.getName()+"_T", null);
 	}
 
-	@Override
+
 	public void remove() {
 		throw new IllegalStateException("Not supported");
 	}

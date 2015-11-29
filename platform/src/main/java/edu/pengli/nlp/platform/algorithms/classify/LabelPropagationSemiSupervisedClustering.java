@@ -55,6 +55,10 @@ public class LabelPropagationSemiSupervisedClustering
 //				weightMatrix[i][j] = 1-metric.distance(fv_i, fv_j);
 			}
 		}
+		
+		
+		
+		
 		int clusterLabels[] = new int[instances.size()];
 		try {
 						

@@ -11,12 +11,12 @@ import edu.pengli.nlp.platform.types.InstanceList;
 import edu.pengli.nlp.platform.types.Metric;
 
 //Semi-supervised learning with Local and Global Consistency.
-public class LocalglobalConsistencySemiSupervisedClustering 
+public class LGC_Cos 
 			extends SemiSupervisedClustering{
 
 	int sigma = 0;
 	
-	public LocalglobalConsistencySemiSupervisedClustering(Pipe instancePipe,
+	public LGC_Cos(Pipe instancePipe,
 			InstanceList seeds, Metric metric, MatlabProxy proxy, int sigma) {
 		super(instancePipe, seeds, metric, proxy);
 		this.sigma = sigma;

@@ -207,9 +207,9 @@ public class ExtractiveGenerator {
 					inst.getName(), inst.getSource()));
 		}
 
-		double threshold = 0.2;
-		double damping = 0.1;
-		double error = 0.1;
+		double threshold = 0.1; // 0.2
+		double damping = 0.1; //0.1
+		double error = 0.1;//0.1
 
 		LexRank lr = new LexRank(tf_idf_fvs, threshold, damping, error);
 		lr.rank();
@@ -219,12 +219,19 @@ public class ExtractiveGenerator {
 		for (double d : L) {
 			score.add(d);
 		}
+		
+		//Lexrank  & 0.28921 & 0.05624 & 0.09322   \\%0.5
+		//Lexrank  & 0.28898 & 0.05618 & 0.09312   \\%0.4
+		//Lexrank  & 0.28972 & 0.05631 & 0.09339   \\%0.3
+		//Lexrank  & 0.28868 & 0.05517 & 0.09253   \\%0.2
+		//Lexrank  & 0.28901 & 0.05473 & 0.09244   \\%0.15
+		//Lexrank  & 0.29348 & 0.05574 & 0.09418   \\%0.1
 
 		// greedy selection
 		int LengthLimit = 100;
 		int iterTime = 0;
 		Summary currentSummary = new Summary();
-		double redundancyThreshold = 0.01;
+		double redundancyThreshold = 0.15; //0.01
 		Instance inst = tf_idf_fvs.get(getHighestPosition(score));
 		currentSummary.add(inst);
 		do {
@@ -247,10 +254,21 @@ public class ExtractiveGenerator {
 		
 		//output
 		PrintWriter out = FileOperation.getPrintWriter(new File(outputSummaryDir), corpusName);
-
+		StringBuilder sb = new StringBuilder();
 		for (Instance sent : currentSummary) {
-	     	out.println(sent.getSource());
+//	     	out.println(sent.getSource());
+	     	sb.append(sent.getSource());
+			sb.append("\n");
 		}
+		
+		String content = sb.toString().trim();
+		String[] toks = content.split(" ");
+		for(int i=0; i<toks.length; i++){
+			if(i > 100)
+				break;
+			out.print(toks[i]+" ");
+		}
+		
 		out.close();
 
 	}

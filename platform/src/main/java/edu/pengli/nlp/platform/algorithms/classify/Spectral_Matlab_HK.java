@@ -12,13 +12,13 @@ import matlabcontrol.MatlabProxy;
 import matlabcontrol.extensions.MatlabNumericArray;
 import matlabcontrol.extensions.MatlabTypeConverter;
 
-public class Spectral_Matlab extends Clusterer {
+public class Spectral_Matlab_HK extends Clusterer {
 
 	Metric metric;
 	int numClusters;
 	MatlabProxy proxy;
 
-	public Spectral_Matlab(Pipe instancePipe, int numClusters, Metric metric,
+	public Spectral_Matlab_HK(Pipe instancePipe, int numClusters, Metric metric,
 			MatlabProxy proxy) {
 
 		super(instancePipe);

@@ -11,12 +11,12 @@ import edu.pengli.nlp.platform.types.InstanceList;
 import edu.pengli.nlp.platform.types.Metric;
 
 //Semi-supervised learning with Local and Global Consistency.
-public class LocalglobalConsistencySemiSupervisedClustering 
+public class LGC_HK 
 			extends SemiSupervisedClustering{
 
 	int sigma = 0;
 	
-	public LocalglobalConsistencySemiSupervisedClustering(Pipe instancePipe,
+	public LGC_HK(Pipe instancePipe,
 			InstanceList seeds, Metric metric, MatlabProxy proxy, int sigma) {
 		super(instancePipe, seeds, metric, proxy);
 		this.sigma = sigma;
@@ -39,12 +39,12 @@ public class LocalglobalConsistencySemiSupervisedClustering
 			FeatureVector fv_i = (FeatureVector) allInsts.get(i).getData();
 			for (int j = 0; j < allInsts.size(); j++) {
 				FeatureVector fv_j = (FeatureVector) allInsts.get(j).getData();
-/*				double sum = 0.0;
+				double sum = 0.0;
 				for(int k=0; k<fv_i.getValues().length; k++){
 					sum += Math.pow((fv_i.getValues()[k]-fv_j.getValues()[k]), 2)/sigma;
 				}
-				weightMatrix[i][j] = Math.exp(-sum);*/
-				weightMatrix[i][j] = 1-metric.distance(fv_i, fv_j);
+				weightMatrix[i][j] = Math.exp(-sum);
+//				weightMatrix[i][j] = 1-metric.distance(fv_i, fv_j);
 			}
 		}
 		int clusterLabels[] = new int[instances.size()];

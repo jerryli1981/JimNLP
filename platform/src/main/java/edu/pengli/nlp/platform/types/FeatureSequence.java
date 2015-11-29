@@ -29,7 +29,7 @@ public class FeatureSequence implements Sequence, AlphabetCarrying, Serializable
 		return features[pos];
 	}
 
-	@Override
+
 	public Object get(int pos) {
 		return dictionary.lookupObject(features[pos]);
 	}
@@ -46,7 +46,6 @@ public class FeatureSequence implements Sequence, AlphabetCarrying, Serializable
 		return feats;
 	}
 
-	@Override
 	public Alphabet getAlphabet() {
 		// TODO Auto-generated method stub
 		return dictionary;
