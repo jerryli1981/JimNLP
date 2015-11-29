@@ -1,4 +1,4 @@
-package edu.pengli.nlp.conference.acl2015.pipe;
+package edu.pengli.nlp.conference.cikm2015.pipe;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,7 +16,7 @@ import edu.knowitall.tool.parse.ClearParser;
 import edu.knowitall.tool.postag.ClearPostagger;
 import edu.knowitall.tool.srl.ClearSrl;
 import edu.knowitall.tool.tokenize.ClearTokenizer;
-import edu.pengli.nlp.conference.acl2015.types.Tuple;
+import edu.pengli.nlp.conference.cikm2015.types.Tuple;
 import edu.pengli.nlp.platform.pipe.Pipe;
 import edu.pengli.nlp.platform.types.Instance;
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
@@ -74,7 +74,7 @@ public class RelationExtractionbyOpenIE extends Pipe {
 	}
 
 	// may not be continuous
-	private edu.pengli.nlp.conference.acl2015.types.Argument getArgument(
+	private edu.pengli.nlp.conference.cikm2015.types.Argument getArgument(
 			Argument arg, TreeMap<Integer, IndexedWord> positionWordMap,
 			String originalSent, StanfordCoreNLP pipeline) {
 
@@ -85,8 +85,8 @@ public class RelationExtractionbyOpenIE extends Pipe {
 			Interval in = iiArg.next();
 			startPositionArg = in.start();
 		}
-		edu.pengli.nlp.conference.acl2015.types.Argument Arg = 
-				new edu.pengli.nlp.conference.acl2015.types.Argument();
+		edu.pengli.nlp.conference.cikm2015.types.Argument Arg = 
+				new edu.pengli.nlp.conference.cikm2015.types.Argument();
 		
 		Annotation argAnn = new Annotation(argMention);
 		
@@ -162,7 +162,7 @@ public class RelationExtractionbyOpenIE extends Pipe {
 		return Arg;
 	}
 
-	private edu.pengli.nlp.conference.acl2015.types.Predicate getRelation(
+	private edu.pengli.nlp.conference.cikm2015.types.Predicate getRelation(
 			Relation rel, TreeMap<Integer, IndexedWord> positionWordMap,
 			String relMention, String originalSent, StanfordCoreNLP pipeline) {
 
@@ -177,8 +177,8 @@ public class RelationExtractionbyOpenIE extends Pipe {
 			startPositionRel = in.start();
 		}
 
-		edu.pengli.nlp.conference.acl2015.types.Predicate Rel = 
-				new edu.pengli.nlp.conference.acl2015.types.Predicate();
+		edu.pengli.nlp.conference.cikm2015.types.Predicate Rel = 
+				new edu.pengli.nlp.conference.cikm2015.types.Predicate();
 		
 		Annotation relAnn = new Annotation(relMention);
 		pipeline.annotate(relAnn);
@@ -325,14 +325,14 @@ public class RelationExtractionbyOpenIE extends Pipe {
 				if (relMention.matches(".*\\[.*?\\].*"))
 					continue;
 				
-				edu.pengli.nlp.conference.acl2015.types.Argument Arg1 = getArgument(
+				edu.pengli.nlp.conference.cikm2015.types.Argument Arg1 = getArgument(
 						arg1, beginPositionWordMap, sentenceMention,
 						pipeline);
 				
 
 				if (arg2ItemSize == 1 || arg2ItemSize == 2) {
 
-					edu.pengli.nlp.conference.acl2015.types.Predicate Rel = getRelation(
+					edu.pengli.nlp.conference.cikm2015.types.Predicate Rel = getRelation(
 							rel, beginPositionWordMap, null,
 							sentenceMention, pipeline);
 
@@ -341,7 +341,7 @@ public class RelationExtractionbyOpenIE extends Pipe {
 
 						Argument arg2 = argIter.next();
 
-						edu.pengli.nlp.conference.acl2015.types.Argument Arg2 = getArgument(
+						edu.pengli.nlp.conference.cikm2015.types.Argument Arg2 = getArgument(
 								arg2, beginPositionWordMap,
 								sentenceMention, pipeline);
 						
@@ -358,14 +358,14 @@ public class RelationExtractionbyOpenIE extends Pipe {
 						arg2List.add(arg2);
 					}
 					String newRel = relMention + " " + arg2List.get(0).text();
-					edu.pengli.nlp.conference.acl2015.types.Predicate Rel = getRelation(
+					edu.pengli.nlp.conference.cikm2015.types.Predicate Rel = getRelation(
 							rel, beginPositionWordMap, newRel,
 							sentenceMention, pipeline);
 					
 					for (int i = 1; i < arg2List.size(); i++) {
 
 						Argument arg2 = arg2List.get(i);
-						edu.pengli.nlp.conference.acl2015.types.Argument Arg2 = getArgument(
+						edu.pengli.nlp.conference.cikm2015.types.Argument Arg2 = getArgument(
 								arg2, beginPositionWordMap,
 								sentenceMention, pipeline);
 

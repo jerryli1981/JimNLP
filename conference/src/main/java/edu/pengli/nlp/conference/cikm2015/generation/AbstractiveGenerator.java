@@ -1,4 +1,4 @@
-package edu.pengli.nlp.conference.acl2015.generation;
+package edu.pengli.nlp.conference.cikm2015.generation;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -34,11 +34,11 @@ import matlabcontrol.MatlabInvocationException;
 import matlabcontrol.MatlabProxy;
 import matlabcontrol.extensions.MatlabNumericArray;
 import matlabcontrol.extensions.MatlabTypeConverter;
-import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
-import edu.pengli.nlp.conference.acl2015.pipe.FeatureVectorGenerator;
-import edu.pengli.nlp.conference.acl2015.types.Category;
-import edu.pengli.nlp.conference.acl2015.types.Pattern;
-import edu.pengli.nlp.conference.acl2015.types.Tuple;
+import edu.pengli.nlp.conference.cikm2015.pipe.CharSequenceExtractContent;
+import edu.pengli.nlp.conference.cikm2015.pipe.FeatureVectorGenerator;
+import edu.pengli.nlp.conference.cikm2015.types.Category;
+import edu.pengli.nlp.conference.cikm2015.types.Pattern;
+import edu.pengli.nlp.conference.cikm2015.types.Tuple;
 import edu.pengli.nlp.platform.algorithms.ClustererUtil;
 import edu.pengli.nlp.platform.algorithms.classify.Clusterer;
 import edu.pengli.nlp.platform.algorithms.classify.Clustering;

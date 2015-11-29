@@ -1,4 +1,4 @@
-package edu.pengli.nlp.conference.acl2015.generation;
+package edu.pengli.nlp.conference.cikm2015.generation;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -10,11 +10,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
-import edu.pengli.nlp.conference.acl2015.pipe.FramenetTagger;
-import edu.pengli.nlp.conference.acl2015.pipe.HeadAnnotation;
-import edu.pengli.nlp.conference.acl2015.pipe.WordnetTagger;
-import edu.pengli.nlp.conference.acl2015.types.Pattern;
-import edu.pengli.nlp.conference.acl2015.types.Tuple;
+import edu.pengli.nlp.conference.cikm2015.pipe.FramenetTagger;
+import edu.pengli.nlp.conference.cikm2015.pipe.HeadAnnotation;
+import edu.pengli.nlp.conference.cikm2015.pipe.WordnetTagger;
+import edu.pengli.nlp.conference.cikm2015.types.Pattern;
+import edu.pengli.nlp.conference.cikm2015.types.Tuple;
 import edu.pengli.nlp.platform.pipe.PipeLine;
 import edu.pengli.nlp.platform.pipe.iterator.OneInstancePerFileIterator;
 import edu.pengli.nlp.platform.types.Instance;
@@ -89,16 +89,16 @@ public class PatternGenerator {
 						continue;
 
 					outt.println(t.getSentenceRepresentation());
-					edu.pengli.nlp.conference.acl2015.types.Argument arg1 = headAnnotator
+					edu.pengli.nlp.conference.cikm2015.types.Argument arg1 = headAnnotator
 							.annotateArgHead(t.getArg1(), sent);
 					t.setArg1(arg1);
 
-					edu.pengli.nlp.conference.acl2015.types.Argument arg2 = headAnnotator
+					edu.pengli.nlp.conference.cikm2015.types.Argument arg2 = headAnnotator
 							.annotateArgHead(t.getArg2(), sent);
 					t.setArg2(arg2);
 
 					// for later sentence realization to get head verb
-					edu.pengli.nlp.conference.acl2015.types.Predicate pre = headAnnotator
+					edu.pengli.nlp.conference.cikm2015.types.Predicate pre = headAnnotator
 							.annotatePredicateHead(t.getRel(), sent);
 					t.setRel(pre);
 

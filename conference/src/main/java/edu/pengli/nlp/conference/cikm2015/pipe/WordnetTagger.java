@@ -1,12 +1,12 @@
-package edu.pengli.nlp.conference.acl2015.pipe;
+package edu.pengli.nlp.conference.cikm2015.pipe;
 
 import java.util.ArrayList;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import edu.pengli.nlp.conference.acl2015.types.Argument;
-import edu.pengli.nlp.conference.acl2015.types.Tuple;
+import edu.pengli.nlp.conference.cikm2015.types.Argument;
+import edu.pengli.nlp.conference.cikm2015.types.Tuple;
 import edu.smu.tspell.wordnet.NounSynset;
 import edu.smu.tspell.wordnet.Synset;
 import edu.smu.tspell.wordnet.SynsetType;

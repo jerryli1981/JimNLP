@@ -1,4 +1,4 @@
-package edu.pengli.nlp.conference.acl2015.generation;
+package edu.pengli.nlp.conference.cikm2015.generation;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -11,7 +11,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
-import edu.pengli.nlp.conference.acl2015.pipe.CharSequenceExtractContent;
+import edu.pengli.nlp.conference.cikm2015.pipe.CharSequenceExtractContent;
 import edu.pengli.nlp.platform.algorithms.ranking.LexRank;
 import edu.pengli.nlp.platform.pipe.CharSequence2TokenSequence;
 import edu.pengli.nlp.platform.pipe.CharSequenceCoreNLPAnnotation;

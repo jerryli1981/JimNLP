@@ -1,4 +1,4 @@
-package edu.pengli.nlp.conference.acl2015.pipe;
+package edu.pengli.nlp.conference.cikm2015.pipe;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.Stack;
 
-import edu.pengli.nlp.conference.acl2015.types.Argument;
-import edu.pengli.nlp.conference.acl2015.types.Predicate;
+import edu.pengli.nlp.conference.cikm2015.types.Argument;
+import edu.pengli.nlp.conference.cikm2015.types.Predicate;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.semgraph.SemanticGraph;

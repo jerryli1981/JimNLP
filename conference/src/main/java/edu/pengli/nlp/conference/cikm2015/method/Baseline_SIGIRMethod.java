@@ -1,4 +1,4 @@
-package edu.pengli.nlp.conference.acl2015.method;
+package edu.pengli.nlp.conference.cikm2015.method;
 
 import java.io.File;
 import java.io.PrintWriter;
@@ -14,12 +14,13 @@ import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.input.SAXBuilder;
 
-import edu.pengli.nlp.conference.acl2015.generation.AbstractiveGenerator;
+import edu.pengli.nlp.conference.cikm2015.generation.AbstractiveGenerator;
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.RougeEvaluationWrapper;
 
-public class Baseline_SimpleNLG {
+public class Baseline_SIGIRMethod {
 	
+
 	public static void main(String[] args) throws Exception {
 		
 	    //Create a proxy, which we will use to control MATLAB
@@ -29,8 +30,8 @@ public class Baseline_SimpleNLG {
         .setHidden(true)
         .build();
 		
-	    MatlabProxyFactory factory = new MatlabProxyFactory(options);
-	    MatlabProxy proxy = factory.getProxy();
+		MatlabProxyFactory factory = new MatlabProxyFactory(options);
+		MatlabProxy proxy = factory.getProxy();
 
 
 		SAXBuilder builder = new SAXBuilder();
@@ -43,7 +44,7 @@ public class Baseline_SimpleNLG {
 		String outputSummaryDir = "../data/ACL2015/Output";
 		String modelSummaryDir = "../data/ACL2015/ROUGE/models";
 		String confFilePath = "../data/ACL2015/ROUGE/conf.xml";
-
+		
 		/*
 		 * Pattern Generation
 		 */
@@ -56,9 +57,11 @@ public class Baseline_SimpleNLG {
 		HeadAnnotation headAnnotator = new HeadAnnotation(); 
 		FramenetTagger framenetTagger = new FramenetTagger(); 
 		WordnetTagger wordnetTagger = new WordnetTagger();*/
-			
+		
+		
+		
 		String[] metrics = {"ROUGE-1", "ROUGE-2", "ROUGE-SU4"};
-		int[] sigmas = {10, 30, 50};
+		int[] sigmas = {10, 70};
 
 		PrintWriter out = FileOperation.getPrintWriter(new File(outputSummaryDir), 
 				"experiment_result");
@@ -83,7 +86,7 @@ public class Baseline_SimpleNLG {
 						pg.run(inputCorpusDir, outputSummaryDir, corpusName, pipeLine);*/
 						
 						AbstractiveGenerator sg = new AbstractiveGenerator();
-						sg.NLGMethod(inputCorpusDir + "/" + topic.getAttributeValue("id"),
+						sg.sigirMethod(inputCorpusDir + "/" + topic.getAttributeValue("id"),
 								outputSummaryDir, corpusName, categoryId, proxy, sigma);
 					}
 					
@@ -131,5 +134,4 @@ public class Baseline_SimpleNLG {
 		proxy.disconnect();
 		out.close();
 	}
-
 }

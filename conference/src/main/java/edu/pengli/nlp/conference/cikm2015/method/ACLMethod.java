@@ -1,4 +1,4 @@
-package edu.pengli.nlp.conference.acl2015.method;
+package edu.pengli.nlp.conference.cikm2015.method;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -20,9 +20,9 @@ import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.input.SAXBuilder;
 
-import edu.pengli.nlp.conference.acl2015.generation.AbstractiveGenerator;
-import edu.pengli.nlp.conference.acl2015.pipe.FeatureVectorGenerator;
-import edu.pengli.nlp.conference.acl2015.types.Pattern;
+import edu.pengli.nlp.conference.cikm2015.generation.AbstractiveGenerator;
+import edu.pengli.nlp.conference.cikm2015.pipe.FeatureVectorGenerator;
+import edu.pengli.nlp.conference.cikm2015.types.Pattern;
 import edu.pengli.nlp.platform.pipe.Noop;
 import edu.pengli.nlp.platform.pipe.PipeLine;
 import edu.pengli.nlp.platform.types.Instance;

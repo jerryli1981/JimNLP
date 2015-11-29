@@ -1,4 +1,4 @@
-package edu.pengli.nlp.conference.acl2015.method;
+package edu.pengli.nlp.conference.cikm2015.method;
 
 import java.io.File;
 import java.io.PrintWriter;
@@ -14,7 +14,7 @@ import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.input.SAXBuilder;
 
-import edu.pengli.nlp.conference.acl2015.generation.AbstractiveGenerator;
+import edu.pengli.nlp.conference.cikm2015.generation.AbstractiveGenerator;
 import edu.pengli.nlp.platform.util.FileOperation;
 import edu.pengli.nlp.platform.util.RougeEvaluationWrapper;
 

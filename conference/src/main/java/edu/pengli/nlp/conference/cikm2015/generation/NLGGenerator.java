@@ -1,12 +1,12 @@
-package edu.pengli.nlp.conference.acl2015.generation;
+package edu.pengli.nlp.conference.cikm2015.generation;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
 
-import edu.pengli.nlp.conference.acl2015.types.Argument;
-import edu.pengli.nlp.conference.acl2015.types.Pattern;
-import edu.pengli.nlp.conference.acl2015.types.Predicate;
+import edu.pengli.nlp.conference.cikm2015.types.Argument;
+import edu.pengli.nlp.conference.cikm2015.types.Pattern;
+import edu.pengli.nlp.conference.cikm2015.types.Predicate;
 import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;

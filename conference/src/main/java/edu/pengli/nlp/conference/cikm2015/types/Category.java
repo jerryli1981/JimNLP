@@ -1,4 +1,4 @@
-package edu.pengli.nlp.conference.acl2015.types;
+package edu.pengli.nlp.conference.cikm2015.types;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

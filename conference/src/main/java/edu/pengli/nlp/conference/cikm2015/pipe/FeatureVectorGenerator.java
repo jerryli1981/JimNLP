@@ -1,4 +1,4 @@
-package edu.pengli.nlp.conference.acl2015.pipe;
+package edu.pengli.nlp.conference.cikm2015.pipe;
 
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
@@ -27,9 +27,9 @@ import com.jmatio.types.MLDouble;
 import com.jmatio.types.MLChar;
 import com.jmatio.types.MLCell;
 
-import edu.pengli.nlp.conference.acl2015.types.Category;
-import edu.pengli.nlp.conference.acl2015.types.Pattern;
-import edu.pengli.nlp.conference.acl2015.types.Tuple;
+import edu.pengli.nlp.conference.cikm2015.types.Category;
+import edu.pengli.nlp.conference.cikm2015.types.Pattern;
+import edu.pengli.nlp.conference.cikm2015.types.Tuple;
 import edu.pengli.nlp.platform.pipe.Pipe;
 import edu.pengli.nlp.platform.types.Alphabet;
 import edu.pengli.nlp.platform.types.FeatureVector;

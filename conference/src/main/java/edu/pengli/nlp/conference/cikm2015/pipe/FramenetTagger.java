@@ -1,4 +1,4 @@
-package edu.pengli.nlp.conference.acl2015.pipe;
+package edu.pengli.nlp.conference.cikm2015.pipe;
 
 import java.io.File;
 import java.io.IOException;
@@ -18,9 +18,9 @@ import edu.knowitall.tool.parse.graph.DependencyNode;
 import edu.knowitall.tool.postag.ClearPostagger;
 import edu.knowitall.tool.postag.Postagger;
 import edu.knowitall.tool.tokenize.ClearTokenizer;
-import edu.pengli.nlp.conference.acl2015.types.Argument;
-import edu.pengli.nlp.conference.acl2015.types.Predicate;
-import edu.pengli.nlp.conference.acl2015.types.Tuple;
+import edu.pengli.nlp.conference.cikm2015.types.Argument;
+import edu.pengli.nlp.conference.cikm2015.types.Predicate;
+import edu.pengli.nlp.conference.cikm2015.types.Tuple;
 import edu.stanford.nlp.ling.IndexedWord;
 
 

@@ -1,4 +1,4 @@
-package edu.pengli.nlp.conference.acl2015.pipe;
+package edu.pengli.nlp.conference.cikm2015.pipe;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
